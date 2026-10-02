@@ -2385,3 +2385,58 @@ footer{
     min-height:440px;
   }
 }
+
+
+/* =========================================================
+   COMPACT MODAL TOP
+   Reduce the preview/title/description area so comments
+   appear higher when a card is opened.
+========================================================= */
+
+.modal .preview{
+  min-height:160px;
+  padding:18px 30px 12px;
+}
+
+.modal .preview h2{
+  max-width:900px;
+  margin:8px auto 16px;
+  font-size:clamp(34px,3.6vw,48px);
+  line-height:1.02;
+  letter-spacing:-.045em;
+}
+
+.modal .preview p{
+  max-width:900px;
+  margin:0 auto;
+  font-size:13px;
+  line-height:1.5;
+}
+
+.modal .desc{
+  max-height:125px;
+  padding:0 30px 12px;
+}
+
+.modal .desc p{
+  margin-top:7px;
+  font-size:12px;
+  line-height:1.5;
+}
+
+@media(max-width:850px){
+  .modal .preview{
+    min-height:135px;
+    padding:16px 22px 10px;
+  }
+
+  .modal .preview h2{
+    font-size:clamp(28px,6vw,40px);
+  }
+
+  .modal .desc{
+    max-height:105px;
+    padding-left:22px;
+    padding-right:22px;
+  }
+}
