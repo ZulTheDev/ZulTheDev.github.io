@@ -2609,3 +2609,118 @@ footer{
     padding:13px 22px 20px;
   }
 }
+
+
+/* =========================================================
+   THREADED ANONYMOUS COMMENTS
+========================================================= */
+
+.replying-to{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin:-2px 0 8px;
+  padding:7px 9px;
+  border:1px solid var(--l);
+  border-radius:9px;
+  color:var(--m);
+  font:10px "Courier New",monospace;
+}
+
+.replying-to strong{
+  color:var(--p);
+}
+
+.replying-to button{
+  margin-left:auto;
+  border:0;
+  background:none;
+  color:var(--m);
+  cursor:pointer;
+  font:700 9px "Courier New",monospace;
+  text-transform:uppercase;
+}
+
+.anonymous-comment-controls{
+  display:flex;
+  gap:9px;
+  margin-top:8px;
+}
+
+.anonymous-comment-controls button{
+  border:0;
+  padding:0;
+  background:none;
+  color:#9c8ea2;
+  cursor:pointer;
+  font:700 9px "Courier New",monospace;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+
+.anonymous-comment-controls button:hover{
+  color:var(--p);
+}
+
+.anonymous-comment-children{
+  margin:9px 0 0 14px;
+  padding-left:10px;
+  border-left:1px solid rgba(242,168,212,.18);
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+}
+
+.anonymous-comment-reply{
+  background:rgba(255,255,255,.012);
+}
+
+.anonymous-edit-form{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+}
+
+.anonymous-edit-form textarea{
+  width:100%;
+  min-height:58px;
+  box-sizing:border-box;
+  border:1px solid var(--l);
+  border-radius:9px;
+  background:rgba(255,255,255,.025);
+  color:var(--t);
+  padding:8px 10px;
+  font:inherit;
+  resize:vertical;
+  outline:none;
+}
+
+.anonymous-edit-form textarea:focus{
+  border-color:var(--p);
+  box-shadow:0 0 0 2px rgba(242,168,212,.08);
+}
+
+.anonymous-edit-form .anonymous-comment-actions{
+  justify-content:flex-start;
+}
+
+.anonymous-edit-form .anonymous-comment-actions button:last-child{
+  border:1px solid var(--l);
+  color:var(--m);
+  background:transparent;
+}
+
+.anonymous-comment-reply .anonymous-comment-children{
+  margin-left:10px;
+}
+
+@media(max-width:600px){
+  .anonymous-comment-children{
+    margin-left:8px;
+    padding-left:8px;
+  }
+
+  .anonymous-comment-controls{
+    gap:7px;
+  }
+}
