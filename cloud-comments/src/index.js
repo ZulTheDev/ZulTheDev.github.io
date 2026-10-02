@@ -142,7 +142,7 @@ function publicComment(item, ownerId) {
   };
 }
 
-async function readTermComments(env, term, ownerId) {
+async function readRawTermComments(env, term) {
   const ids = await redisCommand(
     env,
     [
@@ -173,44 +173,7 @@ async function readTermComments(env, term, ownerId) {
         ? JSON.parse(entry.result)
         : null
     )
-    .filter(Boolean)
-    .map((item) =>
-      publicComment(item, ownerId)
-    );
-}
-
-async function findParent(env, term, parentId) {
-  const value = await redisCommand(
-    env,
-    [
-      'HGET',
-      COMMENT_HASH,
-      parentId,
-    ]
-  );
-
-  if (!value) {
-    return null;
-  }
-
-  const parent = JSON.parse(value);
-
-  return parent.term === term
-    ? parent
-    : null;
-}
-
-function countSessionReplies(
-  comments,
-  ownerId,
-  sessionId
-) {
-  return comments.filter(
-    (item) =>
-      item.parentId &&
-      item.ownerId === ownerId &&
-      item.authorSessionId === sessionId
-  ).length;
+    .filter(Boolean);
 }
 
 async function saveComment(env, item) {
@@ -299,27 +262,26 @@ async function handle(request, env) {
         );
       }
 
-      const comments =
-        await readTermComments(
+      const rawComments =
+        await readRawTermComments(
           env,
-          term,
-          ownerId
+          term
         );
 
       return json(
         {
-          comments,
+          comments:
+            rawComments.map((item) =>
+              publicComment(
+                item,
+                ownerId
+              )
+            ),
           replyCount:
             validAnonymousId(ownerId) &&
             validAnonymousId(sessionId)
               ? countSessionReplies(
-                  comments.map((item) => ({
-                    ...item,
-                    ownerId:
-                      item.canEdit
-                        ? ownerId
-                        : null,
-                  })),
+                  rawComments,
                   ownerId,
                   sessionId
                 )
@@ -428,10 +390,9 @@ async function handle(request, env) {
       }
 
       const existing =
-        await readTermComments(
+        await readRawTermComments(
           env,
-          term,
-          ownerId
+          term
         );
 
       if (parentId) {
@@ -460,13 +421,7 @@ async function handle(request, env) {
 
         const replies =
           countSessionReplies(
-            existing.map((item) => ({
-              ...item,
-              ownerId:
-                item.canEdit
-                  ? ownerId
-                  : null,
-            })),
+            existing,
             ownerId,
             sessionId
           );
