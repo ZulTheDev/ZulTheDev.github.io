@@ -7,8 +7,8 @@ const COMMENTS_BACKUP_API =
 
 function commentApiCandidates() {
   return [
-    API,
     COMMENTS_BACKUP_API,
+    API,
   ].filter(
     (value, index, list) =>
       value &&
