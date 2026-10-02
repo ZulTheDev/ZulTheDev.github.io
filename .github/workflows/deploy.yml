@@ -1,0 +1,99 @@
+﻿name: Deploy Portfolio
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and Deploy Client
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm install
+
+      - name: Verify source commit
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "SOURCE COMMIT"
+          echo "======================================"
+          git rev-parse HEAD
+
+          echo ""
+          echo "======================================"
+          echo "SOURCE FILES"
+          echo "======================================"
+
+          echo "--- client/src/main.jsx ---"
+          sha256sum client/src/main.jsx
+
+          echo "--- client/src/style.css ---"
+          sha256sum client/src/style.css
+
+          echo "--- client/public/content.json ---"
+          sha256sum client/public/content.json
+
+      - name: Build client
+        working-directory: client
+        env:
+          VITE_API_BASE_URL: https://system32.tail39684d.ts.net:8787
+        run: npm run build
+
+      - name: Verify build output
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "BUILD OUTPUT"
+          echo "======================================"
+
+          test -f client/dist/index.html
+
+          echo ""
+          echo "Dist files:"
+          find client/dist -maxdepth 3 -type f | sort
+
+          echo ""
+          echo "index.html hash:"
+          sha256sum client/dist/index.html
+
+          echo ""
+          echo "BUILD SUCCESSFUL"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload client/dist
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./client/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
