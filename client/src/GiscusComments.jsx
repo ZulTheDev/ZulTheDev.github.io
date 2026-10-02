@@ -2,6 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import Giscus from '@giscus/react';
 
 const API = import.meta.env.VITE_API_BASE_URL || '';
+const COMMENTS_BACKUP_API =
+  import.meta.env.VITE_COMMENTS_BACKUP_URL || '';
+
+function commentApiCandidates() {
+  return [
+    API,
+    COMMENTS_BACKUP_API,
+  ].filter(
+    (value, index, list) =>
+      value &&
+      list.indexOf(value) === index
+  );
+}
 
 const DEVICE_KEY = 'portfolio-anonymous-device-id';
 const SESSION_KEY = 'portfolio-comment-session-id';
@@ -139,12 +152,19 @@ export default function GiscusComments({ discussionTerm }) {
   async function loadComments() {
     setLoading(true);
 
-    try {
-      if (API) {
+    const candidates =
+      commentApiCandidates();
+
+    for (const base of candidates) {
+      try {
         const response = await fetch(
-          `${API}/api/comments?term=${encodeURIComponent(
+          `${base}/api/comments?term=${encodeURIComponent(
             discussionTerm
-          )}&deviceId=${encodeURIComponent(deviceId)}&sessionId=${encodeURIComponent(sessionId)}`
+          )}&deviceId=${encodeURIComponent(
+            deviceId
+          )}&sessionId=${encodeURIComponent(
+            sessionId
+          )}`
         );
 
         if (response.ok) {
@@ -163,23 +183,27 @@ export default function GiscusComments({ discussionTerm }) {
           setLoading(false);
           return;
         }
+      } catch {
+        // Try the next comment backend.
       }
-    } catch {
-      // Fall back to browser-local comments.
     }
 
     try {
       const saved = JSON.parse(
-        localStorage.getItem(getLocalKey(discussionTerm)) || '[]'
+        localStorage.getItem(
+          getLocalKey(discussionTerm)
+        ) || '[]'
       );
 
-      const localComments = Array.isArray(saved)
-        ? saved.map(normalizeComment)
-        : [];
+      const localComments =
+        Array.isArray(saved)
+          ? saved.map(normalizeComment)
+          : [];
 
       setComments(localComments);
 
       const localState = readLocalState();
+
       setReplyCount(
         Number(
           localState?.[sessionId]?.replies || 0
@@ -237,14 +261,18 @@ export default function GiscusComments({ discussionTerm }) {
 
     setNotice('');
 
-    try {
-      if (API) {
+    const candidates =
+      commentApiCandidates();
+
+    for (const base of candidates) {
+      try {
         const response = await fetch(
-          `${API}/api/comments/${encodeURIComponent(item.id)}`,
+          `${base}/api/comments/${encodeURIComponent(item.id)}`,
           {
             method: 'DELETE',
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type':
+                'application/json',
             },
             body: JSON.stringify({
               deviceId,
@@ -252,70 +280,108 @@ export default function GiscusComments({ discussionTerm }) {
           }
         );
 
-        if (!response.ok) {
-          throw new Error('delete_failed');
+        if (response.ok) {
+          await loadComments();
+          setNotice('Your comment was deleted.');
+          return;
         }
 
-        await loadComments();
-        setNotice('Your comment was deleted.');
-        return;
-      }
+        if (
+          response.status >= 400 &&
+          response.status < 500 &&
+          response.status !== 404
+        ) {
+          const data =
+            await response
+              .json()
+              .catch(() => ({}));
 
+          setNotice(
+            data?.error ||
+              'Unable to delete the comment.'
+          );
+          return;
+        }
+      } catch {
+        // Try the backup backend.
+      }
+    }
+
+    try {
       const saved = JSON.parse(
-        localStorage.getItem(getLocalKey(discussionTerm)) || '[]'
+        localStorage.getItem(
+          getLocalKey(discussionTerm)
+        ) || '[]'
       );
 
-      const next = Array.isArray(saved)
-        ? saved.map((entry) =>
-            entry.id === item.id
-              ? {
-                  ...entry,
-                  deleted: true,
-                  comment: '',
-                  updatedAt: new Date().toISOString(),
-                }
-              : entry
-          )
-        : [];
+      const next =
+        Array.isArray(saved)
+          ? saved.map((entry) =>
+              entry.id === item.id
+                ? {
+                    ...entry,
+                    deleted: true,
+                    comment: '',
+                    updatedAt:
+                      new Date().toISOString(),
+                  }
+                : entry
+            )
+          : [];
 
       localStorage.setItem(
         getLocalKey(discussionTerm),
         JSON.stringify(next)
       );
 
-      setComments(next.map(normalizeComment));
+      setComments(
+        next.map(normalizeComment)
+      );
       setNotice('Your comment was deleted.');
     } catch {
-      setNotice('Unable to delete the comment right now.');
+      setNotice(
+        'Unable to delete the comment right now.'
+      );
     }
   }
 
   async function saveEdit(event) {
     event.preventDefault();
 
-    const cleanComment = editingText.trim();
+    const cleanComment =
+      editingText.trim();
 
     if (!cleanComment) {
-      setNotice('Please write a comment first.');
+      setNotice(
+        'Please write a comment first.'
+      );
       return;
     }
 
     if (cleanComment.length > 2000) {
-      setNotice('Comment must be 2000 characters or less.');
+      setNotice(
+        'Comment must be 2000 characters or less.'
+      );
       return;
     }
 
     setPosting(true);
     setNotice('');
 
+    const candidates =
+      commentApiCandidates();
+
     try {
-      if (API) {
+      for (const base of candidates) {
         const response = await fetch(
-          `${API}/api/comments/${encodeURIComponent(editingId)}`,
+          `${base}/api/comments/${encodeURIComponent(
+            editingId
+          )}`,
           {
             method: 'PUT',
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type':
+                'application/json',
             },
             body: JSON.stringify({
               deviceId,
@@ -324,53 +390,47 @@ export default function GiscusComments({ discussionTerm }) {
           }
         );
 
-        const data = await response.json().catch(() => ({}));
+        const data =
+          await response
+            .json()
+            .catch(() => ({}));
 
-        if (!response.ok) {
-          throw new Error(data?.error || 'edit_failed');
+        if (response.ok) {
+          setComments(
+            (current) =>
+              current.map((item) =>
+                item.id === editingId
+                  ? normalizeComment(
+                      data.comment
+                    )
+                  : item
+              )
+          );
+
+          setEditingId(null);
+          setEditingText('');
+          setNotice('Comment updated.');
+          return;
         }
 
-        setComments((current) =>
-          current.map((item) =>
-            item.id === editingId
-              ? normalizeComment(data.comment)
-              : item
-          )
-        );
-
-        setEditingId(null);
-        setEditingText('');
-        setNotice('Comment updated.');
-        return;
+        if (
+          response.status >= 400 &&
+          response.status < 500 &&
+          response.status !== 404
+        ) {
+          setNotice(
+            data?.error ||
+              'Unable to edit the comment.'
+          );
+          return;
+        }
       }
 
-      const saved = JSON.parse(
-        localStorage.getItem(getLocalKey(discussionTerm)) || '[]'
-      );
-
-      const next = Array.isArray(saved)
-        ? saved.map((entry) =>
-            entry.id === editingId
-              ? {
-                  ...entry,
-                  comment: cleanComment,
-                  updatedAt: new Date().toISOString(),
-                }
-              : entry
-          )
-        : [];
-
-      localStorage.setItem(
-        getLocalKey(discussionTerm),
-        JSON.stringify(next)
-      );
-
-      setComments(next.map(normalizeComment));
-      setEditingId(null);
-      setEditingText('');
-      setNotice('Comment updated.');
+      throw new Error('edit_failed');
     } catch {
-      setNotice('Unable to edit the comment right now.');
+      setNotice(
+        'Unable to edit the comment right now.'
+      );
     } finally {
       setPosting(false);
     }
@@ -379,30 +439,42 @@ export default function GiscusComments({ discussionTerm }) {
   async function submitComment(event) {
     event.preventDefault();
 
-    const cleanName = name.trim();
-    const cleanComment = comment.trim();
+    const cleanName =
+      name.trim();
+
+    const cleanComment =
+      comment.trim();
 
     if (!cleanName) {
-      setNotice('Please enter your name or nickname first.');
+      setNotice(
+        'Please enter your name or nickname first.'
+      );
       return;
     }
 
     if (!cleanComment) {
-      setNotice('Please write a comment first.');
+      setNotice(
+        'Please write a comment first.'
+      );
       return;
     }
 
     if (cleanName.length > 50) {
-      setNotice('Name must be 50 characters or less.');
+      setNotice(
+        'Name must be 50 characters or less.'
+      );
       return;
     }
 
     if (cleanComment.length > 2000) {
-      setNotice('Comment must be 2000 characters or less.');
+      setNotice(
+        'Comment must be 2000 characters or less.'
+      );
       return;
     }
 
-    const isReply = Boolean(replyTo);
+    const isReply =
+      Boolean(replyTo);
 
     if (
       isReply &&
@@ -421,38 +493,54 @@ export default function GiscusComments({ discussionTerm }) {
       term: discussionTerm,
       name: cleanName,
       comment: cleanComment,
-      parentId: replyTo?.id || null,
+      parentId:
+        replyTo?.id || null,
       deviceId,
       sessionId,
     };
 
     try {
-      if (API) {
+      const candidates =
+        commentApiCandidates();
+
+      for (const base of candidates) {
         const response = await fetch(
-          `${API}/api/comments`,
+          `${base}/api/comments`,
           {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type':
+                'application/json',
             },
-            body: JSON.stringify(payload),
+            body:
+              JSON.stringify(payload),
           }
         );
 
-        const data = await response.json().catch(() => ({}));
+        const data =
+          await response
+            .json()
+            .catch(() => ({}));
 
         if (response.ok) {
-          setComments((current) => [
-            normalizeComment(data.comment),
-            ...current,
-          ]);
+          setComments(
+            (current) => [
+              normalizeComment(
+                data.comment
+              ),
+              ...current,
+            ]
+          );
 
           setName(cleanName);
           setComment('');
           setReplyTo(null);
 
           if (isReply) {
-            setReplyCount((current) => current + 1);
+            setReplyCount(
+              (current) =>
+                current + 1
+            );
           }
 
           setNotice(
@@ -472,85 +560,54 @@ export default function GiscusComments({ discussionTerm }) {
           return;
         }
 
-        throw new Error(
-          data?.error || 'comment_post_failed'
-        );
+        if (
+          response.status >= 400 &&
+          response.status < 500 &&
+          response.status !== 404
+        ) {
+          setNotice(
+            data?.error ||
+              'Unable to post the comment.'
+          );
+          return;
+        }
       }
 
-      const nextComment = {
-        id: createId(),
-        term: discussionTerm,
-        name: cleanName,
-        comment: cleanComment,
-        createdAt: new Date().toISOString(),
-        parentId: replyTo?.id || null,
-        ownerId: deviceId,
-        sessionId,
-        canEdit: true,
-      };
-
-      const key = getLocalKey(discussionTerm);
-      const saved = JSON.parse(
-        localStorage.getItem(key) || '[]'
-      );
-
-      const next = [
-        nextComment,
-        ...(Array.isArray(saved) ? saved : []),
-      ];
-
-      localStorage.setItem(
-        key,
-        JSON.stringify(next)
-      );
-
-      if (isReply) {
-        const state = readLocalState();
-
-        state[sessionId] = {
-          ...(state[sessionId] || {}),
-          replies:
-            Number(state?.[sessionId]?.replies || 0) + 1,
-        };
-
-        writeLocalState(state);
-
-        setReplyCount((current) => current + 1);
-      }
-
-      setComments(next.map(normalizeComment));
-      setName(cleanName);
-      setComment('');
-      setReplyTo(null);
-      setNotice(
-        isReply
-          ? 'Reply saved on this device.'
-          : 'Saved on this device.'
+      throw new Error(
+        'comment_api_unavailable'
       );
     } catch {
-      // Local fallback so comments still work if the API is unavailable.
       try {
         const nextComment = {
           id: createId(),
           term: discussionTerm,
           name: cleanName,
           comment: cleanComment,
-          createdAt: new Date().toISOString(),
-          parentId: replyTo?.id || null,
+          createdAt:
+            new Date().toISOString(),
+          parentId:
+            replyTo?.id || null,
           ownerId: deviceId,
           sessionId,
           canEdit: true,
           localOnly: true,
         };
 
-        const key = getLocalKey(discussionTerm);
+        const key =
+          getLocalKey(
+            discussionTerm
+          );
+
         const saved = JSON.parse(
-          localStorage.getItem(key) || '[]'
+          localStorage.getItem(key) ||
+            '[]'
         );
 
         const next = [
           nextComment,
-          ...(Array.isArray(saved) ? saved : []),
+          ...(Array.isArray(saved)
+            ? saved
+            : []),
         ];
 
         localStorage.setItem(
@@ -559,29 +616,43 @@ export default function GiscusComments({ discussionTerm }) {
         );
 
         if (isReply) {
-          const state = readLocalState();
+          const state =
+            readLocalState();
 
           state[sessionId] = {
             ...(state[sessionId] || {}),
             replies:
-              Number(state?.[sessionId]?.replies || 0) + 1,
+              Number(
+                state?.[sessionId]
+                  ?.replies || 0
+              ) + 1,
           };
 
-          writeLocalState(state);
-          setReplyCount((current) => current + 1);
+          writeLocalState(
+            state
+          );
+
+          setReplyCount(
+            (current) =>
+              current + 1
+          );
         }
 
-        setComments(next.map(normalizeComment));
+        setComments(
+          next.map(normalizeComment)
+        );
+
         setName(cleanName);
         setComment('');
         setReplyTo(null);
+
         setNotice(
-          isReply
-            ? 'Saved on this device. Server comments are unavailable.'
-            : 'Saved on this device. Server comments are unavailable.'
+          'Saved on this device. Cloud and local comment servers are unavailable.'
         );
       } catch {
-        setNotice('Unable to post the comment right now.');
+        setNotice(
+          'Unable to post the comment right now.'
+        );
       }
     } finally {
       setPosting(false);
