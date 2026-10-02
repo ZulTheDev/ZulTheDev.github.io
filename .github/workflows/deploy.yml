@@ -68,7 +68,7 @@ jobs:
       - name: Build client
         working-directory: client
         env:
-          VITE_API_BASE_URL: https://system32.tail39684d.ts.net:8787
+          VITE_API_BASE_URL: https://system32.tail39684d.ts.net
         run: npm run build
 
       - name: Verify build output
