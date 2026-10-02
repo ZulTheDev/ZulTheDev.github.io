@@ -132,49 +132,9 @@ export default function GiscusComments({ discussionTerm }) {
   const [posting, setPosting] = useState(false);
   const [notice, setNotice] = useState('');
   const [replyCount, setReplyCount] = useState(0);
-  const [accessReady, setAccessReady] = useState(false);
-
   useEffect(() => {
     saveName(name.trim());
   }, [name]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function trackAccess() {
-      if (!API) {
-        if (mounted) {
-          setAccessReady(true);
-        }
-        return;
-      }
-
-      try {
-        await fetch(`${API}/api/access/track`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            deviceId,
-            sessionId,
-          }),
-        });
-      } catch {
-        // Access tracking is best-effort and never blocks comments.
-      } finally {
-        if (mounted) {
-          setAccessReady(true);
-        }
-      }
-    }
-
-    trackAccess();
-
-    return () => {
-      mounted = false;
-    };
-  }, [deviceId, sessionId]);
 
   async function loadComments() {
     setLoading(true);
@@ -184,7 +144,7 @@ export default function GiscusComments({ discussionTerm }) {
         const response = await fetch(
           `${API}/api/comments?term=${encodeURIComponent(
             discussionTerm
-          )}&deviceId=${encodeURIComponent(deviceId)}`
+          )}&deviceId=${encodeURIComponent(deviceId)}&sessionId=${encodeURIComponent(sessionId)}`
         );
 
         if (response.ok) {
@@ -235,7 +195,7 @@ export default function GiscusComments({ discussionTerm }) {
 
   useEffect(() => {
     loadComments();
-  }, [discussionTerm, deviceId, sessionId, accessReady]);
+  }, [discussionTerm, deviceId, sessionId]);
 
   function resetComposer() {
     setReplyTo(null);
