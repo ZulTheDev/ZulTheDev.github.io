@@ -3,6 +3,16 @@ dist/
 .env
 .env.*
 *.log
-admin/*
-server/*
-scripts/*
+
+# Local/generated server data
+server/node_modules/
+server/.env
+server/.env.*
+server/comments.json
+
+# Local admin dependencies/build output
+admin/node_modules/
+admin/dist/
+
+# Local development scripts
+scripts/
