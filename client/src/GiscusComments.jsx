@@ -1,19 +1,180 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Giscus from '@giscus/react';
 
 const API = import.meta.env.VITE_API_BASE_URL || '';
+
+const DEVICE_KEY = 'portfolio-anonymous-device-id';
+const SESSION_KEY = 'portfolio-comment-session-id';
+const NAME_KEY = 'portfolio-anonymous-display-name';
+const MAX_SESSION_REPLIES = 10;
+
+function createId() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `anon-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getPersistentId() {
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+
+    if (!id) {
+      id = createId();
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+
+    return id;
+  } catch {
+    return createId();
+  }
+}
+
+function getSessionId() {
+  try {
+    let id = sessionStorage.getItem(SESSION_KEY);
+
+    if (!id) {
+      id = createId();
+      sessionStorage.setItem(SESSION_KEY, id);
+    }
+
+    return id;
+  } catch {
+    return createId();
+  }
+}
+
+function getSavedName() {
+  try {
+    return localStorage.getItem(NAME_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveName(value) {
+  try {
+    if (value) {
+      localStorage.setItem(NAME_KEY, value);
+    } else {
+      localStorage.removeItem(NAME_KEY);
+    }
+  } catch {
+    // Storage can be disabled in some browsers.
+  }
+}
 
 function getLocalKey(term) {
   return `portfolio-anonymous-comments:${term}`;
 }
 
+function getLocalStateKey() {
+  return 'portfolio-anonymous-comment-state';
+}
+
+function readLocalState() {
+  try {
+    return JSON.parse(
+      localStorage.getItem(getLocalStateKey()) || '{}'
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalState(state) {
+  try {
+    localStorage.setItem(
+      getLocalStateKey(),
+      JSON.stringify(state)
+    );
+  } catch {
+    // Ignore unavailable storage.
+  }
+}
+
+function formatDate(value) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleString('en-SG');
+}
+
+function normalizeComment(comment) {
+  return {
+    ...comment,
+    parentId: comment.parentId || null,
+    canEdit: Boolean(comment.canEdit),
+    deleted: Boolean(comment.deleted),
+  };
+}
+
 export default function GiscusComments({ discussionTerm }) {
+  const deviceId = useMemo(() => getPersistentId(), []);
+  const sessionId = useMemo(() => getSessionId(), []);
+
   const [comments, setComments] = useState([]);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(() => getSavedName());
   const [comment, setComment] = useState('');
+  const [replyTo, setReplyTo] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState('');
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [notice, setNotice] = useState('');
+  const [replyCount, setReplyCount] = useState(0);
+  const [accessReady, setAccessReady] = useState(false);
+
+  useEffect(() => {
+    saveName(name.trim());
+  }, [name]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function trackAccess() {
+      if (!API) {
+        if (mounted) {
+          setAccessReady(true);
+        }
+        return;
+      }
+
+      try {
+        await fetch(`${API}/api/access/track`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            deviceId,
+            sessionId,
+          }),
+        });
+      } catch {
+        // Access tracking is best-effort and never blocks comments.
+      } finally {
+        if (mounted) {
+          setAccessReady(true);
+        }
+      }
+    }
+
+    trackAccess();
+
+    return () => {
+      mounted = false;
+    };
+  }, [deviceId, sessionId]);
 
   async function loadComments() {
     setLoading(true);
@@ -21,18 +182,30 @@ export default function GiscusComments({ discussionTerm }) {
     try {
       if (API) {
         const response = await fetch(
-          `${API}/api/comments?term=${encodeURIComponent(discussionTerm)}`
+          `${API}/api/comments?term=${encodeURIComponent(
+            discussionTerm
+          )}&deviceId=${encodeURIComponent(deviceId)}`
         );
 
         if (response.ok) {
           const data = await response.json();
-          setComments(Array.isArray(data.comments) ? data.comments : []);
+
+          setComments(
+            Array.isArray(data.comments)
+              ? data.comments.map(normalizeComment)
+              : []
+          );
+
+          setReplyCount(
+            Number(data.replyCount || 0)
+          );
+
           setLoading(false);
           return;
         }
       }
     } catch {
-      // Fall back to comments stored in this browser.
+      // Fall back to browser-local comments.
     }
 
     try {
@@ -40,9 +213,21 @@ export default function GiscusComments({ discussionTerm }) {
         localStorage.getItem(getLocalKey(discussionTerm)) || '[]'
       );
 
-      setComments(Array.isArray(saved) ? saved : []);
+      const localComments = Array.isArray(saved)
+        ? saved.map(normalizeComment)
+        : [];
+
+      setComments(localComments);
+
+      const localState = readLocalState();
+      setReplyCount(
+        Number(
+          localState?.[sessionId]?.replies || 0
+        )
+      );
     } catch {
       setComments([]);
+      setReplyCount(0);
     }
 
     setLoading(false);
@@ -50,9 +235,188 @@ export default function GiscusComments({ discussionTerm }) {
 
   useEffect(() => {
     loadComments();
-  }, [discussionTerm]);
+  }, [discussionTerm, deviceId, sessionId, accessReady]);
 
-  async function submitAnonymousComment(event) {
+  function resetComposer() {
+    setReplyTo(null);
+    setComment('');
+    setNotice('');
+  }
+
+  function startReply(item) {
+    setEditingId(null);
+    setEditingText('');
+    setReplyTo(item);
+    setComment('');
+    setNotice('');
+  }
+
+  function startEdit(item) {
+    if (!item.canEdit || item.deleted) {
+      return;
+    }
+
+    setReplyTo(null);
+    setEditingId(item.id);
+    setEditingText(item.comment || '');
+    setNotice('');
+  }
+
+  async function removeComment(item) {
+    if (!item.canEdit) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Delete your comment? Your replies remain visible.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setNotice('');
+
+    try {
+      if (API) {
+        const response = await fetch(
+          `${API}/api/comments/${encodeURIComponent(item.id)}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              deviceId,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('delete_failed');
+        }
+
+        await loadComments();
+        setNotice('Your comment was deleted.');
+        return;
+      }
+
+      const saved = JSON.parse(
+        localStorage.getItem(getLocalKey(discussionTerm)) || '[]'
+      );
+
+      const next = Array.isArray(saved)
+        ? saved.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  deleted: true,
+                  comment: '',
+                  updatedAt: new Date().toISOString(),
+                }
+              : entry
+          )
+        : [];
+
+      localStorage.setItem(
+        getLocalKey(discussionTerm),
+        JSON.stringify(next)
+      );
+
+      setComments(next.map(normalizeComment));
+      setNotice('Your comment was deleted.');
+    } catch {
+      setNotice('Unable to delete the comment right now.');
+    }
+  }
+
+  async function saveEdit(event) {
+    event.preventDefault();
+
+    const cleanComment = editingText.trim();
+
+    if (!cleanComment) {
+      setNotice('Please write a comment first.');
+      return;
+    }
+
+    if (cleanComment.length > 2000) {
+      setNotice('Comment must be 2000 characters or less.');
+      return;
+    }
+
+    setPosting(true);
+    setNotice('');
+
+    try {
+      if (API) {
+        const response = await fetch(
+          `${API}/api/comments/${encodeURIComponent(editingId)}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              deviceId,
+              comment: cleanComment,
+            }),
+          }
+        );
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data?.error || 'edit_failed');
+        }
+
+        setComments((current) =>
+          current.map((item) =>
+            item.id === editingId
+              ? normalizeComment(data.comment)
+              : item
+          )
+        );
+
+        setEditingId(null);
+        setEditingText('');
+        setNotice('Comment updated.');
+        return;
+      }
+
+      const saved = JSON.parse(
+        localStorage.getItem(getLocalKey(discussionTerm)) || '[]'
+      );
+
+      const next = Array.isArray(saved)
+        ? saved.map((entry) =>
+            entry.id === editingId
+              ? {
+                  ...entry,
+                  comment: cleanComment,
+                  updatedAt: new Date().toISOString(),
+                }
+              : entry
+          )
+        : [];
+
+      localStorage.setItem(
+        getLocalKey(discussionTerm),
+        JSON.stringify(next)
+      );
+
+      setComments(next.map(normalizeComment));
+      setEditingId(null);
+      setEditingText('');
+      setNotice('Comment updated.');
+    } catch {
+      setNotice('Unable to edit the comment right now.');
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function submitComment(event) {
     event.preventDefault();
 
     const cleanName = name.trim();
@@ -78,6 +442,18 @@ export default function GiscusComments({ discussionTerm }) {
       return;
     }
 
+    const isReply = Boolean(replyTo);
+
+    if (
+      isReply &&
+      replyCount >= MAX_SESSION_REPLIES
+    ) {
+      setNotice(
+        `Reply limit reached for this session (${MAX_SESSION_REPLIES}).`
+      );
+      return;
+    }
+
     setPosting(true);
     setNotice('');
 
@@ -85,57 +461,165 @@ export default function GiscusComments({ discussionTerm }) {
       term: discussionTerm,
       name: cleanName,
       comment: cleanComment,
+      parentId: replyTo?.id || null,
+      deviceId,
+      sessionId,
     };
 
     try {
       if (API) {
-        const response = await fetch(`${API}/api/comments`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
+        const response = await fetch(
+          `${API}/api/comments`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          }
+        );
 
         const data = await response.json().catch(() => ({}));
 
         if (response.ok) {
           setComments((current) => [
-            data.comment,
+            normalizeComment(data.comment),
             ...current,
           ]);
-          setName('');
+
+          setName(cleanName);
           setComment('');
-          setNotice('Posted anonymously.');
-          setPosting(false);
+          setReplyTo(null);
+
+          if (isReply) {
+            setReplyCount((current) => current + 1);
+          }
+
+          setNotice(
+            isReply
+              ? 'Reply posted anonymously.'
+              : 'Posted anonymously.'
+          );
+
           return;
         }
 
-        throw new Error(data?.error || 'comment_post_failed');
+        if (response.status === 429) {
+          setNotice(
+            data?.message ||
+              `Reply limit reached for this session (${MAX_SESSION_REPLIES}).`
+          );
+          return;
+        }
+
+        throw new Error(
+          data?.error || 'comment_post_failed'
+        );
       }
 
-      throw new Error('comment_api_unavailable');
+      const nextComment = {
+        id: createId(),
+        term: discussionTerm,
+        name: cleanName,
+        comment: cleanComment,
+        createdAt: new Date().toISOString(),
+        parentId: replyTo?.id || null,
+        ownerId: deviceId,
+        sessionId,
+        canEdit: true,
+      };
+
+      const key = getLocalKey(discussionTerm);
+      const saved = JSON.parse(
+        localStorage.getItem(key) || '[]'
+      );
+
+      const next = [
+        nextComment,
+        ...(Array.isArray(saved) ? saved : []),
+      ];
+
+      localStorage.setItem(
+        key,
+        JSON.stringify(next)
+      );
+
+      if (isReply) {
+        const state = readLocalState();
+
+        state[sessionId] = {
+          ...(state[sessionId] || {}),
+          replies:
+            Number(state?.[sessionId]?.replies || 0) + 1,
+        };
+
+        writeLocalState(state);
+
+        setReplyCount((current) => current + 1);
+      }
+
+      setComments(next.map(normalizeComment));
+      setName(cleanName);
+      setComment('');
+      setReplyTo(null);
+      setNotice(
+        isReply
+          ? 'Reply saved on this device.'
+          : 'Saved on this device.'
+      );
     } catch {
-      // Local fallback so the form still works if the API is unavailable.
+      // Local fallback so comments still work if the API is unavailable.
       try {
         const nextComment = {
-          id: `local-${Date.now()}`,
+          id: createId(),
           term: discussionTerm,
           name: cleanName,
           comment: cleanComment,
           createdAt: new Date().toISOString(),
+          parentId: replyTo?.id || null,
+          ownerId: deviceId,
+          sessionId,
+          canEdit: true,
           localOnly: true,
         };
 
         const key = getLocalKey(discussionTerm);
-        const saved = JSON.parse(localStorage.getItem(key) || '[]');
-        const next = [nextComment, ...(Array.isArray(saved) ? saved : [])];
+        const saved = JSON.parse(
+          localStorage.getItem(key) || '[]'
+        );
 
-        localStorage.setItem(key, JSON.stringify(next));
-        setComments(next);
-        setName('');
+        const next = [
+          nextComment,
+          ...(Array.isArray(saved) ? saved : []),
+        ];
+
+        localStorage.setItem(
+          key,
+          JSON.stringify(next)
+        );
+
+        if (isReply) {
+          const state = readLocalState();
+
+          state[sessionId] = {
+            ...(state[sessionId] || {}),
+            replies:
+              Number(state?.[sessionId]?.replies || 0) + 1,
+          };
+
+          writeLocalState(state);
+          setReplyCount((current) => current + 1);
+        }
+
+        setComments(next.map(normalizeComment));
+        setName(cleanName);
         setComment('');
-        setNotice('Saved on this device. Server comments are unavailable.');
+        setReplyTo(null);
+        setNotice(
+          isReply
+            ? 'Saved on this device. Server comments are unavailable.'
+            : 'Saved on this device. Server comments are unavailable.'
+        );
       } catch {
         setNotice('Unable to post the comment right now.');
       }
@@ -143,6 +627,136 @@ export default function GiscusComments({ discussionTerm }) {
       setPosting(false);
     }
   }
+
+  const repliesByParent = useMemo(() => {
+    const map = new Map();
+
+    for (const item of comments) {
+      if (!item.parentId) {
+        continue;
+      }
+
+      if (!map.has(item.parentId)) {
+        map.set(item.parentId, []);
+      }
+
+      map.get(item.parentId).push(item);
+    }
+
+    return map;
+  }, [comments]);
+
+  function renderComment(item, depth = 0) {
+    const children = repliesByParent.get(item.id) || [];
+
+    return (
+      <article
+        className={[
+          'anonymous-comment',
+          depth > 0 ? 'anonymous-comment-reply' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        key={item.id}
+      >
+        <header>
+          <strong>
+            {item.deleted ? 'Anonymous' : item.name}
+          </strong>
+
+          <time>
+            {formatDate(item.updatedAt || item.createdAt)}
+            {item.updatedAt && !item.deleted ? ' · edited' : ''}
+          </time>
+        </header>
+
+        {editingId === item.id ? (
+          <form
+            className="anonymous-edit-form"
+            onSubmit={saveEdit}
+          >
+            <textarea
+              value={editingText}
+              onChange={(event) =>
+                setEditingText(event.target.value)
+              }
+              maxLength={2000}
+              rows={3}
+              autoFocus
+            />
+
+            <div className="anonymous-comment-actions">
+              <button
+                type="submit"
+                disabled={posting}
+              >
+                {posting ? 'Saving…' : 'Save edit'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingId(null);
+                  setEditingText('');
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p>
+            {item.deleted
+              ? 'This comment was deleted by its author.'
+              : item.comment}
+          </p>
+        )}
+
+        {!item.deleted && (
+          <div className="anonymous-comment-controls">
+            <button
+              type="button"
+              onClick={() => startReply(item)}
+            >
+              Reply
+            </button>
+
+            {item.canEdit && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => startEdit(item)}
+                >
+                  Edit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => removeComment(item)}
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {children.length > 0 && (
+          <div className="anonymous-comment-children">
+            {children.map((child) =>
+              renderComment(
+                child,
+                Math.min(depth + 1, 6)
+              )
+            )}
+          </div>
+        )}
+      </article>
+    );
+  }
+
+  const canReply =
+    replyCount < MAX_SESSION_REPLIES;
 
   return (
     <section className="portfolio-comments">
@@ -156,21 +770,37 @@ export default function GiscusComments({ discussionTerm }) {
         </h3>
 
         <p>
-          Anonymous visitors can enter a name or nickname and
-          leave a comment without signing in to GitHub.
+          Anonymous comments use a private browser ID.
+          Your name is remembered on this browser.
+          No IP address or device fingerprint is required.
         </p>
       </div>
 
+      {replyTo && (
+        <div className="replying-to">
+          Replying to <strong>{replyTo.name}</strong>
+          <button
+            type="button"
+            onClick={resetComposer}
+            aria-label="Cancel reply"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       <form
         className="anonymous-comment-form"
-        onSubmit={submitAnonymousComment}
+        onSubmit={submitComment}
       >
         <div className="anonymous-comment-row">
           <label>
             <span>Name / nickname</span>
             <input
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) =>
+                setName(event.target.value)
+              }
               maxLength={50}
               placeholder="Enter your name"
               autoComplete="nickname"
@@ -183,26 +813,44 @@ export default function GiscusComments({ discussionTerm }) {
         </div>
 
         <label>
-          <span>Comment</span>
+          <span>
+            {replyTo ? 'Reply' : 'Comment'}
+          </span>
           <textarea
             value={comment}
-            onChange={(event) => setComment(event.target.value)}
+            onChange={(event) =>
+              setComment(event.target.value)
+            }
             maxLength={2000}
             rows={4}
-            placeholder="Write something about this item..."
+            placeholder={
+              replyTo
+                ? 'Write a reply...'
+                : 'Write something about this item...'
+            }
           />
         </label>
 
         <div className="anonymous-comment-actions">
           <button
             type="submit"
-            disabled={posting}
+            disabled={posting || (replyTo && !canReply)}
           >
-            {posting ? 'Posting…' : 'Post anonymously'}
+            {posting
+              ? 'Posting…'
+              : replyTo
+                ? 'Post reply'
+                : 'Post anonymously'}
           </button>
 
           <small>
             {comment.length}/2000
+            {replyTo
+              ? ` · ${Math.max(
+                  0,
+                  MAX_SESSION_REPLIES - replyCount
+                )} replies left`
+              : ''}
           </small>
         </div>
 
@@ -228,29 +876,9 @@ export default function GiscusComments({ discussionTerm }) {
             No anonymous comments yet. Be the first.
           </div>
         ) : (
-          comments.map((item) => (
-            <article
-              className="anonymous-comment"
-              key={item.id}
-            >
-              <header>
-                <strong>{item.name}</strong>
-                <time>
-                  {item.createdAt
-                    ? new Date(item.createdAt).toLocaleString('en-SG')
-                    : ''}
-                </time>
-              </header>
-
-              <p>{item.comment}</p>
-
-              {item.localOnly && (
-                <small className="anonymous-local-note">
-                  saved on this device
-                </small>
-              )}
-            </article>
-          ))
+          comments
+            .filter((item) => !item.parentId)
+            .map((item) => renderComment(item))
         )}
       </div>
 
