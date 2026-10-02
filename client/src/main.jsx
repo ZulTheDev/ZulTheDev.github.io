@@ -1083,12 +1083,40 @@ function App() {
                     description: 'Content, music, leadership and learning.',
                   },
                 ]
-            ).map((item) => (
-              <article key={item.id || item.title}>
+            ).map((item, index) => (
+              <button
+                className="tile-button"
+                key={item.id || item.title || index}
+                onClick={() =>
+                  setSelected([
+                    'Recent Activity',
+                    {
+                      ...item,
+                      id:
+                        item.id ||
+                        `recent-${index}`,
+                      title:
+                        item.title ||
+                        'Recent activity',
+                      description:
+                        item.description ||
+                        item.summary ||
+                        '',
+                    },
+                  ])
+                }
+              >
                 <b>{item.title}</b>
                 <br />
-                <small>{item.description || item.summary || ''}</small>
-              </article>
+                <small>
+                  {item.description ||
+                    item.summary ||
+                    ''}
+                </small>
+                <span className="tile-button-open">
+                  Open <ArrowUpRight size={14} />
+                </span>
+              </button>
             ))}
           </div>
         </section>
@@ -1260,9 +1288,31 @@ function App() {
 
           <div className="tiles">
             {content.education.map(
-              (item) => (
-                <article
-                  key={item.id}
+              (item, index) => (
+                <button
+                  className="tile-button"
+                  key={item.id || index}
+                  onClick={() =>
+                    setSelected([
+                      'Education',
+                      {
+                        ...item,
+                        id:
+                          item.id ||
+                          `education-${index}`,
+                        title:
+                          item.school ||
+                          'Education',
+                        description:
+                          [
+                            item.qualification,
+                            item.period,
+                          ]
+                            .filter(Boolean)
+                            .join(' · '),
+                      },
+                    ])
+                  }
                 >
                   <b>
                     {item.school}
@@ -1275,7 +1325,11 @@ function App() {
                   <small>
                     {item.period}
                   </small>
-                </article>
+
+                  <span className="tile-button-open">
+                    Open <ArrowUpRight size={14} />
+                  </span>
+                </button>
               )
             )}
           </div>
