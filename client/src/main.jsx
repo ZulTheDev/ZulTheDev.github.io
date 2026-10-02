@@ -43,9 +43,35 @@ const months = (start, end) => {
    Keeps the client safe when the CMS/API has optional fields.
 ========================================================= */
 
+function normalizeAssetPath(value) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return '';
+  }
+
+  const source = value.trim();
+
+  // Keep absolute/external URLs untouched.
+  if (/^(https?:|data:|blob:|\\/\\/)/i.test(source)) {
+    return source;
+  }
+
+  // Vite's public/ directory is served from the site root.
+  let normalized = source
+    .replace(/^(?:\.\.\/)+public\//i, '/')
+    .replace(/^\.?\/?public\//i, '/')
+    .replace(/^\/public\//i, '/');
+
+  if (!normalized.startsWith('/')) {
+    normalized = `/${normalized}`;
+  }
+
+  return normalized;
+}
+
 function normalizeContent(data) {
   const source = data || {};
   const profile = source.profile || {};
+  const profileImage = profile.image || profile.photo || {};
   const links = Array.isArray(profile.links)
     ? profile.links
     : [profile.linkedin, profile.github, profile.website, profile.email]
@@ -59,7 +85,12 @@ function normalizeContent(data) {
       summary: profile.summary || '',
       pronouns: profile.pronouns || '',
       links,
-      image: profile.image || {},
+      image: {
+        ...profileImage,
+        local:
+          normalizeAssetPath(profileImage.local) ||
+          '/images/profile.png',
+      },
     },
     explore: Array.isArray(source.explore) ? source.explore : [],
     recent: Array.isArray(source.recent) ? source.recent : [],
@@ -174,7 +205,7 @@ function Modal({ item, type, close }) {
           <div className="preview">
             {media[0].type === 'image' ? (
               <img
-                src={media[0].src}
+                src={normalizeAssetPath(media[0].src)}
                 alt={
                   media[0].title ||
                   item.title
@@ -506,9 +537,11 @@ function ProfilePhoto({ profile }) {
     {};
 
   const localSrc =
-    imageConfig.local ||
-    profile?.photoLocal ||
-    '/images/profile.png';
+    normalizeAssetPath(
+      imageConfig.local ||
+      profile?.photoLocal ||
+      '/images/profile.png'
+    ) || '/images/profile.png';
 
   const driveId =
     imageConfig.driveId ||
