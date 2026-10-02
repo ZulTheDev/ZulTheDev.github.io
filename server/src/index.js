@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { google } from 'googleapis';
+import { createClient } from 'redis';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,89 +133,82 @@ async function writeContent(data) {
 ========================================================= */
 
 const REDIS_URL =
-  process.env.UPSTASH_REDIS_REST_URL || '';
+  process.env.REDIS_URL || '';
 
-const REDIS_TOKEN =
-  process.env.UPSTASH_REDIS_REST_TOKEN || '';
-
-const REDIS_COMMENT_HASH =
-  'portfolio:comments:data';
+let redisClientPromise = null;
 
 function redisConfigured() {
   return Boolean(
-    REDIS_URL &&
-    REDIS_TOKEN
+    REDIS_URL
   );
 }
 
-async function redisCommand(command) {
+async function getRedis() {
   if (!redisConfigured()) {
-    throw new Error('redis_not_configured');
-  }
-
-  const r = await fetch(
-    REDIS_URL,
-    {
-      method: 'POST',
-      headers: {
-        Authorization:
-          `Bearer ${REDIS_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(command),
-    }
-  );
-
-  if (!r.ok) {
     throw new Error(
-      `redis_http_${r.status}`
+      'redis_not_configured'
     );
   }
 
-  const data = await r.json();
+  if (!redisClientPromise) {
+    const client = createClient({
+      url: REDIS_URL,
+    });
 
-  if (data?.error) {
-    throw new Error(data.error);
+    client.on(
+      'error',
+      (error) => {
+        console.error(
+          'Redis client error:',
+          error?.message ||
+            error
+        );
+      }
+    );
+
+    redisClientPromise =
+      client
+        .connect()
+        .then(() => client)
+        .catch((error) => {
+          redisClientPromise = null;
+          throw error;
+        });
   }
 
-  return data?.result;
+  return redisClientPromise;
+}
+
+async function redisCommand(
+  command
+) {
+  const redis =
+    await getRedis();
+
+  return redis.sendCommand(
+    command
+  );
 }
 
 async function redisPipeline(
   commands
 ) {
-  if (!redisConfigured()) {
-    throw new Error('redis_not_configured');
-  }
+  const redis =
+    await getRedis();
 
-  const r = await fetch(
-    `${REDIS_URL}/pipeline`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization:
-          `Bearer ${REDIS_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(commands),
-    }
-  );
+  const results = [];
 
-  if (!r.ok) {
-    throw new Error(
-      `redis_pipeline_http_${r.status}`
+  for (
+    const command of commands
+  ) {
+    results.push(
+      await redis.sendCommand(
+        command
+      )
     );
   }
 
-  const data = await r.json();
-
-  if (!Array.isArray(data)) {
-    throw new Error(
-      'redis_pipeline_invalid'
-    );
-  }
-
-  return data;
+  return results;
 }
 
 async function readComments() {
