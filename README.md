@@ -63,12 +63,9 @@ It is a small Vercel serverless API backed by Redis Cloud. Redis Cloud provides 
 
 ### 1. Create the Redis database
 
-Create an Upstash Redis database and copy its REST URL and token from the database details.
+Create a Redis Cloud database and copy its database connection string from the Redis Cloud database details/connection wizard.
 
-Upstash documents the REST API and Cloudflare Workers integration here:
-
-- https://upstash.com/docs/redis/features/restapi
-- https://developers.cloudflare.com/workers/databases/third-party-integrations/upstash/
+Redis Cloud provides managed Redis databases and documents application connections through Redis clients such as node-redis. citeturn677241search8turn677241search10
 
 ### 2. Configure the online API
 
@@ -153,7 +150,7 @@ The local server is intended to follow this schedule in **Singapore Time (SGT, U
 
 The schedule is an operational plan, not an automatic enforcement mechanism.
 
-When the local server is offline, the portfolio's **comment service can continue through the online Redis-backed Worker** once the backup is configured.
+When the local server is offline, the portfolio's **comment service can continue through the online Redis-backed API** once the backup is configured.
 
 The chatbot is tied to the local server and is therefore **not a 24/7 service**. It is unavailable whenever the local server is offline, including the scheduled Sunday shutdown.
 
@@ -169,7 +166,7 @@ By interacting with the site, visitors are expected to:
 2. Do not attempt denial-of-service, request flooding, load testing, or resource exhaustion.
 3. Do not brute-force, credential-stuff, or attempt to bypass authentication or authorization.
 4. Do not probe for secrets, environment variables, private files, server-side source, Redis credentials, Google Drive credentials, admin credentials, or local-machine resources.
-5. Do not attempt exploitation of the local Express server, Tailscale endpoint, cloud Worker, Redis database, GitHub repository, or deployment infrastructure.
+5. Do not attempt exploitation of the local Express server, Tailscale endpoint, online API, Redis database, GitHub repository, or deployment infrastructure.
 6. Do not perform automated vulnerability scanning, fuzzing, mass endpoint enumeration, or exploit-chain testing against this portfolio without explicit written authorization.
 7. Do not attempt to access, modify, delete, or exfiltrate another visitor's comments or data.
 8. Do not impersonate another visitor or intentionally abuse anonymous ownership controls.
@@ -184,7 +181,7 @@ The infrastructure is **not a hardened enterprise environment**.
 
 That does not mean visitors are invited to attack it.
 
-Treat the site as a normal personal portfolio and use the features for their intended purpose. The local server, cloud Worker, Redis database, deployment pipeline, and related infrastructure are operational components of the portfolio, not a challenge environment.
+Treat the site as a normal personal portfolio and use the features for their intended purpose. The local server, online API, Redis database, deployment pipeline, and related infrastructure are operational components of the portfolio, not a challenge environment.
 
 ## Responsible disclosure
 
