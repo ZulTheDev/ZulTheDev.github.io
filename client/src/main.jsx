@@ -48,18 +48,31 @@ function normalizeAssetPath(value) {
     return '';
   }
 
-  const source = value.trim();
+  let normalized = value.trim();
 
-  // Keep absolute/external URLs untouched.
-  if (/^(https?:|data:|blob:|\\/\\/)/i.test(source)) {
-    return source;
+  // Keep external/data/blob URLs untouched.
+  if (
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://') ||
+    normalized.startsWith('//') ||
+    normalized.startsWith('data:') ||
+    normalized.startsWith('blob:')
+  ) {
+    return normalized;
   }
 
   // Vite's public/ directory is served from the site root.
-  let normalized = source
-    .replace(/^(?:\.\.\/)+public\//i, '/')
-    .replace(/^\.?\/?public\//i, '/')
-    .replace(/^\/public\//i, '/');
+  while (normalized.startsWith('../public/')) {
+    normalized = normalized.slice('../public'.length);
+  }
+
+  if (normalized.startsWith('./public/')) {
+    normalized = normalized.slice('./public'.length);
+  } else if (normalized.startsWith('public/')) {
+    normalized = normalized.slice('public'.length);
+  } else if (normalized.startsWith('/public/')) {
+    normalized = normalized.slice('/public'.length);
+  }
 
   if (!normalized.startsWith('/')) {
     normalized = `/${normalized}`;
