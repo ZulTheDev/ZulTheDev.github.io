@@ -9,6 +9,7 @@ server/node_modules/
 server/.env
 server/.env.*
 server/comments.json
+server/visitors.json
 
 # Local admin dependencies/build output
 admin/node_modules/
