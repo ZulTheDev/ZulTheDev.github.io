@@ -13,9 +13,9 @@ GitHub Pages
   |     |
   |     +-- Anonymous comments
   |             |
-  |             +-- Cloudflare Worker -> Upstash Redis (24/7 comment persistence)
+  |             +-- Online Vercel API -> Redis Cloud (24/7 comment persistence)
   |             |
-  |             +-- Local Express API -> shared Redis when local server is online
+  |             +-- Local Express API -> same Redis Cloud database when local server is online
   |                                      -> local JSON fallback if Redis is unavailable
   |
   +-- Local Express API
@@ -27,7 +27,7 @@ GitHub Pages
 
 The online backup service is intentionally **comment-only**. It does not provide the admin API, portfolio content API, Google Drive integration, DeepSeek chatbot, or local visitor tracker.
 
-Upstash Redis exposes a REST API that works well from edge/serverless runtimes such as Cloudflare Workers, avoiding a long-lived TCP connection requirement. citeturn859439search0turn796663search3
+Redis Cloud is the managed Redis database used by the comment service. The browser never receives its database credentials; both the online API and local Express API connect server-side using the Redis client. citeturn859439search0turn796663search3
 
 ## Comment storage
 
@@ -57,9 +57,9 @@ This is not an authentication system or a cryptographic identity system. Clearin
 
 The online comment backup lives in:
 
-`cloud-comments/`
+`online-comments/`
 
-It is a Cloudflare Worker backed by Upstash Redis.
+It is a small Vercel serverless API backed by Redis Cloud. Redis Cloud provides the managed database; Vercel only hosts the small HTTP API that safely keeps the Redis credentials server-side.
 
 ### 1. Create the Redis database
 
@@ -70,23 +70,17 @@ Upstash documents the REST API and Cloudflare Workers integration here:
 - https://upstash.com/docs/redis/features/restapi
 - https://developers.cloudflare.com/workers/databases/third-party-integrations/upstash/
 
-### 2. Configure the Worker
+### 2. Configure the online API
 
-```powershell
-cd cloud-comments
-npm install
+Deploy the `online-comments/` directory as a small Vercel project.
 
-npx wrangler secret put UPSTASH_REDIS_REST_URL
-npx wrangler secret put UPSTASH_REDIS_REST_TOKEN
-```
+In the Vercel project settings, add:
 
-Deploy:
+`REDIS_URL`
 
-```powershell
-npm run deploy
-```
+Use the Redis Cloud database connection string supplied by Redis Cloud.
 
-The Worker will provide a `workers.dev` URL.
+Redis Cloud documents the public database endpoint and connection details in the database configuration/connection wizard. citeturn677241search8turn906360search8
 
 ### 3. Connect GitHub Pages to the backup
 
@@ -94,26 +88,25 @@ Add a GitHub repository secret named:
 
 `COMMENTS_BACKUP_URL`
 
-Set it to the deployed Worker URL.
+Set it to the deployed Vercel project URL.
 
 The Pages workflow injects this value into `VITE_COMMENTS_BACKUP_URL`.
 
-When configured, the portfolio prefers this cloud comment service for comment traffic so comments can remain available even when the local server is offline. The local API remains a fallback, and both can use the same Redis store.
+When configured, the portfolio prefers the online comment API so comments remain available when the local server is offline. The local API remains a fallback, and both APIs use the same Redis Cloud database.
 
-### 4. Connect the local server to the same Redis database
+### 4. Connect the local server to the same Redis Cloud database
 
-Copy the Redis credentials into your **local** `server/.env`:
+Copy the Redis Cloud connection string into your **local** `server/.env`:
 
 ```env
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
+REDIS_URL=redis[s]://username:password@host:port
 ```
 
-Do not commit these values.
+Do not commit this value.
 
-With Redis configured, the local Express API and the Cloudflare Worker use the same Redis comment store. This means comments can continue to exist when the local machine is offline.
+The local Express API and the online Vercel API use the same Redis Cloud database. This keeps comments persistent while the local machine is offline.
 
-The local JSON comment file remains a fallback for development when Redis is unavailable. Local-only comments are migrated into Redis when the shared store becomes available again.
+The local JSON comment file remains a fallback for development when Redis is unavailable.
 
 ## Local development
 
@@ -164,7 +157,7 @@ When the local server is offline, the portfolio's **comment service can continue
 
 The chatbot is tied to the local server and is therefore **not a 24/7 service**. It is unavailable whenever the local server is offline, including the scheduled Sunday shutdown.
 
-The online comment Worker has **no chatbot feature**.
+The online comment API has **no chatbot feature**.
 
 ## Visitor rules and acceptable use
 
