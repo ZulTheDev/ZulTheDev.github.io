@@ -11,6 +11,62 @@ import './style.css';
 
 const API = import.meta.env.VITE_API_BASE_URL || '';
 
+const ANONYMOUS_DEVICE_KEY = 'portfolio-anonymous-device-id';
+const ANONYMOUS_SESSION_KEY = 'portfolio-comment-session-id';
+
+function getAnonymousIdentity() {
+  let deviceId = '';
+  let sessionId = '';
+
+  try {
+    deviceId =
+      localStorage.getItem(ANONYMOUS_DEVICE_KEY) || '';
+
+    if (!deviceId) {
+      deviceId =
+        globalThis.crypto?.randomUUID?.() ||
+        `anon-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}`;
+
+      localStorage.setItem(
+        ANONYMOUS_DEVICE_KEY,
+        deviceId
+      );
+    }
+
+    sessionId =
+      sessionStorage.getItem(ANONYMOUS_SESSION_KEY) ||
+      '';
+
+    if (!sessionId) {
+      sessionId =
+        globalThis.crypto?.randomUUID?.() ||
+        `session-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}`;
+
+      sessionStorage.setItem(
+        ANONYMOUS_SESSION_KEY,
+        sessionId
+      );
+    }
+  } catch {
+    deviceId =
+      globalThis.crypto?.randomUUID?.() ||
+      `anon-${Date.now()}`;
+
+    sessionId =
+      globalThis.crypto?.randomUUID?.() ||
+      `session-${Date.now()}`;
+  }
+
+  return {
+    deviceId,
+    sessionId,
+  };
+}
+
 const GAMES =
   import.meta.env.VITE_GAMES_URL ||
   'https://YOUR-GAMES-REPO.github.io/';
@@ -725,6 +781,28 @@ function App() {
   const [content, setContent] = useState(null);
   const [loadProgress, setLoadProgress] = useState(8);
   const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    const { deviceId, sessionId } =
+      getAnonymousIdentity();
+
+    if (!API) {
+      return;
+    }
+
+    fetch(`${API}/api/access/track`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        deviceId,
+        sessionId,
+      }),
+    }).catch(() => {
+      // Anonymous access tracking is best-effort.
+    });
+  }, []);
 
   const [page, setPage] = useState(
     location.hash.slice(1) || 'home'
