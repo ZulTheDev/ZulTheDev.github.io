@@ -1,0 +1,68 @@
+name: Deploy Portfolio API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - "render.yaml"
+      - ".github/workflows/deploy-api.yml"
+
+  workflow_dispatch:
+
+# GLOBAL ENVIRONMENT VARIABLES
+# Values come from GitHub Repository Secrets.
+env:
+  DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+  DEEPSEEK_MODEL: deepseek-chat
+  DEEPSEEK_BASE_URL: https://api.deepseek.com
+
+  GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
+  GOOGLE_DRIVE_ROOT_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_ROOT_FOLDER_ID }}
+
+  TAILSCALE_AI_URL: ${{ secrets.TAILSCALE_AI_URL }}
+  TAILSCALE_AI_SHARED_SECRET: ${{ secrets.TAILSCALE_AI_SHARED_SECRET }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required secrets exist
+        shell: bash
+        run: |
+          test -n "$DEEPSEEK_API_KEY" || {
+            echo "DEEPSEEK_API_KEY is missing"
+            exit 1
+          }
+
+          test -n "$GOOGLE_SERVICE_ACCOUNT_EMAIL" || {
+            echo "GOOGLE_SERVICE_ACCOUNT_EMAIL is missing"
+            exit 1
+          }
+
+          test -n "$GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY" || {
+            echo "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY is missing"
+            exit 1
+          }
+
+          test -n "$GOOGLE_DRIVE_ROOT_FOLDER_ID" || {
+            echo "GOOGLE_DRIVE_ROOT_FOLDER_ID is missing"
+            exit 1
+          }
+
+          echo "Required secrets are configured."
+
+      - name: Trigger API deployment
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Deployment triggered
+        run: echo "Portfolio API deployment triggered."

@@ -1,0 +1,434 @@
+{
+  "profile": {
+    "name": "Zulfaqar Jamal",
+    "displayName": "Zulfaqar Jamal",
+    "title": "Threat Intelligence Specialist | CCT by EC Council | Indie Developer",
+    "headline": "Cybersecurity • DFIR • CTI • Automation",
+    "summary": "Independent cybersecurity enthusiast and EC-Council Certified Cybersecurity Technician (CCT) with a strong interest in offensive and defensive security. Leads the Infinity Code CTF team, training members in problem-solving and security fundamentals. Focused on DFIR, Cyber Threat Intelligence (CTI), automation, VAPT fundamentals and hands-on security projects, while also exploring software development, technical initiatives and STEM education.",
+    "pronouns": "He/Her/She/Faer",
+    "location": "Singapore, Singapore",
+    "email": "zulfaqardhiyaulhaq@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/zulfaqarnet",
+    "github": "",
+    "website": "https://zulthedev.github.io/",
+    "orcid": "https://orcid.org/0009-0004-2126-7780",
+    "image": {
+      "local": "../public/images/profile.png",
+      "driveId": ""
+    },
+    "links": [
+      "mailto:zulfaqardhiyaulhaq@gmail.com",
+      "https://www.linkedin.com/in/zulfaqarnet",
+      "https://zulthedev.github.io/",
+      "https://orcid.org/0009-0004-2126-7780"
+    ]
+  },
+
+  "settings": {
+    "theme": {
+      "bg": "#0e0b13",
+      "primary": "#f2a8d4",
+      "violet": "#cbb5ff",
+      "text": "#f7eff9",
+      "muted": "#aa9eaf",
+      "line": "#302635"
+    }
+  },
+
+  "recent": [
+    {
+      "id": "recent-nitec-cyber",
+      "title": "Higher Nitec in Cyber & Network Security",
+      "description": "Currently studying Cyber & Network Security at the Institute of Technical Education, with an Information Technology focus."
+    },
+    {
+      "id": "recent-infinity-code",
+      "title": "Infinity Code CTF",
+      "description": "Leading and training team members in cybersecurity challenges, problem-solving and security fundamentals."
+    },
+    {
+      "id": "recent-security",
+      "title": "Cybersecurity focus",
+      "description": "Building knowledge across DFIR, Cyber Threat Intelligence, VAPT fundamentals, automation and security tooling."
+    },
+    {
+      "id": "recent-development",
+      "title": "Indie development",
+      "description": "Developing software and exploring technical projects driven by curiosity, automation and practical problem-solving."
+    }
+  ],
+
+  "certifications": [
+    {
+      "id": "cert-cct",
+      "title": "Certified Cybersecurity Technician",
+      "issuer": "EC-Council",
+      "category": "Cybersecurity Certification",
+      "description": "Certified Cybersecurity Technician (CCT) certification associated with EC-Council.",
+      "date": "",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "cert-htb-cyber-apocalypses-2023",
+      "title": "HTB: Cyber Apocalypse 2023",
+      "issuer": "Hack The Box",
+      "category": "CTF / Cybersecurity",
+      "description": "Participation in the HTB Cyber Apocalypse 2023 cybersecurity event.",
+      "date": "2023",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "cert-bearcatctf-uc",
+      "title": "BearCatCTF@UC",
+      "issuer": "BearCatCTF@UC",
+      "category": "CTF / Cybersecurity",
+      "description": "Certificate of participation in BearCatCTF@UC.",
+      "date": "",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "cert-automotive-security",
+      "title": "Intro to Automotive Security & Car Hacking",
+      "issuer": "Cybersecurity Event",
+      "category": "Cybersecurity",
+      "description": "Certificate of participation in an introduction to automotive security and car hacking.",
+      "date": "",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "cert-mental-health",
+      "title": "Making Sense of Mental Health Problems",
+      "issuer": "Certificate / Programme",
+      "category": "Learning",
+      "description": "Certificate associated with learning about mental health problems.",
+      "date": "",
+      "link": "",
+      "media": []
+    }
+  ],
+
+  "achievements": [
+    {
+      "id": "achievement-infinity-code",
+      "title": "Infinity Code CTF Leadership",
+      "issuer": "Infinity Code CTF",
+      "category": "Leadership",
+      "description": "Leads the Infinity Code CTF team and trains members in cybersecurity challenges, problem-solving and security fundamentals.",
+      "date": "2022",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "achievement-ctf-participation",
+      "title": "Cybersecurity CTF Participation",
+      "issuer": "Various CTF Platforms",
+      "category": "Cybersecurity",
+      "description": "Participated in cybersecurity competitions and activities focused on problem-solving and security fundamentals.",
+      "date": "",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "achievement-student-leadership",
+      "title": "Student Council Leadership",
+      "issuer": "Spectra Secondary School",
+      "category": "Leadership",
+      "description": "Served as a student councilor and developed leadership, communication, peer support and practical problem-solving skills through school activities and patrol responsibilities.",
+      "date": "2023",
+      "link": "",
+      "media": []
+    }
+  ],
+
+  "awards": [
+    {
+      "id": "award-edusave-2022",
+      "title": "Edusave Scholarship 2022",
+      "issuer": "Edusave",
+      "category": "Scholarship",
+      "description": "Received the Edusave Scholarship in 2022.",
+      "date": "2022",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "award-edusave-2023",
+      "title": "Edusave Scholarship 2023",
+      "issuer": "Edusave",
+      "category": "Scholarship",
+      "description": "Received the Edusave Scholarship in 2023.",
+      "date": "2023",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "award-ec-council-scholarship",
+      "title": "EC-Council Scholarship C|CT",
+      "issuer": "EC-Council",
+      "category": "Scholarship",
+      "description": "Received an EC-Council scholarship associated with the Certified Cybersecurity Technician (C|CT) pathway.",
+      "date": "",
+      "link": "",
+      "media": []
+    }
+  ],
+
+  "projects": [
+    {
+      "id": "project-vapt-python",
+      "title": "Python VAPT Tooling",
+      "issuer": "Independent Development",
+      "category": "Cybersecurity / Software Development",
+      "description": "Hands-on exploration of VAPT tooling and security automation using Python.",
+      "date": "",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "project-security-automation",
+      "title": "Security Automation",
+      "issuer": "Independent Development",
+      "category": "Cybersecurity / Automation",
+      "description": "Exploring automation at the intersection of cybersecurity, DFIR and Cyber Threat Intelligence.",
+      "date": "",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "project-indie-development",
+      "title": "Indie Development",
+      "issuer": "Zulfaqar Studio",
+      "category": "Software Development",
+      "description": "Independent software development driven by curiosity, practical experimentation and technical problem-solving.",
+      "date": "",
+      "link": "",
+      "media": []
+    }
+  ],
+
+  "research": [
+    {
+      "id": "research-dfir",
+      "title": "Digital Forensics & Incident Response",
+      "issuer": "Security Focus",
+      "category": "DFIR",
+      "description": "An ongoing area of interest focused on digital forensics, incident response and practical security investigation.",
+      "date": "",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "research-cti",
+      "title": "Cyber Threat Intelligence",
+      "issuer": "Security Focus",
+      "category": "CTI",
+      "description": "Exploring Cyber Threat Intelligence concepts and how threat information can support defensive security work.",
+      "date": "",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "research-neuroengineering",
+      "title": "Bioinformatics & Neuroengineering",
+      "issuer": "Independent Interest",
+      "category": "Research Interest",
+      "description": "Current interests include bioinformatics, neuroengineering, brain-computer interfaces and neuroscience-related security topics.",
+      "date": "",
+      "link": "",
+      "media": []
+    }
+  ],
+
+  "experience": [
+    {
+      "id": "exp-infinity-code",
+      "company": "Infinity Code CTF",
+      "role": "CTF Leader | Head / Founder in Asia",
+      "location": "Singapore",
+      "start": "2022-10",
+      "end": "",
+      "summary": "Lead and train team members in cybersecurity challenges and participate in CTF competitions focused on problem-solving and security fundamentals.",
+      "elaboration": "Developed leadership and team-training experience through cybersecurity challenges, competition preparation and security fundamentals.",
+      "reflection": "This role combines technical curiosity with team leadership, communication and structured problem-solving.",
+      "skills": [
+        "Cybersecurity",
+        "CTF",
+        "Problem-solving",
+        "Team Leadership",
+        "Security Fundamentals",
+        "Training"
+      ],
+      "media": []
+    },
+    {
+      "id": "exp-lalamove",
+      "company": "Lalamove",
+      "role": "Logistic Delivery Runner",
+      "location": "Singapore",
+      "start": "2026-05",
+      "end": "",
+      "summary": "Developing experience in handling logistics and delivery work with care.",
+      "elaboration": "Current logistics delivery work involving careful handling of deliveries and practical on-site execution.",
+      "reflection": "Provides additional hands-on experience in responsibility, situational awareness and operational discipline.",
+      "skills": [
+        "Logistics",
+        "Delivery Operations",
+        "Careful Handling",
+        "Responsibility"
+      ],
+      "media": []
+    },
+    {
+      "id": "exp-foodpanda",
+      "company": "foodpanda",
+      "role": "Food Runner",
+      "location": "Singapore",
+      "start": "2026-04",
+      "end": "",
+      "summary": "Developing geolocation critical thinking through on-site delivery situations while working within client and food hygiene requirements.",
+      "elaboration": "Built practical situational awareness, geolocation thinking and disciplined execution while working around delivery constraints and hygiene requirements.",
+      "reflection": "The role strengthened mental discipline and the ability to make practical decisions in changing on-site situations.",
+      "skills": [
+        "Geolocation",
+        "Situational Awareness",
+        "Food Hygiene",
+        "Time Management",
+        "Operational Discipline"
+      ],
+      "media": []
+    },
+    {
+      "id": "exp-zulfaqar-studio",
+      "company": "Zulfaqar Studio",
+      "role": "Founder | Freelancer | Head of Development, Technology Strategy & Organisation",
+      "location": "Singapore",
+      "start": "2020-03",
+      "end": "",
+      "summary": "Independent software, lifestyle retail and freelancing initiative started with family support.",
+      "elaboration": "As founder, developed experience in organisation strategy, project management and active communication. Also worked across development and technology strategy with exposure to risk management, organisation security and network communication.",
+      "reflection": "Zulfaqar Studio represents an early foundation in entrepreneurship, independent development, organisation and technology strategy.",
+      "skills": [
+        "Entrepreneurship",
+        "Project Management",
+        "Organisation Strategy",
+        "Technology Strategy",
+        "Risk Management",
+        "Network Communication",
+        "Software Development"
+      ],
+      "media": []
+    },
+    {
+      "id": "exp-youtube",
+      "company": "YouTube",
+      "role": "Content Creator",
+      "location": "Singapore",
+      "start": "2025-06",
+      "end": "2026-03",
+      "summary": "Created content around cybersecurity, music and composition, and education and self-learning tips.",
+      "elaboration": "Produced content based on personal interests and learning, including cybersecurity topics, music and composition, and educational or self-learning material.",
+      "reflection": "Content creation provided an avenue for communication, knowledge sharing and creative experimentation.",
+      "skills": [
+        "Content Creation",
+        "Cybersecurity Communication",
+        "Music",
+        "Education",
+        "Self-Learning"
+      ],
+      "media": [
+        {
+          "type": "link",
+          "title": "FireSecuritySG YouTube",
+          "body": "https://youtube.com/@firesecuritysg",
+          "url": "https://youtube.com/@firesecuritysg"
+        }
+      ]
+    },
+    {
+      "id": "exp-spectra-student-council",
+      "company": "Spectra Secondary School",
+      "role": "Student Councilor",
+      "location": "Singapore",
+      "start": "2023-01",
+      "end": "2025-12",
+      "summary": "Served as a student councilor, taking part in school events and developing leadership, communication, peer-support and problem-solving skills.",
+      "elaboration": "Was nominated as a Junior Student Councilor in secondary 2 and took on senior student council responsibilities from 2023. Participated in school events including graduation ceremonies, anniversary activities, NDP-related activities and school patrol responsibilities.",
+      "reflection": "Developed group leadership, communication, practical problem-solving and peer-support skills while coordinating students and helping maintain smooth school operations.",
+      "skills": [
+        "Student Leadership",
+        "Team Communication",
+        "Problem-solving",
+        "Peer Support",
+        "Event Coordination",
+        "Time Management"
+      ],
+      "media": []
+    },
+    {
+      "id": "exp-holiday-inn",
+      "company": "Holiday Inn Singapore Atrium",
+      "role": "Student Intern",
+      "location": "Singapore",
+      "start": "2024-10",
+      "end": "2024-11",
+      "summary": "Completed a three-week Industry Experiential Programme internship in the restaurant environment.",
+      "elaboration": "Used the internship to develop transferable workplace skills and explore another industry pathway while still a student. Applied technical and teamwork habits to hotel and food-and-beverage operations.",
+      "reflection": "The experience strengthened communication, strategy, efficiency and workplace adaptability.",
+      "skills": [
+        "Communication",
+        "Teamwork",
+        "Time Management",
+        "Efficiency",
+        "Visual Pattern Recognition",
+        "Restocking",
+        "Table Setup"
+      ],
+      "media": []
+    }
+  ],
+
+  "education": [
+    {
+      "id": "edu-ite-higher-nitec",
+      "school": "Institute of Technical Education",
+      "qualification": "Higher Nitec in Cyber & Network Security, Information Technology (S&D)",
+      "period": "January 2026 – 2029",
+      "description": "Current Higher Nitec studies in Cyber & Network Security with an Information Technology focus."
+    },
+    {
+      "id": "edu-spectra",
+      "school": "Spectra Secondary School",
+      "qualification": "GCE (N) Level + ISSC (IoTA - ISS1001, MWA - ISS1003), Information Technology",
+      "period": "January 2022 – December 2025",
+      "description": "Secondary education with Information Technology-related studies and student leadership involvement."
+    },
+    {
+      "id": "edu-qihua",
+      "school": "Qihua Primary School",
+      "qualification": "PSLE",
+      "period": "March 2017 – November 2021",
+      "description": "Primary education."
+    }
+  ],
+
+  "explore": [
+    "Cybersecurity",
+    "DFIR",
+    "Cyber Threat Intelligence",
+    "CTF & Security Challenges",
+    "VAPT Fundamentals",
+    "Python & Automation",
+    "Software Development",
+    "Indie Development",
+    "STEM Education",
+    "Music & Composition",
+    "Content Creation",
+    "Bioinformatics",
+    "Neuroengineering",
+    "Brain-Computer Interfaces"
+  ]
+}
