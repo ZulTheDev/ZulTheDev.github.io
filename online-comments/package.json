@@ -1,0 +1,11 @@
+{
+  "name": "zulfaqar-portfolio-online-comments",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "redis": "^5.11.0"
+  }
+}
