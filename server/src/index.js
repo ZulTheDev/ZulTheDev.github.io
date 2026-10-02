@@ -32,6 +32,27 @@ const commentsFile = path.join(
   'comments.json'
 );
 
+const visitorsFile = path.join(
+  __dirname,
+  '..',
+  'visitors.json'
+);
+
+let commentsWriteQueue = Promise.resolve();
+let visitorsWriteQueue = Promise.resolve();
+
+function withCommentsLock(task) {
+  const run = commentsWriteQueue.then(task, task);
+  commentsWriteQueue = run.catch(() => {});
+  return run;
+}
+
+function withVisitorsLock(task) {
+  const run = visitorsWriteQueue.then(task, task);
+  visitorsWriteQueue = run.catch(() => {});
+  return run;
+}
+
 const allowedOrigins = (
   process.env.CLIENT_ORIGIN ||
   [
@@ -107,14 +128,20 @@ async function writeContent(data) {
 }
 
 /* =========================================================
-   COMMENTS
+   COMMENTS + ANONYMOUS ACCESS
 ========================================================= */
 
 async function readComments() {
   try {
-    return JSON.parse(
+    const data = JSON.parse(
       await fs.readFile(commentsFile, 'utf8')
     );
+
+    return data &&
+      typeof data === 'object' &&
+      !Array.isArray(data)
+      ? data
+      : {};
   } catch {
     return {};
   }
@@ -140,6 +167,42 @@ async function writeComments(data) {
   );
 }
 
+async function readVisitors() {
+  try {
+    const data = JSON.parse(
+      await fs.readFile(visitorsFile, 'utf8')
+    );
+
+    return data &&
+      typeof data === 'object' &&
+      !Array.isArray(data)
+      ? data
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeVisitors(data) {
+  await fs.mkdir(
+    path.dirname(visitorsFile),
+    { recursive: true }
+  );
+
+  const tempFile = `${visitorsFile}.tmp`;
+
+  await fs.writeFile(
+    tempFile,
+    `${JSON.stringify(data, null, 2)}\n`,
+    'utf8'
+  );
+
+  await fs.rename(
+    tempFile,
+    visitorsFile
+  );
+}
+
 function validCommentTerm(term) {
   return (
     term.startsWith('portfolio:') &&
@@ -147,11 +210,123 @@ function validCommentTerm(term) {
   );
 }
 
+function validAnonymousId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[a-zA-Z0-9-]{20,100}$/.test(value)
+  );
+}
+
+function flattenComments(allComments) {
+  return Object.values(allComments)
+    .filter(Array.isArray)
+    .flat();
+}
+
+function countSessionReplies(
+  allComments,
+  deviceId,
+  sessionId
+) {
+  return flattenComments(allComments)
+    .filter(
+      (item) =>
+        item.parentId &&
+        item.ownerId === deviceId &&
+        item.authorSessionId === sessionId
+    )
+    .length;
+}
+
+function publicComment(item, deviceId) {
+  return {
+    id: item.id,
+    term: item.term,
+    name: item.name,
+    comment: item.comment,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt || null,
+    parentId: item.parentId || null,
+    deleted: Boolean(item.deleted),
+    canEdit:
+      Boolean(deviceId) &&
+      item.ownerId === deviceId &&
+      !item.deleted,
+  };
+}
+
+app.post(
+  '/api/access/track',
+  async (request, response) => {
+    const deviceId = String(
+      request.body?.deviceId || ''
+    ).trim();
+
+    const sessionId = String(
+      request.body?.sessionId || ''
+    ).trim();
+
+    if (
+      !validAnonymousId(deviceId) ||
+      !validAnonymousId(sessionId)
+    ) {
+      return response.status(400).json({
+        error: 'invalid_anonymous_id',
+      });
+    }
+
+    try {
+      await withVisitorsLock(async () => {
+        const visitors = await readVisitors();
+        const now = new Date().toISOString();
+        const current = visitors[deviceId];
+
+        visitors[deviceId] = {
+          firstSeen:
+            current?.firstSeen || now,
+          lastSeen: now,
+          visits:
+            Number(current?.visits || 0) + 1,
+          sessions:
+            Number(current?.sessions || 0) +
+            (current?.lastSessionId === sessionId
+              ? 0
+              : 1),
+          lastSessionId: sessionId,
+          comments:
+            Number(current?.comments || 0),
+          replies:
+            Number(current?.replies || 0),
+        };
+
+        await writeVisitors(visitors);
+      });
+
+      response.json({
+        ok: true,
+      });
+    } catch (error) {
+      console.error(
+        'Access tracker error:',
+        error?.message || error
+      );
+
+      response.status(500).json({
+        error: 'access_tracker_failed',
+      });
+    }
+  }
+);
+
 app.get(
   '/api/comments',
   async (request, response) => {
     const term = String(
       request.query.term || ''
+    ).trim();
+
+    const deviceId = String(
+      request.query.deviceId || ''
     ).trim();
 
     if (!term || !validCommentTerm(term)) {
@@ -164,11 +339,26 @@ app.get(
       const allComments =
         await readComments();
 
+      const rawComments =
+        Array.isArray(allComments[term])
+          ? allComments[term]
+          : [];
+
       response.json({
-        comments:
-          Array.isArray(allComments[term])
-            ? allComments[term]
-            : [],
+        comments: rawComments
+          .map((item) =>
+            publicComment(item, deviceId)
+          ),
+        replyCount:
+          validAnonymousId(deviceId)
+            ? countSessionReplies(
+                allComments,
+                deviceId,
+                String(
+                  request.query.sessionId || ''
+                ).trim()
+              )
+            : 0,
       });
     } catch (error) {
       console.error(
@@ -198,9 +388,33 @@ app.post(
       request.body?.comment || ''
     ).trim();
 
+    const parentId =
+      request.body?.parentId
+        ? String(
+            request.body.parentId
+          ).trim()
+        : null;
+
+    const deviceId = String(
+      request.body?.deviceId || ''
+    ).trim();
+
+    const sessionId = String(
+      request.body?.sessionId || ''
+    ).trim();
+
     if (!term || !validCommentTerm(term)) {
       return response.status(400).json({
         error: 'invalid_term',
+      });
+    }
+
+    if (
+      !validAnonymousId(deviceId) ||
+      !validAnonymousId(sessionId)
+    ) {
+      return response.status(400).json({
+        error: 'invalid_anonymous_id',
       });
     }
 
@@ -228,34 +442,116 @@ app.post(
       });
     }
 
-    try {
-      const allComments =
-        await readComments();
-
-      if (!Array.isArray(allComments[term])) {
-        allComments[term] = [];
-      }
-
-      const newComment = {
-        id: randomUUID(),
-        term,
-        name,
-        comment,
-        createdAt: new Date().toISOString(),
-      };
-
-      allComments[term].unshift(
-        newComment
-      );
-
-      await writeComments(
-        allComments
-      );
-
-      response.status(201).json({
-        ok: true,
-        comment: newComment,
+    if (
+      parentId &&
+      !/^[a-zA-Z0-9-]{10,100}$/.test(parentId)
+    ) {
+      return response.status(400).json({
+        error: 'invalid_parent',
       });
+    }
+
+    try {
+      const result = await withCommentsLock(async () => {
+        const allComments =
+          await readComments();
+
+        if (!Array.isArray(allComments[term])) {
+          allComments[term] = [];
+        }
+
+        if (parentId) {
+          const parent =
+            flattenComments(allComments)
+              .find(
+                (item) =>
+                  item.id === parentId &&
+                  item.term === term
+              );
+
+          if (!parent) {
+            return {
+              status: 404,
+              body: {
+                error: 'parent_not_found',
+              },
+            };
+          }
+
+          if (parent.deleted) {
+            return {
+              status: 400,
+              body: {
+                error: 'parent_deleted',
+              },
+            };
+          }
+
+          const replies =
+            countSessionReplies(
+              allComments,
+              deviceId,
+              sessionId
+            );
+
+          if (replies >= 10) {
+            return {
+              status: 429,
+              body: {
+                error: 'reply_limit_reached',
+                message:
+                  'Reply limit reached for this session (10).',
+              },
+            };
+          }
+        }
+
+        const now =
+          new Date().toISOString();
+
+        const newComment = {
+          id: randomUUID(),
+          term,
+          name,
+          comment,
+          createdAt: now,
+          updatedAt: null,
+          parentId,
+          deleted: false,
+          ownerId: deviceId,
+          authorSessionId: sessionId,
+        };
+
+        allComments[term].unshift(
+          newComment
+        );
+
+        await writeComments(
+          allComments
+        );
+
+        return {
+          status: 201,
+          body: {
+            ok: true,
+            comment:
+              publicComment(
+                newComment,
+                deviceId
+              ),
+            replyCount:
+              countSessionReplies(
+                allComments,
+                deviceId,
+                sessionId
+              ),
+          },
+        };
+      });
+
+      return response
+        .status(result.status)
+        .json(result.body);
     } catch (error) {
       console.error(
         'Comment write error:',
@@ -264,6 +560,226 @@ app.post(
 
       response.status(500).json({
         error: 'comment_write_failed',
+      });
+    }
+  }
+);
+
+app.put(
+  '/api/comments/:id',
+  async (request, response) => {
+    const id =
+      String(
+        request.params.id || ''
+      ).trim();
+
+    const deviceId = String(
+      request.body?.deviceId || ''
+    ).trim();
+
+    const comment = String(
+      request.body?.comment || ''
+    ).trim();
+
+    if (
+      !id ||
+      !/^[a-zA-Z0-9-]{10,100}$/.test(id)
+    ) {
+      return response.status(400).json({
+        error: 'invalid_comment_id',
+      });
+    }
+
+    if (!validAnonymousId(deviceId)) {
+      return response.status(400).json({
+        error: 'invalid_anonymous_id',
+      });
+    }
+
+    if (!comment) {
+      return response.status(400).json({
+        error: 'comment_required',
+      });
+    }
+
+    if (comment.length > 2000) {
+      return response.status(400).json({
+        error: 'comment_too_long',
+      });
+    }
+
+    try {
+      const result = await withCommentsLock(async () => {
+        const allComments =
+          await readComments();
+
+        const item =
+          flattenComments(allComments)
+            .find(
+              (entry) =>
+                entry.id === id
+            );
+
+        if (!item) {
+          return {
+            status: 404,
+            body: {
+              error: 'comment_not_found',
+            },
+          };
+        }
+
+        if (item.ownerId !== deviceId) {
+          return {
+            status: 403,
+            body: {
+              error: 'comment_not_owned',
+            },
+          };
+        }
+
+        if (item.deleted) {
+          return {
+            status: 400,
+            body: {
+              error: 'comment_deleted',
+            },
+          };
+        }
+
+        item.comment = comment;
+        item.updatedAt =
+          new Date().toISOString();
+
+        await writeComments(
+          allComments
+        );
+
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            comment:
+              publicComment(
+                item,
+                deviceId
+              ),
+          },
+        };
+      });
+
+      return response
+        .status(result.status)
+        .json(result.body);
+    } catch (error) {
+      console.error(
+        'Comment edit error:',
+        error?.message || error
+      );
+
+      response.status(500).json({
+        error: 'comment_edit_failed',
+      });
+    }
+  }
+);
+
+app.delete(
+  '/api/comments/:id',
+  async (request, response) => {
+    const id =
+      String(
+        request.params.id || ''
+      ).trim();
+
+    const deviceId = String(
+      request.body?.deviceId || ''
+    ).trim();
+
+    if (
+      !id ||
+      !/^[a-zA-Z0-9-]{10,100}$/.test(id)
+    ) {
+      return response.status(400).json({
+        error: 'invalid_comment_id',
+      });
+    }
+
+    if (!validAnonymousId(deviceId)) {
+      return response.status(400).json({
+        error: 'invalid_anonymous_id',
+      });
+    }
+
+    try {
+      const result = await withCommentsLock(async () => {
+        const allComments =
+          await readComments();
+
+        const item =
+          flattenComments(allComments)
+            .find(
+              (entry) =>
+                entry.id === id
+            );
+
+        if (!item) {
+          return {
+            status: 404,
+            body: {
+              error: 'comment_not_found',
+            },
+          };
+        }
+
+        if (item.ownerId !== deviceId) {
+          return {
+            status: 403,
+            body: {
+              error: 'comment_not_owned',
+            },
+          };
+        }
+
+        if (item.deleted) {
+          return {
+            status: 400,
+            body: {
+              error: 'comment_already_deleted',
+            },
+          };
+        }
+
+        item.deleted = true;
+        item.comment = '';
+        item.updatedAt =
+          new Date().toISOString();
+
+        await writeComments(
+          allComments
+        );
+
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            deleted: true,
+            id,
+          },
+        };
+      });
+
+      return response
+        .status(result.status)
+        .json(result.body);
+    } catch (error) {
+      console.error(
+        'Comment delete error:',
+        error?.message || error
+      );
+
+      response.status(500).json({
+        error: 'comment_delete_failed',
       });
     }
   }
