@@ -17,3 +17,4 @@ admin/dist/
 
 # Local development scripts
 scripts/
+.wrangler/
