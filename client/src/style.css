@@ -2272,3 +2272,116 @@ footer{
     min-height:34px;
   }
 }
+
+
+/* =========================================================
+   COMMENT MODAL / CARD EXPANSION
+   Lets the entire modal body scroll so the discussion is
+   never trapped behind a fixed-height row.
+========================================================= */
+
+.modal section{
+  display:block;
+  min-width:0;
+  min-height:0;
+  overflow-x:hidden;
+  overflow-y:auto;
+  scrollbar-width:thin;
+  scrollbar-color:#49394d transparent;
+}
+
+.modal .preview{
+  min-height:260px;
+  box-sizing:border-box;
+}
+
+.modal .desc{
+  max-height:190px;
+  overflow:auto;
+  box-sizing:border-box;
+}
+
+.portfolio-comments{
+  min-height:520px;
+  box-sizing:border-box;
+  overflow:visible;
+}
+
+.portfolio-comments .giscus{
+  width:100%;
+  min-height:500px;
+}
+
+.portfolio-comments iframe{
+  width:100%;
+  min-height:500px;
+}
+
+.expbody .portfolio-comments{
+  min-height:520px;
+}
+
+.tiles .tile-button{
+  width:100%;
+  min-height:100px;
+  box-sizing:border-box;
+  font:inherit;
+  color:var(--t);
+  text-align:left;
+  background:#17121e;
+  border:1px solid var(--l);
+  border-radius:17px;
+  padding:25px;
+  line-height:1.6;
+  cursor:pointer;
+  transition:
+    transform .2s ease,
+    border-color .2s ease,
+    background .2s ease;
+}
+
+.tiles .tile-button:hover{
+  transform:translateY(-3px);
+  border-color:#54415a;
+  background:#201725;
+}
+
+.tile-button b{
+  display:block;
+}
+
+.tile-button p,
+.tile-button small{
+  color:var(--m);
+}
+
+.tile-button small{
+  text-transform:none;
+  letter-spacing:0;
+}
+
+.tile-button-open{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  margin-top:14px;
+  color:var(--p);
+  font:700 10px "Courier New",monospace;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+@media(max-width:850px){
+  .modal .preview{
+    min-height:220px;
+  }
+
+  .portfolio-comments{
+    min-height:460px;
+  }
+
+  .portfolio-comments .giscus,
+  .portfolio-comments iframe{
+    min-height:440px;
+  }
+}
