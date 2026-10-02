@@ -131,10 +131,99 @@ async function writeContent(data) {
    COMMENTS + ANONYMOUS ACCESS
 ========================================================= */
 
+const REDIS_URL =
+  process.env.UPSTASH_REDIS_REST_URL || '';
+
+const REDIS_TOKEN =
+  process.env.UPSTASH_REDIS_REST_TOKEN || '';
+
+const REDIS_COMMENT_HASH =
+  'portfolio:comments:data';
+
+function redisConfigured() {
+  return Boolean(
+    REDIS_URL &&
+    REDIS_TOKEN
+  );
+}
+
+async function redisCommand(command) {
+  if (!redisConfigured()) {
+    throw new Error('redis_not_configured');
+  }
+
+  const r = await fetch(
+    REDIS_URL,
+    {
+      method: 'POST',
+      headers: {
+        Authorization:
+          `Bearer ${REDIS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(command),
+    }
+  );
+
+  if (!r.ok) {
+    throw new Error(
+      `redis_http_${r.status}`
+    );
+  }
+
+  const data = await r.json();
+
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+
+  return data?.result;
+}
+
+async function redisPipeline(
+  commands
+) {
+  if (!redisConfigured()) {
+    throw new Error('redis_not_configured');
+  }
+
+  const r = await fetch(
+    `${REDIS_URL}/pipeline`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization:
+          `Bearer ${REDIS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(commands),
+    }
+  );
+
+  if (!r.ok) {
+    throw new Error(
+      `redis_pipeline_http_${r.status}`
+    );
+  }
+
+  const data = await r.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error(
+      'redis_pipeline_invalid'
+    );
+  }
+
+  return data;
+}
+
 async function readComments() {
   try {
     const data = JSON.parse(
-      await fs.readFile(commentsFile, 'utf8')
+      await fs.readFile(
+        commentsFile,
+        'utf8'
+      )
     );
 
     return data &&
@@ -153,11 +242,16 @@ async function writeComments(data) {
     { recursive: true }
   );
 
-  const tempFile = `${commentsFile}.tmp`;
+  const tempFile =
+    `${commentsFile}.tmp`;
 
   await fs.writeFile(
     tempFile,
-    `${JSON.stringify(data, null, 2)}\n`,
+    `${JSON.stringify(
+      data,
+      null,
+      2
+    )}\n`,
     'utf8'
   );
 
@@ -167,10 +261,99 @@ async function writeComments(data) {
   );
 }
 
+async function readRedisTermComments(term) {
+  const ids =
+    await redisCommand([
+      'ZRANGE',
+      `portfolio:comments:index:${term}`,
+      '0',
+      '-1',
+      'REV',
+    ]);
+
+  if (
+    !Array.isArray(ids) ||
+    ids.length === 0
+  ) {
+    return [];
+  }
+
+  const pipeline =
+    await redisPipeline(
+      ids.map((id) => [
+        'HGET',
+        REDIS_COMMENT_HASH,
+        id,
+      ])
+    );
+
+  return pipeline
+    .map((item) =>
+      typeof item?.result === 'string'
+        ? JSON.parse(item.result)
+        : null
+    )
+    .filter(Boolean);
+}
+
+async function saveRedisComment(
+  item
+) {
+  await redisPipeline([
+    [
+      'HSET',
+      REDIS_COMMENT_HASH,
+      item.id,
+      JSON.stringify(item),
+    ],
+    [
+      'ZADD',
+      `portfolio:comments:index:${item.term}`,
+      Date.parse(item.createdAt) ||
+        Date.now(),
+      item.id,
+    ],
+  ]);
+}
+
+async function migrateTermToRedis(
+  term,
+  localComments
+) {
+  if (
+    !redisConfigured() ||
+    !Array.isArray(localComments) ||
+    localComments.length === 0
+  ) {
+    return;
+  }
+
+  await redisPipeline(
+    localComments.flatMap((item) => [
+      [
+        'HSET',
+        REDIS_COMMENT_HASH,
+        item.id,
+        JSON.stringify(item),
+      ],
+      [
+        'ZADD',
+        `portfolio:comments:index:${term}`,
+        Date.parse(item.createdAt) ||
+          Date.now(),
+        item.id,
+      ],
+    ])
+  );
+}
+
 async function readVisitors() {
   try {
     const data = JSON.parse(
-      await fs.readFile(visitorsFile, 'utf8')
+      await fs.readFile(
+        visitorsFile,
+        'utf8'
+      )
     );
 
     return data &&
@@ -189,11 +372,16 @@ async function writeVisitors(data) {
     { recursive: true }
   );
 
-  const tempFile = `${visitorsFile}.tmp`;
+  const tempFile =
+    `${visitorsFile}.tmp`;
 
   await fs.writeFile(
     tempFile,
-    `${JSON.stringify(data, null, 2)}\n`,
+    `${JSON.stringify(
+      data,
+      null,
+      2
+    )}\n`,
     'utf8'
   );
 
@@ -217,7 +405,9 @@ function validAnonymousId(value) {
   );
 }
 
-function flattenComments(allComments) {
+function flattenComments(
+  allComments
+) {
   return Object.values(allComments)
     .filter(Array.isArray)
     .flat();
@@ -238,16 +428,35 @@ function countSessionReplies(
     .length;
 }
 
-function publicComment(item, deviceId) {
+function countRawSessionReplies(
+  comments,
+  deviceId,
+  sessionId
+) {
+  return comments.filter(
+    (item) =>
+      item.parentId &&
+      item.ownerId === deviceId &&
+      item.authorSessionId === sessionId
+  ).length;
+}
+
+function publicComment(
+  item,
+  deviceId
+) {
   return {
     id: item.id,
     term: item.term,
     name: item.name,
     comment: item.comment,
     createdAt: item.createdAt,
-    updatedAt: item.updatedAt || null,
-    parentId: item.parentId || null,
-    deleted: Boolean(item.deleted),
+    updatedAt:
+      item.updatedAt || null,
+    parentId:
+      item.parentId || null,
+    deleted:
+      Boolean(item.deleted),
     canEdit:
       Boolean(deviceId) &&
       item.ownerId === deviceId &&
@@ -258,49 +467,74 @@ function publicComment(item, deviceId) {
 app.post(
   '/api/access/track',
   async (request, response) => {
-    const deviceId = String(
-      request.body?.deviceId || ''
-    ).trim();
+    const deviceId =
+      String(
+        request.body?.deviceId || ''
+      ).trim();
 
-    const sessionId = String(
-      request.body?.sessionId || ''
-    ).trim();
+    const sessionId =
+      String(
+        request.body?.sessionId || ''
+      ).trim();
 
     if (
       !validAnonymousId(deviceId) ||
       !validAnonymousId(sessionId)
     ) {
-      return response.status(400).json({
-        error: 'invalid_anonymous_id',
-      });
+      return response
+        .status(400)
+        .json({
+          error:
+            'invalid_anonymous_id',
+        });
     }
 
     try {
-      await withVisitorsLock(async () => {
-        const visitors = await readVisitors();
-        const now = new Date().toISOString();
-        const current = visitors[deviceId];
+      await withVisitorsLock(
+        async () => {
+          const visitors =
+            await readVisitors();
 
-        visitors[deviceId] = {
-          firstSeen:
-            current?.firstSeen || now,
-          lastSeen: now,
-          visits:
-            Number(current?.visits || 0) + 1,
-          sessions:
-            Number(current?.sessions || 0) +
-            (current?.lastSessionId === sessionId
-              ? 0
-              : 1),
-          lastSessionId: sessionId,
-          comments:
-            Number(current?.comments || 0),
-          replies:
-            Number(current?.replies || 0),
-        };
+          const now =
+            new Date().toISOString();
 
-        await writeVisitors(visitors);
-      });
+          const current =
+            visitors[deviceId];
+
+          visitors[deviceId] = {
+            firstSeen:
+              current?.firstSeen ||
+              now,
+            lastSeen: now,
+            visits:
+              Number(
+                current?.visits || 0
+              ) + 1,
+            sessions:
+              Number(
+                current?.sessions || 0
+              ) +
+              (current?.lastSessionId ===
+              sessionId
+                ? 0
+                : 1),
+            lastSessionId:
+              sessionId,
+            comments:
+              Number(
+                current?.comments || 0
+              ),
+            replies:
+              Number(
+                current?.replies || 0
+              ),
+          };
+
+          await writeVisitors(
+            visitors
+          );
+        }
+      );
 
       response.json({
         ok: true,
@@ -311,9 +545,12 @@ app.post(
         error?.message || error
       );
 
-      response.status(500).json({
-        error: 'access_tracker_failed',
-      });
+      response
+        .status(500)
+        .json({
+          error:
+            'access_tracker_failed',
+        });
     }
   }
 );
@@ -321,42 +558,122 @@ app.post(
 app.get(
   '/api/comments',
   async (request, response) => {
-    const term = String(
-      request.query.term || ''
-    ).trim();
+    const term =
+      String(
+        request.query.term || ''
+      ).trim();
 
-    const deviceId = String(
-      request.query.deviceId || ''
-    ).trim();
+    const deviceId =
+      String(
+        request.query.deviceId || ''
+      ).trim();
 
-    if (!term || !validCommentTerm(term)) {
-      return response.status(400).json({
-        error: 'invalid_term',
-      });
+    const sessionId =
+      String(
+        request.query.sessionId || ''
+      ).trim();
+
+    if (
+      !term ||
+      !validCommentTerm(term)
+    ) {
+      return response
+        .status(400)
+        .json({
+          error: 'invalid_term',
+        });
     }
 
     try {
+      if (redisConfigured()) {
+        try {
+          let rawComments =
+            await readRedisTermComments(
+              term
+            );
+
+          if (rawComments.length === 0) {
+            const local =
+              await readComments();
+
+            const localTerm =
+              Array.isArray(local[term])
+                ? local[term]
+                : [];
+
+            if (localTerm.length > 0) {
+              await migrateTermToRedis(
+                term,
+                localTerm
+              );
+
+              rawComments =
+                localTerm;
+            }
+          }
+
+          return response.json({
+            comments:
+              rawComments.map(
+                (item) =>
+                  publicComment(
+                    item,
+                    deviceId
+                  )
+              ),
+            replyCount:
+              validAnonymousId(
+                deviceId
+              ) &&
+              validAnonymousId(
+                sessionId
+              )
+                ? countRawSessionReplies(
+                    rawComments,
+                    deviceId,
+                    sessionId
+                  )
+                : 0,
+          });
+        } catch (redisError) {
+          console.warn(
+            'Redis comment read failed; using local JSON:',
+            redisError?.message ||
+              redisError
+          );
+        }
+      }
+
       const allComments =
         await readComments();
 
       const rawComments =
-        Array.isArray(allComments[term])
+        Array.isArray(
+          allComments[term]
+        )
           ? allComments[term]
           : [];
 
       response.json({
-        comments: rawComments
-          .map((item) =>
-            publicComment(item, deviceId)
+        comments:
+          rawComments.map(
+            (item) =>
+              publicComment(
+                item,
+                deviceId
+              )
           ),
         replyCount:
-          validAnonymousId(deviceId)
+          validAnonymousId(
+            deviceId
+          ) &&
+          validAnonymousId(
+            sessionId
+          )
             ? countSessionReplies(
                 allComments,
                 deviceId,
-                String(
-                  request.query.sessionId || ''
-                ).trim()
+                sessionId
               )
             : 0,
       });
@@ -366,9 +683,12 @@ app.get(
         error?.message || error
       );
 
-      response.status(500).json({
-        error: 'comments_unavailable',
-      });
+      response
+        .status(500)
+        .json({
+          error:
+            'comments_unavailable',
+        });
     }
   }
 );
@@ -376,17 +696,20 @@ app.get(
 app.post(
   '/api/comments',
   async (request, response) => {
-    const term = String(
-      request.body?.term || ''
-    ).trim();
+    const term =
+      String(
+        request.body?.term || ''
+      ).trim();
 
-    const name = String(
-      request.body?.name || ''
-    ).trim();
+    const name =
+      String(
+        request.body?.name || ''
+      ).trim();
 
-    const comment = String(
-      request.body?.comment || ''
-    ).trim();
+    const comment =
+      String(
+        request.body?.comment || ''
+      ).trim();
 
     const parentId =
       request.body?.parentId
@@ -395,159 +718,302 @@ app.post(
           ).trim()
         : null;
 
-    const deviceId = String(
-      request.body?.deviceId || ''
-    ).trim();
+    const deviceId =
+      String(
+        request.body?.deviceId || ''
+      ).trim();
 
-    const sessionId = String(
-      request.body?.sessionId || ''
-    ).trim();
+    const sessionId =
+      String(
+        request.body?.sessionId || ''
+      ).trim();
 
-    if (!term || !validCommentTerm(term)) {
-      return response.status(400).json({
-        error: 'invalid_term',
-      });
+    if (
+      !term ||
+      !validCommentTerm(term)
+    ) {
+      return response
+        .status(400)
+        .json({
+          error: 'invalid_term',
+        });
     }
 
     if (
-      !validAnonymousId(deviceId) ||
-      !validAnonymousId(sessionId)
+      !validAnonymousId(
+        deviceId
+      ) ||
+      !validAnonymousId(
+        sessionId
+      )
     ) {
-      return response.status(400).json({
-        error: 'invalid_anonymous_id',
-      });
+      return response
+        .status(400)
+        .json({
+          error:
+            'invalid_anonymous_id',
+        });
     }
 
     if (!name) {
-      return response.status(400).json({
-        error: 'name_required',
-      });
+      return response
+        .status(400)
+        .json({
+          error: 'name_required',
+        });
     }
 
     if (!comment) {
-      return response.status(400).json({
-        error: 'comment_required',
-      });
+      return response
+        .status(400)
+        .json({
+          error: 'comment_required',
+        });
     }
 
     if (name.length > 50) {
-      return response.status(400).json({
-        error: 'name_too_long',
-      });
+      return response
+        .status(400)
+        .json({
+          error: 'name_too_long',
+        });
     }
 
     if (comment.length > 2000) {
-      return response.status(400).json({
-        error: 'comment_too_long',
-      });
+      return response
+        .status(400)
+        .json({
+          error: 'comment_too_long',
+        });
     }
 
     if (
       parentId &&
-      !/^[a-zA-Z0-9-]{10,100}$/.test(parentId)
+      !/^[a-zA-Z0-9-]{10,100}$/.test(
+        parentId
+      )
     ) {
-      return response.status(400).json({
-        error: 'invalid_parent',
-      });
+      return response
+        .status(400)
+        .json({
+          error: 'invalid_parent',
+        });
     }
 
     try {
-      const result = await withCommentsLock(async () => {
-        const allComments =
-          await readComments();
-
-        if (!Array.isArray(allComments[term])) {
-          allComments[term] = [];
-        }
-
-        if (parentId) {
-          const parent =
-            flattenComments(allComments)
-              .find(
-                (item) =>
-                  item.id === parentId &&
-                  item.term === term
-              );
-
-          if (!parent) {
-            return {
-              status: 404,
-              body: {
-                error: 'parent_not_found',
-              },
-            };
-          }
-
-          if (parent.deleted) {
-            return {
-              status: 400,
-              body: {
-                error: 'parent_deleted',
-              },
-            };
-          }
-
-          const replies =
-            countSessionReplies(
-              allComments,
-              deviceId,
-              sessionId
+      if (redisConfigured()) {
+        try {
+          const existing =
+            await readRedisTermComments(
+              term
             );
 
-          if (replies >= 10) {
+          if (parentId) {
+            const parent =
+              await redisCommand([
+                'HGET',
+                REDIS_COMMENT_HASH,
+                parentId,
+              ]);
+
+            if (!parent) {
+              return response
+                .status(404)
+                .json({
+                  error:
+                    'parent_not_found',
+                });
+            }
+
+            const parentItem =
+              JSON.parse(parent);
+
+            if (
+              parentItem.term !== term
+            ) {
+              return response
+                .status(404)
+                .json({
+                  error:
+                    'parent_not_found',
+                });
+            }
+
+            if (
+              parentItem.deleted
+            ) {
+              return response
+                .status(400)
+                .json({
+                  error:
+                    'parent_deleted',
+                });
+            }
+
+            const replies =
+              countRawSessionReplies(
+                existing,
+                deviceId,
+                sessionId
+              );
+
+            if (replies >= 10) {
+              return response
+                .status(429)
+                .json({
+                  error:
+                    'reply_limit_reached',
+                  message:
+                    'Reply limit reached for this session (10).',
+                });
+            }
+          }
+
+          const now =
+            new Date().toISOString();
+
+          const newComment = {
+            id: randomUUID(),
+            term,
+            name,
+            comment,
+            createdAt: now,
+            updatedAt: null,
+            parentId,
+            deleted: false,
+            ownerId: deviceId,
+            authorSessionId:
+              sessionId,
+          };
+
+          await saveRedisComment(
+            newComment
+          );
+
+          return response
+            .status(201)
+            .json({
+              ok: true,
+              comment:
+                publicComment(
+                  newComment,
+                  deviceId
+                ),
+            });
+        } catch (redisError) {
+          console.warn(
+            'Redis comment write failed; using local JSON:',
+            redisError?.message ||
+              redisError
+          );
+        }
+      }
+
+      const result =
+        await withCommentsLock(
+          async () => {
+            const allComments =
+              await readComments();
+
+            if (
+              !Array.isArray(
+                allComments[term]
+              )
+            ) {
+              allComments[term] = [];
+            }
+
+            if (parentId) {
+              const parent =
+                flattenComments(
+                  allComments
+                ).find(
+                  (item) =>
+                    item.id ===
+                      parentId &&
+                    item.term === term
+                );
+
+              if (!parent) {
+                return {
+                  status: 404,
+                  body: {
+                    error:
+                      'parent_not_found',
+                  },
+                };
+              }
+
+              if (parent.deleted) {
+                return {
+                  status: 400,
+                  body: {
+                    error:
+                      'parent_deleted',
+                  },
+                };
+              }
+
+              const replies =
+                countSessionReplies(
+                  allComments,
+                  deviceId,
+                  sessionId
+                );
+
+              if (replies >= 10) {
+                return {
+                  status: 429,
+                  body: {
+                    error:
+                      'reply_limit_reached',
+                    message:
+                      'Reply limit reached for this session (10).',
+                  },
+                };
+              }
+            }
+
+            const now =
+              new Date().toISOString();
+
+            const newComment = {
+              id: randomUUID(),
+              term,
+              name,
+              comment,
+              createdAt: now,
+              updatedAt: null,
+              parentId,
+              deleted: false,
+              ownerId: deviceId,
+              authorSessionId:
+                sessionId,
+            };
+
+            allComments[
+              term
+            ].unshift(
+              newComment
+            );
+
+            await writeComments(
+              allComments
+            );
+
             return {
-              status: 429,
+              status: 201,
               body: {
-                error: 'reply_limit_reached',
-                message:
-                  'Reply limit reached for this session (10).',
+                ok: true,
+                comment:
+                  publicComment(
+                    newComment,
+                    deviceId
+                  ),
               },
             };
           }
-        }
-
-        const now =
-          new Date().toISOString();
-
-        const newComment = {
-          id: randomUUID(),
-          term,
-          name,
-          comment,
-          createdAt: now,
-          updatedAt: null,
-          parentId,
-          deleted: false,
-          ownerId: deviceId,
-          authorSessionId: sessionId,
-        };
-
-        allComments[term].unshift(
-          newComment
         );
-
-        await writeComments(
-          allComments
-        );
-
-        return {
-          status: 201,
-          body: {
-            ok: true,
-            comment:
-              publicComment(
-                newComment,
-                deviceId
-              ),
-            replyCount:
-              countSessionReplies(
-                allComments,
-                deviceId,
-                sessionId
-              ),
-          },
-        };
-      });
 
       return response
         .status(result.status)
@@ -558,9 +1024,12 @@ app.post(
         error?.message || error
       );
 
-      response.status(500).json({
-        error: 'comment_write_failed',
-      });
+      response
+        .status(500)
+        .json({
+          error:
+            'comment_write_failed',
+        });
     }
   }
 );
@@ -573,100 +1042,199 @@ app.put(
         request.params.id || ''
       ).trim();
 
-    const deviceId = String(
-      request.body?.deviceId || ''
-    ).trim();
+    const deviceId =
+      String(
+        request.body?.deviceId || ''
+      ).trim();
 
-    const comment = String(
-      request.body?.comment || ''
-    ).trim();
+    const comment =
+      String(
+        request.body?.comment || ''
+      ).trim();
 
     if (
       !id ||
-      !/^[a-zA-Z0-9-]{10,100}$/.test(id)
+      !/^[a-zA-Z0-9-]{10,100}$/.test(
+        id
+      )
     ) {
-      return response.status(400).json({
-        error: 'invalid_comment_id',
-      });
+      return response
+        .status(400)
+        .json({
+          error:
+            'invalid_comment_id',
+        });
     }
 
-    if (!validAnonymousId(deviceId)) {
-      return response.status(400).json({
-        error: 'invalid_anonymous_id',
-      });
+    if (
+      !validAnonymousId(
+        deviceId
+      )
+    ) {
+      return response
+        .status(400)
+        .json({
+          error:
+            'invalid_anonymous_id',
+        });
     }
 
     if (!comment) {
-      return response.status(400).json({
-        error: 'comment_required',
-      });
+      return response
+        .status(400)
+        .json({
+          error:
+            'comment_required',
+        });
     }
 
     if (comment.length > 2000) {
-      return response.status(400).json({
-        error: 'comment_too_long',
-      });
+      return response
+        .status(400)
+        .json({
+          error:
+            'comment_too_long',
+        });
     }
 
     try {
-      const result = await withCommentsLock(async () => {
-        const allComments =
-          await readComments();
+      if (redisConfigured()) {
+        try {
+          const raw =
+            await redisCommand([
+              'HGET',
+              REDIS_COMMENT_HASH,
+              id,
+            ]);
 
-        const item =
-          flattenComments(allComments)
-            .find(
-              (entry) =>
-                entry.id === id
-            );
+          if (!raw) {
+            return response
+              .status(404)
+              .json({
+                error:
+                  'comment_not_found',
+              });
+          }
 
-        if (!item) {
-          return {
-            status: 404,
-            body: {
-              error: 'comment_not_found',
-            },
-          };
-        }
+          const item =
+            JSON.parse(raw);
 
-        if (item.ownerId !== deviceId) {
-          return {
-            status: 403,
-            body: {
-              error: 'comment_not_owned',
-            },
-          };
-        }
+          if (
+            item.ownerId !==
+            deviceId
+          ) {
+            return response
+              .status(403)
+              .json({
+                error:
+                  'comment_not_owned',
+              });
+          }
 
-        if (item.deleted) {
-          return {
-            status: 400,
-            body: {
-              error: 'comment_deleted',
-            },
-          };
-        }
+          if (item.deleted) {
+            return response
+              .status(400)
+              .json({
+                error:
+                  'comment_deleted',
+              });
+          }
 
-        item.comment = comment;
-        item.updatedAt =
-          new Date().toISOString();
+          item.comment =
+            comment;
+          item.updatedAt =
+            new Date().toISOString();
 
-        await writeComments(
-          allComments
-        );
+          await saveRedisComment(
+            item
+          );
 
-        return {
-          status: 200,
-          body: {
+          return response.json({
             ok: true,
             comment:
               publicComment(
                 item,
                 deviceId
               ),
-          },
-        };
-      });
+          });
+        } catch (redisError) {
+          console.warn(
+            'Redis comment edit failed; using local JSON:',
+            redisError?.message ||
+              redisError
+          );
+        }
+      }
+
+      const result =
+        await withCommentsLock(
+          async () => {
+            const allComments =
+              await readComments();
+
+            const item =
+              flattenComments(
+                allComments
+              ).find(
+                (entry) =>
+                  entry.id === id
+              );
+
+            if (!item) {
+              return {
+                status: 404,
+                body: {
+                  error:
+                    'comment_not_found',
+                },
+              };
+            }
+
+            if (
+              item.ownerId !==
+              deviceId
+            ) {
+              return {
+                status: 403,
+                body: {
+                  error:
+                    'comment_not_owned',
+                },
+              };
+            }
+
+            if (item.deleted) {
+              return {
+                status: 400,
+                body: {
+                  error:
+                    'comment_deleted',
+                },
+              };
+            }
+
+            item.comment =
+              comment;
+            item.updatedAt =
+              new Date().toISOString();
+
+            await writeComments(
+              allComments
+            );
+
+            return {
+              status: 200,
+              body: {
+                ok: true,
+                comment:
+                  publicComment(
+                    item,
+                    deviceId
+                  ),
+              },
+            };
+          }
+        );
 
       return response
         .status(result.status)
@@ -677,9 +1245,12 @@ app.put(
         error?.message || error
       );
 
-      response.status(500).json({
-        error: 'comment_edit_failed',
-      });
+      response
+        .status(500)
+        .json({
+          error:
+            'comment_edit_failed',
+        });
     }
   }
 );
@@ -692,82 +1263,170 @@ app.delete(
         request.params.id || ''
       ).trim();
 
-    const deviceId = String(
-      request.body?.deviceId || ''
-    ).trim();
+    const deviceId =
+      String(
+        request.body?.deviceId || ''
+      ).trim();
 
     if (
       !id ||
-      !/^[a-zA-Z0-9-]{10,100}$/.test(id)
+      !/^[a-zA-Z0-9-]{10,100}$/.test(
+        id
+      )
     ) {
-      return response.status(400).json({
-        error: 'invalid_comment_id',
-      });
+      return response
+        .status(400)
+        .json({
+          error:
+            'invalid_comment_id',
+        });
     }
 
-    if (!validAnonymousId(deviceId)) {
-      return response.status(400).json({
-        error: 'invalid_anonymous_id',
-      });
+    if (
+      !validAnonymousId(
+        deviceId
+      )
+    ) {
+      return response
+        .status(400)
+        .json({
+          error:
+            'invalid_anonymous_id',
+        });
     }
 
     try {
-      const result = await withCommentsLock(async () => {
-        const allComments =
-          await readComments();
+      if (redisConfigured()) {
+        try {
+          const raw =
+            await redisCommand([
+              'HGET',
+              REDIS_COMMENT_HASH,
+              id,
+            ]);
 
-        const item =
-          flattenComments(allComments)
-            .find(
-              (entry) =>
-                entry.id === id
-            );
+          if (!raw) {
+            return response
+              .status(404)
+              .json({
+                error:
+                  'comment_not_found',
+              });
+          }
 
-        if (!item) {
-          return {
-            status: 404,
-            body: {
-              error: 'comment_not_found',
-            },
-          };
-        }
+          const item =
+            JSON.parse(raw);
 
-        if (item.ownerId !== deviceId) {
-          return {
-            status: 403,
-            body: {
-              error: 'comment_not_owned',
-            },
-          };
-        }
+          if (
+            item.ownerId !==
+            deviceId
+          ) {
+            return response
+              .status(403)
+              .json({
+                error:
+                  'comment_not_owned',
+              });
+          }
 
-        if (item.deleted) {
-          return {
-            status: 400,
-            body: {
-              error: 'comment_already_deleted',
-            },
-          };
-        }
+          if (item.deleted) {
+            return response
+              .status(400)
+              .json({
+                error:
+                  'comment_already_deleted',
+              });
+          }
 
-        item.deleted = true;
-        item.comment = '';
-        item.updatedAt =
-          new Date().toISOString();
+          item.deleted = true;
+          item.comment = '';
+          item.updatedAt =
+            new Date().toISOString();
 
-        await writeComments(
-          allComments
-        );
+          await saveRedisComment(
+            item
+          );
 
-        return {
-          status: 200,
-          body: {
+          return response.json({
             ok: true,
             deleted: true,
             id,
-          },
-        };
-      });
+          });
+        } catch (redisError) {
+          console.warn(
+            'Redis comment delete failed; using local JSON:',
+            redisError?.message ||
+              redisError
+          );
+        }
+      }
+
+      const result =
+        await withCommentsLock(
+          async () => {
+            const allComments =
+              await readComments();
+
+            const item =
+              flattenComments(
+                allComments
+              ).find(
+                (entry) =>
+                  entry.id === id
+              );
+
+            if (!item) {
+              return {
+                status: 404,
+                body: {
+                  error:
+                    'comment_not_found',
+                },
+              };
+            }
+
+            if (
+              item.ownerId !==
+              deviceId
+            ) {
+              return {
+                status: 403,
+                body: {
+                  error:
+                    'comment_not_owned',
+                },
+              };
+            }
+
+            if (item.deleted) {
+              return {
+                status: 400,
+                body: {
+                  error:
+                    'comment_already_deleted',
+                },
+              };
+            }
+
+            item.deleted = true;
+            item.comment = '';
+            item.updatedAt =
+              new Date().toISOString();
+
+            await writeComments(
+              allComments
+            );
+
+            return {
+              status: 200,
+              body: {
+                ok: true,
+                deleted: true,
+                id,
+              },
+            };
+          }
+        );
 
       return response
         .status(result.status)
@@ -778,9 +1437,12 @@ app.delete(
         error?.message || error
       );
 
-      response.status(500).json({
-        error: 'comment_delete_failed',
-      });
+      response
+        .status(500)
+        .json({
+          error:
+            'comment_delete_failed',
+        });
     }
   }
 );
