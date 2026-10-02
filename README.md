@@ -98,7 +98,7 @@ Set it to the deployed Worker URL.
 
 The Pages workflow injects this value into `VITE_COMMENTS_BACKUP_URL`.
 
-When the local server is unavailable, the portfolio automatically falls back to this cloud comment service.
+When configured, the portfolio prefers this cloud comment service for comment traffic so comments can remain available even when the local server is offline. The local API remains a fallback, and both can use the same Redis store.
 
 ### 4. Connect the local server to the same Redis database
 
@@ -113,7 +113,7 @@ Do not commit these values.
 
 With Redis configured, the local Express API and the Cloudflare Worker use the same Redis comment store. This means comments can continue to exist when the local machine is offline.
 
-The local JSON comment file remains a fallback for development when Redis is unavailable.
+The local JSON comment file remains a fallback for development when Redis is unavailable. Local-only comments are migrated into Redis when the shared store becomes available again.
 
 ## Local development
 
