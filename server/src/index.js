@@ -592,23 +592,51 @@ app.get(
               term
             );
 
-          if (rawComments.length === 0) {
-            const local =
-              await readComments();
+          const local =
+            await readComments();
 
-            const localTerm =
-              Array.isArray(local[term])
-                ? local[term]
-                : [];
+          const localTerm =
+            Array.isArray(local[term])
+              ? local[term]
+              : [];
 
-            if (localTerm.length > 0) {
-              await migrateTermToRedis(
-                term,
-                localTerm
+          if (localTerm.length > 0) {
+            const remoteIds =
+              new Set(
+                rawComments.map(
+                  (item) => item.id
+                )
               );
 
-              rawComments =
-                localTerm;
+            const missingLocal =
+              localTerm.filter(
+                (item) =>
+                  item?.id &&
+                  !remoteIds.has(
+                    item.id
+                  )
+              );
+
+            if (
+              missingLocal.length > 0
+            ) {
+              await migrateTermToRedis(
+                term,
+                missingLocal
+              );
+
+              rawComments = [
+                ...rawComments,
+                ...missingLocal,
+              ].sort(
+                (a, b) =>
+                  (Date.parse(
+                    b.createdAt
+                  ) || 0) -
+                  (Date.parse(
+                    a.createdAt
+                  ) || 0)
+              );
             }
           }
 
