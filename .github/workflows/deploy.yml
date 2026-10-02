@@ -1,4 +1,4 @@
-﻿name: Deploy Portfolio
+name: Deploy Portfolio
 
 on:
   push:
@@ -38,27 +38,32 @@ jobs:
         working-directory: client
         run: npm install
 
-      - name: Verify source commit
+      - name: Verify client assets
         shell: bash
         run: |
-          echo "======================================"
-          echo "SOURCE COMMIT"
-          echo "======================================"
-          git rev-parse HEAD
+          set -e
+          if [ -f "client/public/content.json" ]; then
+            echo "FOUND: client/public/content.json"
+          else
+            echo "ERROR: client/public/content.json is missing"
+            exit 1
+          fi
 
-          echo ""
-          echo "======================================"
-          echo "SOURCE FILES"
-          echo "======================================"
-
-          echo "--- client/src/main.jsx ---"
-          sha256sum client/src/main.jsx
-
-          echo "--- client/src/style.css ---"
-          sha256sum client/src/style.css
-
-          echo "--- client/public/content.json ---"
-          sha256sum client/public/content.json
+          if [ -f "client/public/images/profile.png" ]; then
+            echo "FOUND: client/public/images/profile.png"
+          elif [ -f "client/public/profile.png" ]; then
+            echo "FOUND: client/public/profile.png"
+            cp "client/public/profile.png" "client/public/images/profile.png"
+          elif [ -f "client/public/images/profile.jpg" ]; then
+            echo "FOUND: client/public/images/profile.jpg"
+            cp "client/public/images/profile.jpg" "client/public/images/profile.png"
+          elif [ -f "client/public/profile.jpg" ]; then
+            echo "FOUND: client/public/profile.jpg"
+            cp "client/public/profile.jpg" "client/public/images/profile.png"
+          else
+            echo "ERROR: no profile image found"
+            exit 1
+          fi
 
       - name: Build client
         working-directory: client
@@ -69,22 +74,31 @@ jobs:
       - name: Verify build output
         shell: bash
         run: |
-          echo "======================================"
-          echo "BUILD OUTPUT"
-          echo "======================================"
+          set -e
 
-          test -f client/dist/index.html
+          if [ -f "client/dist/index.html" ]; then
+            echo "FOUND: client/dist/index.html"
+          else
+            echo "ERROR: client/dist/index.html is missing"
+            exit 1
+          fi
 
-          echo ""
-          echo "Dist files:"
+          if [ -f "client/dist/content.json" ]; then
+            echo "FOUND: client/dist/content.json"
+          else
+            echo "ERROR: client/dist/content.json is missing"
+            exit 1
+          fi
+
+          if [ -f "client/dist/images/profile.png" ]; then
+            echo "FOUND: client/dist/images/profile.png"
+          else
+            echo "ERROR: client/dist/images/profile.png is missing"
+            exit 1
+          fi
+
+          echo "Build output:"
           find client/dist -maxdepth 3 -type f | sort
-
-          echo ""
-          echo "index.html hash:"
-          sha256sum client/dist/index.html
-
-          echo ""
-          echo "BUILD SUCCESSFUL"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
