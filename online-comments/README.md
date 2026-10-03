@@ -67,7 +67,8 @@ Only anonymous comment data is stored:
 - parent comment id
 - creation/update timestamps
 - opaque browser ownership token
-- opaque browser-session token
+
+The browser keeps the ownership token in a first-party cookie with a local-storage backup so the same browser can return later and still edit or delete its own comments. The comment limit is up to 10 replies per anonymous browser identity for each discussion. The browser can create a new anonymous identity when its cookie and local storage are cleared, so this is an anonymous convenience/ownership mechanism rather than account authentication.
 
 The online comment service does not intentionally store IP addresses, precise location, PID, PHI, passwords, API keys, payment information, Google Drive credentials, chatbot conversations, or portfolio content.
 
