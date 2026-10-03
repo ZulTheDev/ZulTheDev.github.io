@@ -2227,6 +2227,20 @@ function WriteupDocumentEditor({
           <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('justifyCenter')}>Center</button>
           <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('insertUnorderedList')}>• List</button>
           <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('insertOrderedList')}>1. List</button>
+          <select className="writeup-format-select" onChange={(e) => document.execCommand('fontName', false, e.target.value)} defaultValue="">
+            <option value="" disabled>Font</option>
+            <option value="Arial">Arial</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Courier New">Mono</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+          <select className="writeup-format-select" onChange={(e) => document.execCommand('fontSize', false, e.target.value)} defaultValue="">
+            <option value="" disabled>Size</option>
+            <option value="2">Small</option>
+            <option value="3">Normal</option>
+            <option value="4">Large</option>
+            <option value="5">XL</option>
+          </select>
           <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('createLink', false, prompt('Link URL') || '')}>Link</button>
         </div>
 
