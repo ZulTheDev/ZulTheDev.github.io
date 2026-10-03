@@ -778,8 +778,10 @@ function AdminShell({ user, onLogout }) {
 
       await loadWriteups();
       setNotice('Writeup draft saved.');
+      return buildWriteupFrom(data.writeup || payload);
     } catch (error) {
       setNotice('Writeup save failed: ' + error.message);
+      return null;
     } finally {
       setWriteupSaving(false);
     }
@@ -791,13 +793,13 @@ function AdminShell({ user, onLogout }) {
     setWriteupPublishing(true);
 
     try {
-      await saveWriteupDraft();
+      const saved = await saveWriteupDraft();
 
-      const slug =
-        safeWriteupSlug(
-          activeWriteup.slug ||
-          activeWriteup.title
-        );
+      if (!saved) {
+        throw new Error('Writeup draft could not be saved.');
+      }
+
+      const slug = saved.slug;
 
       const response = await authFetch(
         API +
@@ -1973,7 +1975,7 @@ function WriteupsEditor({
               <small>CTF BLOG</small>
               <h2>Writeup workspace</h2>
             </div>
-            <button className="accent-button" onClick={start}>+ New writeup</button>
+            <button className="accent-button" onClick={startNew}>+ New writeup</button>
           </div>
 
           <p className="helper">
@@ -1984,7 +1986,7 @@ function WriteupsEditor({
           {loading ? (
             <div className="media-empty">Loading writeup drafts...</div>
           ) : !writeups.length ? (
-            <EmptyState action={<button className="accent-button" onClick={start}>+ Create your first writeup</button>} />
+            <EmptyState action={<button className="accent-button" onClick={startNew}>+ Create your first writeup</button>} />
           ) : (
             <div className="writeup-draft-list">
               {writeups.map((item) => (
