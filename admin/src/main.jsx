@@ -1933,6 +1933,1063 @@ function StringListEditor({ items, onChange, placeholder, addLabel }) {
   );
 }
 
+
+function WriteupsEditor({
+  writeups,
+  activeWriteup,
+  setActiveWriteup,
+  loading,
+  saving,
+  publishing,
+  tab,
+  setTab,
+  startNew,
+  openWriteup,
+  saveDraft,
+  publish,
+  updateWriteup,
+  uploadFile,
+  r2Objects,
+  r2Loading,
+  loadR2Objects,
+}) {
+  return (
+    <div className="writeup-admin-shell">
+      {!activeWriteup ? (
+        <section className="panel">
+          <div className="panel-head">
+            <div>
+              <small>CTF BLOG</small>
+              <h2>Writeup workspace</h2>
+            </div>
+            <button className="accent-button" onClick={start}>+ New writeup</button>
+          </div>
+
+          <p className="helper">
+            Build a structured writeup, add sessions, attach R2 media, embed runnable code and create
+            an interactive object-to-object workflow before publishing it to <code>/ctf-blog/&lt;slug&gt;</code>.
+          </p>
+
+          {loading ? (
+            <div className="media-empty">Loading writeup drafts...</div>
+          ) : !writeups.length ? (
+            <EmptyState action={<button className="accent-button" onClick={start}>+ Create your first writeup</button>} />
+          ) : (
+            <div className="writeup-draft-list">
+              {writeups.map((item) => (
+                <button
+                  className="writeup-draft-card"
+                  key={item.slug}
+                  onClick={() => openWriteup(item.slug)}
+                >
+                  <div>
+                    <small>{item.status || 'draft'} · {item.slug}</small>
+                    <strong>{item.title || 'Untitled writeup'}</strong>
+                    <span>{item.excerpt || 'No excerpt yet.'}</span>
+                  </div>
+                  <b>Open →</b>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="panel writeup-editor-panel">
+          <div className="writeup-editor-head">
+            <div>
+              <small>WRITEUP / {activeWriteup.status || 'DRAFT'}</small>
+              <h2>{activeWriteup.title || 'Untitled CTF writeup'}</h2>
+              <span>/ctf-blog/{activeWriteup.slug || 'writeup-slug'}</span>
+            </div>
+            <div className="writeup-editor-actions">
+              <button className="ghost" onClick={() => setActiveWriteup(null)} disabled={saving || publishing}>Back</button>
+              <button className="ghost" onClick={saveDraft} disabled={saving || publishing}>
+                {saving ? 'Saving...' : 'Save draft'}
+              </button>
+              <button className="save" onClick={publish} disabled={saving || publishing || !activeWriteup.title?.trim()}>
+                {publishing ? 'Publishing...' : 'Publish'}
+              </button>
+            </div>
+          </div>
+
+          <div className="writeup-tabs">
+            {[
+              ['document', 'Document'],
+              ['workspace', 'Interactive workspace'],
+              ['media', 'R2 media'],
+              ['preview', 'Preview data'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                className={tab === key ? 'active' : ''}
+                onClick={() => setTab(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'document' && (
+            <WriteupDocumentEditor
+              writeup={activeWriteup}
+              updateWriteup={updateWriteup}
+              uploadFile={uploadFile}
+            />
+          )}
+
+          {tab === 'workspace' && (
+            <WriteupWorkspaceTab
+              writeup={activeWriteup}
+              updateWriteup={updateWriteup}
+            />
+          )}
+
+          {tab === 'media' && (
+            <WriteupR2MediaTab
+              writeup={activeWriteup}
+              updateWriteup={updateWriteup}
+              uploadFile={uploadFile}
+              r2Objects={r2Objects}
+              r2Loading={r2Loading}
+              loadR2Objects={loadR2Objects}
+            />
+          )}
+
+          {tab === 'preview' && (
+            <WriteupPreviewData writeup={activeWriteup} />
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
+
+function WriteupDocumentEditor({
+  writeup,
+  updateWriteup,
+  uploadFile,
+}) {
+  const sessions = Array.isArray(writeup.sessions) ? writeup.sessions : [];
+  const blocks = Array.isArray(writeup.blocks) ? writeup.blocks : [];
+
+  function updateField(field, value) {
+    updateWriteup((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function updateSession(index, field, value) {
+    updateWriteup((current) => {
+      const next = clone(current.sessions || []);
+      next[index] = {
+        ...(next[index] || {}),
+        [field]: value,
+      };
+      return { ...current, sessions: next };
+    });
+  }
+
+  function addSession() {
+    const session = {
+      id: makeId('session'),
+      title: 'New session',
+    };
+
+    updateWriteup((current) => ({
+      ...current,
+      sessions: [...(current.sessions || []), session],
+    }));
+  }
+
+  function removeSession(index) {
+    updateWriteup((current) => {
+      const nextSessions = current.sessions.filter((_, i) => i !== index);
+      const removedId = current.sessions[index]?.id;
+      const fallback = nextSessions[0]?.id || '';
+
+      return {
+        ...current,
+        sessions: nextSessions.length ? nextSessions : [{ id: makeId('session'), title: 'Introduction' }],
+        blocks: (current.blocks || []).map((block) =>
+          block.sessionId === removedId
+            ? { ...block, sessionId: fallback }
+            : block
+        ),
+      };
+    });
+  }
+
+  function addBlock(type = 'paragraph') {
+    updateWriteup((current) => {
+      const sessionId =
+        current.sessions?.[current.sessions.length - 1]?.id || '';
+
+      const base = {
+        id: makeId('block'),
+        sessionId,
+        type,
+      };
+
+      if (type === 'heading') base.html = '<strong>New section</strong>';
+      else if (type === 'code') Object.assign(base, { languageId: 71, code: '', stdin: '' });
+      else if (type === 'table') Object.assign(base, { headers: ['Column 1', 'Column 2'], rows: [['', ''], ['', '']] });
+      else if (type === 'list') base.html = '<ul><li>List item</li></ul>';
+      else if (type === 'quote') base.html = '<p>Quote</p>';
+      else if (type === 'media') Object.assign(base, { media: null });
+      else if (type === 'workflow') Object.assign(base, { title: 'Interactive workflow' });
+      else base.html = '';
+
+      return {
+        ...current,
+        blocks: [...(current.blocks || []), base],
+      };
+    });
+  }
+
+  function updateBlock(index, nextBlock) {
+    updateWriteup((current) => {
+      const blocksNext = [...(current.blocks || [])];
+      blocksNext[index] = nextBlock;
+      return { ...current, blocks: blocksNext };
+    });
+  }
+
+  function removeBlock(index) {
+    updateWriteup((current) => ({
+      ...current,
+      blocks: (current.blocks || []).filter((_, i) => i !== index),
+    }));
+  }
+
+  function moveBlock(index, direction) {
+    updateWriteup((current) => {
+      const next = [...(current.blocks || [])];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...current, blocks: next };
+    });
+  }
+
+  return (
+    <div className="writeup-document-layout">
+      <aside className="writeup-session-rail">
+        <div className="writeup-meta-card">
+          <label className="field">
+            <span>Title</span>
+            <input value={writeup.title || ''} onChange={(e) => updateField('title', e.target.value)} />
+          </label>
+          <label className="field">
+            <span>URL slug</span>
+            <input value={writeup.slug || ''} onChange={(e) => updateField('slug', e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Excerpt</span>
+            <textarea rows={4} value={writeup.excerpt || ''} onChange={(e) => updateField('excerpt', e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Tags, comma separated</span>
+            <input
+              value={Array.isArray(writeup.tags) ? writeup.tags.join(', ') : ''}
+              onChange={(e) => updateField('tags', e.target.value.split(',').map((x) => x.trim()).filter(Boolean))}
+            />
+          </label>
+        </div>
+
+        <div className="writeup-session-list">
+          <div className="writeup-session-list-head">
+            <small>SESSIONS</small>
+            <button className="accent-button small" onClick={addSession}>+</button>
+          </div>
+
+          {sessions.map((session, index) => (
+            <div className="writeup-session-row" key={session.id}>
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <input value={session.title || ''} onChange={(e) => updateSession(index, 'title', e.target.value)} />
+              <button className="delete-button compact" onClick={() => removeSession(index)}>×</button>
+            </div>
+          ))}
+
+          <div className="writeup-session-hint">
+            These sessions become the public table-of-contents navigation and each block can be assigned to one.
+          </div>
+        </div>
+      </aside>
+
+      <main className="writeup-document">
+        <div className="writeup-format-toolbar">
+          <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('bold')}>B</button>
+          <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('italic')}>I</button>
+          <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('underline')}>U</button>
+          <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('justifyLeft')}>Left</button>
+          <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('justifyCenter')}>Center</button>
+          <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('insertUnorderedList')}>• List</button>
+          <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('insertOrderedList')}>1. List</button>
+          <button className="ghost small" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('createLink', false, prompt('Link URL') || '')}>Link</button>
+        </div>
+
+        <div className="writeup-editor-paper">
+          {!blocks.length && (
+            <div className="media-empty">
+              Start writing, then add tables, code, media or an interactive workflow.
+            </div>
+          )}
+
+          {blocks.map((block, index) => (
+            <WriteupBlockEditor
+              key={block.id}
+              block={block}
+              index={index}
+              sessions={sessions}
+              update={(next) => updateBlock(index, next)}
+              remove={() => removeBlock(index)}
+              moveUp={() => moveBlock(index, -1)}
+              moveDown={() => moveBlock(index, 1)}
+              uploadFile={uploadFile}
+              addBlock={addBlock}
+            />
+          ))}
+
+          <div className="writeup-add-menu">
+            {WRITEUP_BLOCK_TYPES.map(([type, label]) => (
+              <button
+                className="ghost"
+                key={type}
+                onClick={() => addBlock(type)}
+              >
+                + {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function WriteupBlockEditor({
+  block,
+  index,
+  sessions,
+  update,
+  remove,
+  moveUp,
+  moveDown,
+  uploadFile,
+}) {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const editableTypes = new Set(['paragraph', 'heading', 'quote', 'list']);
+
+  function updateField(field, value) {
+    update({
+      ...block,
+      [field]: value,
+    });
+  }
+
+  async function runCode() {
+    setRunning(true);
+    setResult(null);
+
+    try {
+      const response = await fetch(API + '/api/judge0/run', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source_code: block.code || '',
+          language_id: Number(block.languageId || 71),
+          stdin: block.stdin || '',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail ||
+          data?.error ||
+          'Judge0 request failed'
+        );
+      }
+
+      setResult(data);
+    } catch (error) {
+      setResult({
+        error: error.message,
+      });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function uploadMedia(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return;
+
+    try {
+      const media = await uploadFile(file, 'writeup-media');
+      update({
+        ...block,
+        media,
+      });
+    } catch (error) {
+      setResult({
+        error: error.message,
+      });
+    }
+  }
+
+  return (
+    <article className="writeup-block-editor">
+      <div className="writeup-block-handle">
+        <span>#{index + 1}</span>
+        <select
+          value={block.type || 'paragraph'}
+          onChange={(e) => updateField('type', e.target.value)}
+        >
+          {WRITEUP_BLOCK_TYPES.map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+        <select
+          value={block.sessionId || sessions[0]?.id || ''}
+          onChange={(e) => updateField('sessionId', e.target.value)}
+        >
+          {sessions.map((session) => (
+            <option key={session.id} value={session.id}>{session.title}</option>
+          ))}
+        </select>
+        <div className="writeup-block-actions">
+          <button className="ghost small" onClick={moveUp}>↑</button>
+          <button className="ghost small" onClick={moveDown}>↓</button>
+          <button className="delete-button compact" onClick={remove}>×</button>
+        </div>
+      </div>
+
+      {editableTypes.has(block.type) && (
+        <div
+          className={'writeup-rich-editor ' + block.type}
+          contentEditable
+          suppressContentEditableWarning
+          dangerouslySetInnerHTML={{ __html: block.html || '' }}
+          onBlur={(e) => updateField('html', e.currentTarget.innerHTML)}
+        />
+      )}
+
+      {block.type === 'table' && (
+        <WriteupTableEditor
+          block={block}
+          update={update}
+        />
+      )}
+
+      {block.type === 'code' && (
+        <div className="writeup-code-editor">
+          <div className="writeup-code-toolbar">
+            <select
+              value={Number(block.languageId || 71)}
+              onChange={(e) => updateField('languageId', Number(e.target.value))}
+            >
+              {JUDGE0_LANGUAGES.map((language) => (
+                <option key={language.id} value={language.id}>{language.label}</option>
+              ))}
+            </select>
+            <button className="accent-button small" onClick={runCode} disabled={running || !block.code?.trim()}>
+              {running ? 'Running...' : 'Run with Judge0'}
+            </button>
+          </div>
+          <textarea
+            className="code-input"
+            value={block.code || ''}
+            onChange={(e) => updateField('code', e.target.value)}
+            spellCheck={false}
+            placeholder="// Paste challenge code here"
+          />
+          <textarea
+            className="stdin-input"
+            value={block.stdin || ''}
+            onChange={(e) => updateField('stdin', e.target.value)}
+            spellCheck={false}
+            placeholder="stdin (optional)"
+          />
+          {result && <pre className="judge-result">{JSON.stringify(result, null, 2)}</pre>}
+        </div>
+      )}
+
+      {block.type === 'media' && (
+        <div className="writeup-media-editor">
+          <div className="media-upload-row">
+            <label className="ghost file-button">
+              Choose file
+              <input type="file" accept="image/*,video/*,audio/*,application/pdf,text/plain,.zip,.7z,.pcap" onChange={uploadMedia} />
+            </label>
+            <input
+              value={block.media?.url || ''}
+              onChange={(e) => updateField('media', { ...(block.media || {}), url: e.target.value })}
+              placeholder="or paste an R2/public media URL"
+            />
+          </div>
+          <div className="form-grid">
+            <Field label="Title" value={block.media?.name || ''} onChange={(v) => updateField('media', { ...(block.media || {}), name: v })} />
+            <Field label="Alt text" value={block.media?.alt || ''} onChange={(v) => updateField('media', { ...(block.media || {}), alt: v })} />
+          </div>
+        </div>
+      )}
+
+      {block.type === 'workflow' && (
+        <div className="writeup-workflow-placeholder">
+          The interactive workflow is edited in the <strong>Interactive workspace</strong> tab.
+          Drop document blocks onto the canvas there, position them and connect the objects.
+        </div>
+      )}
+    </article>
+  );
+}
+
+function WriteupTableEditor({ block, update }) {
+  const headers = Array.isArray(block.headers) ? block.headers : ['Column 1', 'Column 2'];
+  const rows = Array.isArray(block.rows) ? block.rows : [['', ''], ['', '']];
+
+  function setCell(rowIndex, colIndex, value, header = false) {
+    const nextHeaders = [...headers];
+    const nextRows = rows.map((row) => [...row]);
+
+    if (header) {
+      nextHeaders[colIndex] = value;
+    } else {
+      nextRows[rowIndex][colIndex] = value;
+    }
+
+    update({
+      ...block,
+      headers: nextHeaders,
+      rows: nextRows,
+    });
+  }
+
+  function addRow() {
+    update({
+      ...block,
+      rows: [...rows, headers.map(() => '')],
+    });
+  }
+
+  function addColumn() {
+    update({
+      ...block,
+      headers: [...headers, 'New column'],
+      rows: rows.map((row) => [...row, '']),
+    });
+  }
+
+  function removeRow() {
+    if (rows.length <= 1) return;
+    update({
+      ...block,
+      rows: rows.slice(0, -1),
+    });
+  }
+
+  function removeColumn() {
+    if (headers.length <= 1) return;
+    update({
+      ...block,
+      headers: headers.slice(0, -1),
+      rows: rows.map((row) => row.slice(0, -1)),
+    });
+  }
+
+  return (
+    <div className="writeup-table-editor">
+      <div className="table-controls">
+        <button className="ghost small" onClick={addRow}>+ row</button>
+        <button className="ghost small" onClick={removeRow}>− row</button>
+        <button className="ghost small" onClick={addColumn}>+ column</button>
+        <button className="ghost small" onClick={removeColumn}>− column</button>
+      </div>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              {headers.map((header, colIndex) => (
+                <th key={colIndex}>
+                  <input
+                    value={header}
+                    onChange={(e) => setCell(0, colIndex, e.target.value, true)}
+                  />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {headers.map((_, colIndex) => (
+                  <td key={colIndex}>
+                    <input
+                      value={row[colIndex] || ''}
+                      onChange={(e) => setCell(rowIndex, colIndex, e.target.value)}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function WriteupWorkspaceTab({ writeup, updateWriteup }) {
+  const [connectMode, setConnectMode] = useState(false);
+  const [connectFrom, setConnectFrom] = useState(null);
+
+  const workspace = writeup.workspace || {
+    id: makeId('workspace'),
+    title: 'Interactive workflow',
+    nodes: [],
+    edges: [],
+  };
+
+  function updateWorkspace(updater) {
+    updateWriteup((current) => ({
+      ...current,
+      workspace: typeof updater === 'function'
+        ? updater(current.workspace || workspace)
+        : updater,
+    }));
+  }
+
+  function addNode(x = 100, y = 80, label = 'Object') {
+    updateWorkspace((current) => ({
+      ...current,
+      nodes: [
+        ...(current.nodes || []),
+        {
+          id: makeId('node'),
+          x,
+          y,
+          label,
+          type: 'object',
+          refBlockId: '',
+        },
+      ],
+    }));
+  }
+
+  function moveNode(id, x, y) {
+    updateWorkspace((current) => ({
+      ...current,
+      nodes: (current.nodes || []).map((node) =>
+        node.id === id
+          ? { ...node, x, y }
+          : node
+      ),
+    }));
+  }
+
+  function updateNode(id, field, value) {
+    updateWorkspace((current) => ({
+      ...current,
+      nodes: (current.nodes || []).map((node) =>
+        node.id === id
+          ? { ...node, [field]: value }
+          : node
+      ),
+    }));
+  }
+
+  function removeNode(id) {
+    updateWorkspace((current) => ({
+      ...current,
+      nodes: (current.nodes || []).filter((node) => node.id !== id),
+      edges: (current.edges || []).filter(
+        (edge) => edge.from !== id && edge.to !== id
+      ),
+    }));
+
+    if (connectFrom === id) {
+      setConnectFrom(null);
+    }
+  }
+
+  function connectNode(id) {
+    if (!connectMode) return;
+
+    if (!connectFrom) {
+      setConnectFrom(id);
+      return;
+    }
+
+    if (connectFrom === id) {
+      setConnectFrom(null);
+      return;
+    }
+
+    updateWorkspace((current) => ({
+      ...current,
+      edges: [
+        ...(current.edges || []).filter(
+          (edge) =>
+            !(edge.from === connectFrom && edge.to === id)
+        ),
+        {
+          id: makeId('edge'),
+          from: connectFrom,
+          to: id,
+          label: '',
+        },
+      ],
+    }));
+
+    setConnectFrom(null);
+  }
+
+  function onCanvasDrop(event) {
+    event.preventDefault();
+
+    const raw = event.dataTransfer.getData('application/x-writeup-block');
+
+    if (!raw) return;
+
+    try {
+      const data = JSON.parse(raw);
+      const rect = event.currentTarget.getBoundingClientRect();
+
+      updateWorkspace((current) => ({
+        ...current,
+        nodes: [
+          ...(current.nodes || []),
+          {
+            id: makeId('node'),
+            x: Math.max(20, event.clientX - rect.left - 70),
+            y: Math.max(20, event.clientY - rect.top - 30),
+            label: data.label,
+            type: 'document-block',
+            refBlockId: data.id,
+          },
+        ],
+      }));
+    } catch {}
+  }
+
+  function startDrag(event, block) {
+    event.dataTransfer.setData(
+      'application/x-writeup-block',
+      JSON.stringify({
+        id: block.id,
+        label: (block.html || block.type || 'Block')
+          .replace(/<[^>]+>/g, '')
+          .slice(0, 50),
+      })
+    );
+  }
+
+  const nodes = Array.isArray(workspace.nodes) ? workspace.nodes : [];
+  const edges = Array.isArray(workspace.edges) ? workspace.edges : [];
+
+  return (
+    <div className="writeup-workspace">
+      <div className="writeup-workspace-toolbar">
+        <div>
+          <small>INTERACTIVE CANVAS</small>
+          <h2>{workspace.title || 'Interactive workflow'}</h2>
+          <p>Drag document blocks into the canvas. Turn on Connect, then click object A and object B to create a workflow edge.</p>
+        </div>
+        <div className="writeup-workspace-actions">
+          <button className={connectMode ? 'accent-button small' : 'ghost small'} onClick={() => { setConnectMode(!connectMode); setConnectFrom(null); }}>
+            {connectMode ? 'Connecting...' : 'Connect objects'}
+          </button>
+          <button className="ghost small" onClick={() => addNode()}>
+            + Empty object
+          </button>
+        </div>
+      </div>
+
+      <div className="workspace-grid">
+        <aside className="workspace-palette">
+          <small>DRAG INTO WORKSPACE</small>
+          {writeup.blocks.map((block) => (
+            <div
+              key={block.id}
+              className="workspace-palette-item"
+              draggable
+              onDragStart={(event) => startDrag(event, block)}
+            >
+              <strong>{block.type}</strong>
+              <span>{(block.html || block.code || block.title || 'Untitled').replace(/<[^>]+>/g, '').slice(0, 80)}</span>
+            </div>
+          ))}
+
+          <div className="workspace-palette-help">
+            Each object can point back to a document block. The public writeup turns these into clickable interactive nodes.
+          </div>
+        </aside>
+
+        <div
+          className={connectMode ? 'workspace-canvas connecting' : 'workspace-canvas'}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={onCanvasDrop}
+        >
+          <svg className="workspace-edges">
+            {edges.map((edge) => {
+              const from = nodes.find((node) => node.id === edge.from);
+              const to = nodes.find((node) => node.id === edge.to);
+
+              if (!from || !to) return null;
+
+              return (
+                <line
+                  key={edge.id}
+                  x1={from.x + 70}
+                  y1={from.y + 34}
+                  x2={to.x + 70}
+                  y2={to.y + 34}
+                  markerEnd="url(#workspace-arrow)"
+                />
+              );
+            })}
+            <defs>
+              <marker id="workspace-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" />
+              </marker>
+            </defs>
+          </svg>
+
+          {nodes.map((node) => (
+            <WorkspaceNode
+              key={node.id}
+              node={node}
+              connectMode={connectMode}
+              connectFrom={connectFrom}
+              blocks={writeup.blocks}
+              onMove={moveNode}
+              onConnect={() => connectNode(node.id)}
+              onChange={updateNode}
+              onRemove={() => removeNode(node.id)}
+            />
+          ))}
+
+          {!nodes.length && (
+            <div className="workspace-empty">
+              Drag any document block here to create the first interactive object.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceNode({
+  node,
+  connectMode,
+  connectFrom,
+  blocks,
+  onMove,
+  onConnect,
+  onChange,
+  onRemove,
+}) {
+  const [dragging, setDragging] = useState(false);
+
+  function startDrag(event) {
+    if (connectMode) {
+      event.preventDefault();
+      onConnect();
+      return;
+    }
+
+    setDragging(true);
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const originX = node.x;
+    const originY = node.y;
+
+    function move(moveEvent) {
+      onMove(
+        node.id,
+        Math.max(10, originX + moveEvent.clientX - startX),
+        Math.max(10, originY + moveEvent.clientY - startY)
+      );
+    }
+
+    function up() {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    }
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  const block = blocks.find((item) => item.id === node.refBlockId);
+
+  return (
+    <div
+      className={
+        'workspace-node' +
+        (dragging ? ' dragging' : '') +
+        (connectFrom === node.id ? ' selected' : '')
+      }
+      style={{ left: node.x, top: node.y }}
+      onPointerDown={startDrag}
+    >
+      <div className="workspace-node-top">
+        <input
+          value={node.label || ''}
+          onChange={(event) => onChange(node.id, 'label', event.target.value)}
+          onPointerDown={(event) => event.stopPropagation()}
+        />
+        <button className="delete-button compact" onClick={onRemove}>×</button>
+      </div>
+      <select
+        value={node.refBlockId || ''}
+        onChange={(event) => onChange(node.id, 'refBlockId', event.target.value)}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <option value="">No document target</option>
+        {blocks.map((item, index) => (
+          <option key={item.id} value={item.id}>
+            #{index + 1} · {item.type}
+          </option>
+        ))}
+      </select>
+      <button
+        className="workspace-node-connect"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={onConnect}
+      >
+        {connectMode
+          ? (connectFrom === node.id ? 'Selected' : 'Connect')
+          : 'Select'}
+      </button>
+    </div>
+  );
+}
+
+function WriteupR2MediaTab({
+  writeup,
+  updateWriteup,
+  uploadFile,
+  r2Objects,
+  r2Loading,
+  loadR2Objects,
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState(null);
+
+  async function upload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return;
+
+    setUploading(true);
+    setUploaded(null);
+
+    try {
+      const media = await uploadFile(
+        file,
+        writeup.slug || writeup.title
+      );
+
+      setUploaded(media);
+
+      updateWriteup((current) => ({
+        ...current,
+        mediaLibrary: [
+          ...(Array.isArray(current.mediaLibrary)
+            ? current.mediaLibrary
+            : []),
+          media,
+        ],
+      }));
+    } catch (error) {
+      setUploaded({ error: error.message });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="writeup-r2-tab">
+      <div className="writeup-r2-head">
+        <div>
+          <small>CLOUDFLARE R2</small>
+          <h2>Writeup media storage</h2>
+          <p>Upload images, video, audio, PDFs and other challenge evidence into the R2 writeup prefix.</p>
+        </div>
+        <div>
+          <label className="accent-button file-button">
+            {uploading ? 'Uploading...' : '+ Upload media'}
+            <input
+              type="file"
+              accept="image/*,video/*,audio/*,application/pdf,text/plain,.zip,.7z,.pcap"
+              onChange={upload}
+              disabled={uploading}
+            />
+          </label>
+          <button className="ghost" onClick={loadR2Objects} disabled={r2Loading}>
+            {r2Loading ? 'Loading...' : 'Refresh R2'}
+          </button>
+        </div>
+      </div>
+
+      {uploaded && (
+        <div className={uploaded.error ? 'test-error' : 'test-output'}>
+          {uploaded.error || 'Uploaded: ' + (uploaded.url || uploaded.key)}
+        </div>
+      )}
+
+      <div className="r2-object-list">
+        {!r2Objects.length ? (
+          <div className="media-empty">No R2 objects loaded yet.</div>
+        ) : (
+          r2Objects.map((item) => (
+            <div className="r2-object-row" key={item.key}>
+              <div>
+                <strong>{item.key}</strong>
+                <small>{item.size ? Math.round(item.size / 1024) + ' KB' : ''}</small>
+              </div>
+              <code>{item.lastModified ? new Date(item.lastModified).toLocaleString() : ''}</code>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WriteupPreviewData({ writeup }) {
+  return (
+    <div className="writeup-preview-data">
+      <div className="preview-json-card">
+        <small>PUBLIC ROUTE</small>
+        <strong>/ctf-blog/{writeup.slug}</strong>
+        <p>Published data will be written to client/public/ctf-blog/{writeup.slug}.json.</p>
+      </div>
+      <div className="preview-json-card">
+        <small>PUBLIC DISCUSSION TERM</small>
+        <strong>ctf-blog:{writeup.slug}</strong>
+        <p>Anonymous + GitHub discussion is attached to the bottom of the public writeup.</p>
+      </div>
+      <pre>{JSON.stringify(writeup, null, 2)}</pre>
+    </div>
+  );
+}
+
 function MediaListEditor({ media, onChange }) {
   const items = Array.isArray(media) ? media : [];
 
