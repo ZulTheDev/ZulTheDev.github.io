@@ -111,6 +111,8 @@ GITHUB_APP_AUTO_PUSH=false
 
 Set `GITHUB_APP_AUTO_PUSH=true` after the App is installed and tested. The local admin's **Service diagnostics** panel checks the GitHub App connection. GitHub App authentication and installation-token behavior are documented by GitHub. urlGitHub Apps documentationhttps://docs.github.com/en/apps
 
+When `GITHUB_APP_AUTO_PUSH=true`, saving the main portfolio content also updates `client/public/content.json` in the repository. Portfolio card media can be uploaded directly from the admin; certification uploads are stored under `client/public/certs/`, while other collection media uses `client/public/portfolio-media/<section>/`. The admin stores the public `/certs/...` path in the content data and provides a GitHub raw preview so the uploaded image can be viewed immediately.
+
 The generated CTF files are intentionally kept small and static so GitHub Pages can serve the writeups without requiring the local admin server to be online.
 ### Admin
 
