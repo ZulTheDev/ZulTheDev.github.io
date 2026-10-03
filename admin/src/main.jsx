@@ -1055,6 +1055,7 @@ function AdminShell() {
     const checks = [
       probe('Local API', API + '/api/health'),
       probe('Online API', ONLINE_API + '/api/health'),
+      probe('R2', API + '/api/r2/status'),
     ];
 
     checks.push(probe('Local AI', API + '/api/ai-status'));
@@ -1062,12 +1063,14 @@ function AdminShell() {
     const results = await Promise.all(checks);
     const local = results[0];
     const online = results[1];
-    const ai = results[2];
+    const r2 = results[2];
+    const ai = results[3];
 
     setServiceStatus({
       local,
       ai,
       online,
+      r2,
       checkedAt: new Date().toISOString(),
     });
     setServiceLoading(false);
@@ -1387,6 +1390,7 @@ function AdminShell() {
               r2Loading={r2Loading}
               loadR2Objects={loadR2Objects}
               openR2Object={openR2Object}
+              deleteR2Object={deleteR2Object}
             />
           )}
 
@@ -3063,6 +3067,7 @@ function DashboardEditor({
         <div className="service-list">
           {[
             ['local', 'Local API'],
+            ['r2', 'Cloudflare R2'],
             ['ai', 'Local AI'],
             ['online', 'Online Vercel API'],
           ].map(([key, label]) => (
@@ -3200,7 +3205,7 @@ function SystemEditor({
     <div className="system-grid">
       <section className="panel">
         <PanelHeader eyebrow="RUNTIME" title="Service diagnostics" />
-        <div className="service-list">{[['local', 'Local API'], ['ai', 'Local AI'], ['online', 'Online API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
+        <div className="service-list">{[['local', 'Local API'], ['r2', 'Cloudflare R2'], ['ai', 'Local AI'], ['online', 'Online API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
         <button className="accent-button" onClick={refreshSystem} disabled={serviceLoading}>{serviceLoading ? 'Checking...' : 'Run diagnostic'}</button>
         {serviceStatus.checkedAt && <small className="system-note">Checked {new Date(serviceStatus.checkedAt).toLocaleString()}</small>}
       </section>
