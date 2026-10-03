@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { google } from 'googleapis';
 import { createClient } from 'redis';
 import {
@@ -55,253 +55,6 @@ const visitorsFile = path.join(
 
 let commentsWriteQueue = Promise.resolve();
 let visitorsWriteQueue = Promise.resolve();
-
-/* =========================================================
-   LOCAL ADMIN AUTH + RBAC
-========================================================= */
-
-const ADMIN_SESSION_TTL_MS =
-  Number(process.env.ADMIN_SESSION_TTL_MINUTES || 480) * 60 * 1000;
-
-const ADMIN_ROLES = new Set([
-  'admin',
-  'editor',
-  'moderator',
-  'diagnostics',
-]);
-
-const ROLE_PERMISSIONS = {
-  admin: new Set(['content', 'comments', 'diagnostics']),
-  editor: new Set(['content']),
-  moderator: new Set(['comments']),
-  diagnostics: new Set(['diagnostics']),
-};
-
-const adminSessions = new Map();
-
-function parseAdminAccounts() {
-  const raw = String(process.env.ADMIN_ACCOUNTS_JSON || '').trim();
-
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw);
-
-    if (!Array.isArray(parsed)) {
-      throw new Error('ADMIN_ACCOUNTS_JSON must be an array');
-    }
-
-    return parsed
-      .filter((item) =>
-        item &&
-        typeof item === 'object' &&
-        typeof item.username === 'string' &&
-        typeof item.passwordHash === 'string' &&
-        ADMIN_ROLES.has(item.role)
-      )
-      .map((item) => ({
-        username: item.username.trim(),
-        passwordHash: item.passwordHash.trim(),
-        role: item.role,
-      }))
-      .filter((item) => item.username);
-  } catch (error) {
-    console.error(
-      'ADMIN_ACCOUNTS_JSON error:',
-      error?.message || error
-    );
-    return [];
-  }
-}
-
-function verifyPassword(password, storedHash) {
-  const parts = String(storedHash || '').split('$');
-
-  if (
-    parts.length !== 4 ||
-    parts[0] !== 'scrypt'
-  ) {
-    return false;
-  }
-
-  const params = Object.fromEntries(
-    parts[1]
-      .split(',')
-      .map((entry) => entry.split('='))
-  );
-
-  const cost = Number(params.N);
-  const blockSize = Number(params.r);
-  const parallelization = Number(params.p);
-  const salt = parts[2];
-  const expected = parts[3];
-
-  if (
-    !Number.isInteger(cost) ||
-    !Number.isInteger(blockSize) ||
-    !Number.isInteger(parallelization) ||
-    !salt ||
-    !expected
-  ) {
-    return false;
-  }
-
-  try {
-    const derived = scryptSync(
-      String(password),
-      Buffer.from(salt, 'base64'),
-      32,
-      {
-        N: cost,
-        r: blockSize,
-        p: parallelization,
-        maxmem: 256 * 1024 * 1024,
-      }
-    );
-
-    const expectedBuffer = Buffer.from(
-      expected,
-      'base64'
-    );
-
-    return (
-      expectedBuffer.length === derived.length &&
-      timingSafeEqual(
-        expectedBuffer,
-        derived
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
-function parseCookies(request) {
-  const header = request.get('Cookie') || '';
-
-  return Object.fromEntries(
-    header
-      .split(';')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const index = part.indexOf('=');
-
-        if (index < 0) {
-          return [part, ''];
-        }
-
-        return [
-          part.slice(0, index),
-          decodeURIComponent(
-            part.slice(index + 1)
-          ),
-        ];
-      })
-  );
-}
-
-function setAdminCookie(response, token) {
-  const secure =
-    process.env.NODE_ENV === 'production'
-      ? '; Secure'
-      : '';
-
-  response.setHeader(
-    'Set-Cookie',
-    'admin_session=' +
-      encodeURIComponent(token) +
-      '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' +
-      Math.floor(
-        ADMIN_SESSION_TTL_MS / 1000
-      ) +
-      secure
-  );
-}
-
-function clearAdminCookie(response) {
-  response.setHeader(
-    'Set-Cookie',
-    'admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
-  );
-}
-
-function getAdminSession(request) {
-  const token =
-    parseCookies(request).admin_session;
-
-  if (!token) {
-    return null;
-  }
-
-  const session =
-    adminSessions.get(token);
-
-  if (!session) {
-    return null;
-  }
-
-  if (session.expiresAt <= Date.now()) {
-    adminSessions.delete(token);
-    return null;
-  }
-
-  return {
-    token,
-    ...session,
-  };
-}
-
-function requireAdminRole(permission) {
-  return (
-    request,
-    response,
-    next
-  ) => {
-    const session =
-      getAdminSession(request);
-
-    if (!session) {
-      return response.status(401).json({
-        error: 'admin_unauthorized',
-      });
-    }
-
-    const allowed =
-      ROLE_PERMISSIONS[session.role]?.has(
-        permission
-      );
-
-    if (!allowed) {
-      return response.status(403).json({
-        error: 'admin_forbidden',
-        role: session.role,
-        permission,
-      });
-    }
-
-    request.admin = session;
-    return next();
-  };
-}
-
-function cleanupAdminSessions() {
-  const now = Date.now();
-
-  for (
-    const [token, session]
-    of adminSessions
-  ) {
-    if (session.expiresAt <= now) {
-      adminSessions.delete(token);
-    }
-  }
-}
-
-setInterval(
-  cleanupAdminSessions,
-  15 * 60 * 1000
-).unref();
 
 function withCommentsLock(task) {
   const run =
@@ -1749,136 +1502,6 @@ app.delete(
 );
 
 /* =========================================================
-   ADMIN AUTH ROUTES
-========================================================= */
-
-app.post(
-  '/api/admin/login',
-  (request, response) => {
-    const username = String(
-      request.body?.username || ''
-    ).trim();
-
-    const password = String(
-      request.body?.password || ''
-    );
-
-    if (!username || !password) {
-      return response.status(400).json({
-        error: 'credentials_required',
-      });
-    }
-
-    const accounts = parseAdminAccounts();
-
-    let account = accounts.find(
-      (item) => item.username === username
-    );
-
-    // Legacy local-secret compatibility while roles are being configured.
-    if (
-      !account &&
-      accounts.length === 0 &&
-      process.env.ADMIN_WRITE_SECRET &&
-      username === 'admin'
-    ) {
-      const provided = Buffer.from(password);
-      const expected = Buffer.from(process.env.ADMIN_WRITE_SECRET);
-
-      if (
-        provided.length === expected.length &&
-        timingSafeEqual(provided, expected)
-      ) {
-        account = {
-          username: 'admin',
-          role: 'admin',
-          passwordHash: '',
-        };
-      }
-    }
-
-    if (
-      !account ||
-
-      (account.passwordHash &&
-        !verifyPassword(
-          password,
-          account.passwordHash
-        ))
-    ) {
-      return response.status(401).json({
-        error: 'invalid_credentials',
-      });
-    }
-
-    const token =
-      randomBytes(32).toString('base64url');
-
-    const expiresAt =
-      Date.now() + ADMIN_SESSION_TTL_MS;
-
-    adminSessions.set(token, {
-      username: account.username,
-      role: account.role,
-      expiresAt,
-    });
-
-    setAdminCookie(response, token);
-
-    return response.json({
-      ok: true,
-      user: {
-        username: account.username,
-        role: account.role,
-      },
-      expiresAt: new Date(expiresAt).toISOString(),
-    });
-  }
-);
-
-app.post(
-  '/api/admin/logout',
-  (request, response) => {
-    const token = parseCookies(request).admin_session;
-
-    if (token) {
-      adminSessions.delete(token);
-    }
-
-    clearAdminCookie(response);
-
-    return response.json({
-      ok: true,
-    });
-  }
-);
-
-app.get(
-  '/api/admin/me',
-  (request, response) => {
-    const session = getAdminSession(request);
-
-    if (!session) {
-      return response.status(401).json({
-        error: 'admin_unauthorized',
-      });
-    }
-
-    return response.json({
-      ok: true,
-      user: {
-        username: session.username,
-        role: session.role,
-      },
-      expiresAt: new Date(session.expiresAt).toISOString(),
-      permissions: [
-        ...(ROLE_PERMISSIONS[session.role] || []),
-      ],
-    });
-  }
-);
-
-/* =========================================================
    ADMIN COMMENT MODERATION
 ========================================================= */
 
@@ -1897,7 +1520,6 @@ function adminPublicComment(item) {
 
 app.get(
   '/api/admin/comments',
-  requireAdminRole('comments'),
   async (request, response) => {
 
     try {
@@ -1964,7 +1586,6 @@ app.get(
 
 app.delete(
   '/api/admin/comments/:id',
-  requireAdminRole('comments'),
   async (request, response) => {
 
     const id = String(
@@ -2075,7 +1696,6 @@ app.delete(
 
 app.post(
   '/api/judge0/run',
-  requireAdminRole('content'),
   async (request, response) => {
     const sourceCode = String(request.body?.source_code || '');
     const stdin = String(request.body?.stdin || '');
@@ -2248,7 +1868,6 @@ function validateWriteupPayload(value) {
 
 app.get(
   '/api/writeups',
-  requireAdminRole('content'),
   async (request, response) => {
     try {
       return response.json({
@@ -2265,7 +1884,6 @@ app.get(
 
 app.get(
   '/api/writeups/:slug',
-  requireAdminRole('content'),
   async (request, response) => {
     try {
       return response.json(
@@ -2281,7 +1899,6 @@ app.get(
 
 app.put(
   '/api/writeups/:slug',
-  requireAdminRole('content'),
   async (request, response) => {
     const slug = writeupId(request.params.slug);
     const payload = request.body || {};
@@ -2324,7 +1941,6 @@ app.put(
 
 app.delete(
   '/api/writeups/:slug',
-  requireAdminRole('content'),
   async (request, response) => {
     try {
       await deleteDraft(writeupId(request.params.slug));
@@ -2341,7 +1957,6 @@ app.delete(
 
 app.post(
   '/api/writeups/:slug/publish',
-  requireAdminRole('content'),
   async (request, response) => {
     try {
       const draft = await readDraft(writeupId(request.params.slug));
@@ -2368,7 +1983,6 @@ app.post(
 
 app.get(
   '/api/r2/status',
-  requireAdminRole('content'),
   (request, response) => {
     response.json({
       configured: r2Configured(),
@@ -2380,7 +1994,6 @@ app.get(
 
 app.get(
   '/api/r2/objects',
-  requireAdminRole('content'),
   async (request, response) => {
     try {
       const prefix = String(request.query.prefix || '').slice(0, 200);
@@ -2397,7 +2010,6 @@ app.get(
 
 app.post(
   '/api/r2/upload-url',
-  requireAdminRole('content'),
   async (request, response) => {
     const filename = String(
       request.body?.filename || ''
@@ -2467,7 +2079,6 @@ app.post(
 
 app.get(
   '/api/r2/read-url',
-  requireAdminRole('content'),
   async (request, response) => {
     const key = String(request.query.key || '').trim();
 
@@ -2565,7 +2176,6 @@ app.get(
 
 app.put(
   '/api/content',
-  requireAdminRole('content'),
   async (request, response) => {
     const nextContent = request.body;
 
@@ -2605,7 +2215,6 @@ app.put(
 
 app.get(
   '/api/drive/media',
-  requireAdminRole('content'),
   async (request, response) => {
     const d = drive();
 
@@ -2651,7 +2260,6 @@ app.get(
 
 app.get(
   '/api/ai-status',
-  requireAdminRole('diagnostics'),
   (request, response) => {
     response.json({
       deepseekConfigured:
