@@ -970,7 +970,7 @@ function HiringPortfolioView({
             )
           );
           setStatus(
-            'Focused using local portfolio data.'
+            'Focused using available portfolio data.'
           );
         }
         return;
@@ -982,7 +982,8 @@ function HiringPortfolioView({
           {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type':
+                'application/json',
             },
             body: JSON.stringify({
               target,
@@ -1026,7 +1027,7 @@ function HiringPortfolioView({
             )
           );
           setStatus(
-            'Focused using local portfolio data.'
+            'Focused using available portfolio data.'
           );
         }
       }
@@ -1066,10 +1067,40 @@ function HiringPortfolioView({
     )
   ).slice(0, 16);
 
+  const relevantMedia = [
+    ...filtered.experience,
+    ...filtered.projects,
+    ...filtered.certifications,
+    ...filtered.achievements,
+    ...filtered.awards,
+  ].flatMap((item) =>
+    Array.isArray(item.media)
+      ? item.media
+          .filter(
+            (media) =>
+              media &&
+              media.type === 'image' &&
+              media.src
+          )
+          .map((media) => ({
+            ...media,
+            itemId: item.id,
+            itemTitle:
+              item.title ||
+              item.role ||
+              item.company ||
+              'Relevant work',
+          }))
+      : []
+  );
+
   const durations =
     filtered.experience.map(
       (item) =>
-        months(item.start, item.end)
+        months(
+          item.start,
+          item.end
+        )
     );
 
   const maxDuration = Math.max(
@@ -1082,24 +1113,98 @@ function HiringPortfolioView({
   const open = (type, item) =>
     setSelected([type, item]);
 
+  const profileImage =
+    normalizeAssetPath(
+      content.profile?.image?.local ||
+        '/images/profile.png'
+    ) || '/images/profile.png';
+
+  const hasSection = (key) =>
+    Array.isArray(filtered[key]) &&
+    filtered[key].length > 0;
+
   return (
     <div className="hiring-portfolio-page">
+      <nav className="hiring-portfolio-nav">
+        <a
+          className="hiring-nav-brand"
+          href="/"
+        >
+          ZULFAQAR JAMAL
+        </a>
+
+        <div className="hiring-nav-links">
+          <a href="#hiring-profile">Profile</a>
+
+          {skills.length > 0 && (
+            <a href="#hiring-skills">Skills</a>
+          )}
+
+          {hasSection('experience') && (
+            <a href="#hiring-experience">Experience</a>
+          )}
+
+          {hasSection('projects') && (
+            <a href="#hiring-projects">Projects</a>
+          )}
+
+          {hasSection('certifications') && (
+            <a href="#hiring-certifications">
+              Certifications
+            </a>
+          )}
+
+          {hasSection('achievements') && (
+            <a href="#hiring-achievements">
+              Achievements
+            </a>
+          )}
+
+          {relevantMedia.length > 0 && (
+            <a href="#hiring-media">Media</a>
+          )}
+        </div>
+
+        <a
+          className="hiring-nav-return"
+          href="/"
+        >
+          Interactive portfolio
+        </a>
+      </nav>
+
       <header className="hiring-portfolio-header">
-        <div>
-          <span>
-            PROFESSIONAL / HIRING VIEW
-          </span>
-          <h1>{content.profile.name}</h1>
-          <p>{target}</p>
-          <small>
-            {content.profile.location}
-          </small>
+        <div className="hiring-identity">
+          <img
+            src={profileImage}
+            alt={
+              content.profile.name +
+              ' profile'
+            }
+            className="hiring-profile-photo"
+            loading="eager"
+          />
+
+          <div>
+            <span>
+              PROFESSIONAL / HIRING VIEW
+            </span>
+            <h1>
+              {content.profile.name}
+            </h1>
+            <p>{target}</p>
+            <small>
+              {content.profile.location}
+            </small>
+          </div>
         </div>
 
         <div className="hiring-portfolio-actions">
-          <a href="/">Portfolio</a>
           <a
-            href={'mailto:' + content.profile.email}
+            href={
+              'mailto:' +
+              content.profile.email
+            }
           >
             Contact
           </a>
@@ -1112,183 +1217,323 @@ function HiringPortfolioView({
       </div>
 
       <main>
-        <section className="hiring-profile-section">
+        <section
+          id="hiring-profile"
+          className="hiring-profile-section"
+        >
           <small>PROFILE</small>
           <p>{content.profile.summary}</p>
         </section>
 
         {skills.length > 0 && (
-          <section className="hiring-profile-section">
+          <section
+            id="hiring-skills"
+            className="hiring-profile-section"
+          >
             <small>RELEVANT SKILLS</small>
             <div className="hiring-skill-list">
               {skills.map((skill) => (
-                <span key={skill}>{skill}</span>
+                <span key={skill}>
+                  {skill}
+                </span>
               ))}
             </div>
           </section>
         )}
 
-        {filtered.experience.length > 0 && (
-          <section className="hiring-profile-section">
+        {hasSection('experience') && (
+          <section
+            id="hiring-experience"
+            className="hiring-profile-section"
+          >
             <small>RELEVANT EXPERIENCE</small>
+
             <div className="hiring-interactive-list">
-              {filtered.experience.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    open('exp', item)
-                  }
-                >
-                  <div>
-                    <strong>{item.role}</strong>
-                    <span>{item.company}</span>
-                  </div>
+              {filtered.experience.map(
+                (item) => (
+                  <button
+                    key={item.id}
+                    onClick={() =>
+                      open('exp', item)
+                    }
+                  >
+                    <div>
+                      <strong>
+                        {item.role}
+                      </strong>
+                      <span>
+                        {item.company}
+                      </span>
+                    </div>
 
-                  <div className="hiring-entry-bar">
-                    <i
-                      style={{
-                        width:
-                          Math.max(
-                            8,
-                            (
-                              months(
-                                item.start,
-                                item.end
-                              ) /
-                              maxDuration
-                            ) * 100
-                          ) + '%',
-                      }}
-                    />
-                  </div>
+                    <div className="hiring-entry-bar">
+                      <i
+                        style={{
+                          width:
+                            Math.max(
+                              8,
+                              (
+                                months(
+                                  item.start,
+                                  item.end
+                                ) /
+                                maxDuration
+                              ) * 100
+                            ) + '%',
+                        }}
+                      />
+                    </div>
 
-                  <small>
-                    {date(item.start)} —{' '}
-                    {date(item.end)}
-                  </small>
-                </button>
-              ))}
+                    <small>
+                      {date(item.start)} —{' '}
+                      {date(item.end)}
+                    </small>
+                  </button>
+                )
+              )}
             </div>
           </section>
         )}
 
-        {filtered.projects.length > 0 && (
-          <section className="hiring-profile-section">
+        {hasSection('projects') && (
+          <section
+            id="hiring-projects"
+            className="hiring-profile-section"
+          >
             <small>RELEVANT PROJECTS</small>
+
             <div className="hiring-card-grid">
-              {filtered.projects.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    open('Project', item)
-                  }
-                >
-                  <span>
-                    {item.category || 'PROJECT'}
-                  </span>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                  <b>Open details →</b>
-                </button>
-              ))}
+              {filtered.projects.map(
+                (item) => (
+                  <button
+                    key={item.id}
+                    onClick={() =>
+                      open(
+                        'Project',
+                        item
+                      )
+                    }
+                  >
+                    <span>
+                      {item.category ||
+                        'PROJECT'}
+                    </span>
+                    <h3>{item.title}</h3>
+                    <p>
+                      {item.description}
+                    </p>
+                    <b>
+                      Open details →
+                    </b>
+                  </button>
+                )
+              )}
             </div>
           </section>
         )}
 
-        {filtered.certifications.length > 0 && (
-          <section className="hiring-profile-section">
-            <small>RELEVANT CERTIFICATIONS</small>
+        {hasSection('certifications') && (
+          <section
+            id="hiring-certifications"
+            className="hiring-profile-section"
+          >
+            <small>
+              RELEVANT CERTIFICATIONS
+            </small>
+
             <div className="hiring-card-grid">
-              {filtered.certifications.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    open('Certification', item)
-                  }
-                >
-                  <span>
-                    {item.issuer || 'CERTIFICATION'}
-                  </span>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                  <b>Open details →</b>
-                </button>
-              ))}
+              {filtered.certifications.map(
+                (item) => (
+                  <button
+                    key={item.id}
+                    onClick={() =>
+                      open(
+                        'Certification',
+                        item
+                      )
+                    }
+                  >
+                    <span>
+                      {item.issuer ||
+                        'CERTIFICATION'}
+                    </span>
+                    <h3>{item.title}</h3>
+                    <p>
+                      {item.description}
+                    </p>
+                    <b>
+                      Open details →
+                    </b>
+                  </button>
+                )
+              )}
             </div>
           </section>
         )}
 
-        {filtered.achievements.length > 0 && (
-          <section className="hiring-profile-section">
-            <small>RELEVANT ACHIEVEMENTS</small>
+        {hasSection('achievements') && (
+          <section
+            id="hiring-achievements"
+            className="hiring-profile-section"
+          >
+            <small>
+              RELEVANT ACHIEVEMENTS
+            </small>
+
             <div className="hiring-card-grid">
-              {filtered.achievements.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    open('Achievement', item)
-                  }
-                >
-                  <span>
-                    {item.issuer || 'ACHIEVEMENT'}
-                  </span>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                  <b>Open details →</b>
-                </button>
-              ))}
+              {filtered.achievements.map(
+                (item) => (
+                  <button
+                    key={item.id}
+                    onClick={() =>
+                      open(
+                        'Achievement',
+                        item
+                      )
+                    }
+                  >
+                    <span>
+                      {item.issuer ||
+                        'ACHIEVEMENT'}
+                    </span>
+                    <h3>{item.title}</h3>
+                    <p>
+                      {item.description}
+                    </p>
+                    <b>
+                      Open details →
+                    </b>
+                  </button>
+                )
+              )}
             </div>
           </section>
         )}
 
-        {filtered.awards.length > 0 && (
-          <section className="hiring-profile-section">
-            <small>RELEVANT RECOGNITION</small>
+        {hasSection('awards') && (
+          <section
+            id="hiring-awards"
+            className="hiring-profile-section"
+          >
+            <small>
+              RELEVANT RECOGNITION
+            </small>
+
             <div className="hiring-card-grid">
-              {filtered.awards.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    open('Award', item)
-                  }
-                >
-                  <span>
-                    {item.issuer || 'RECOGNITION'}
-                  </span>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                  <b>Open details →</b>
-                </button>
-              ))}
+              {filtered.awards.map(
+                (item) => (
+                  <button
+                    key={item.id}
+                    onClick={() =>
+                      open(
+                        'Award',
+                        item
+                      )
+                    }
+                  >
+                    <span>
+                      {item.issuer ||
+                        'RECOGNITION'}
+                    </span>
+                    <h3>{item.title}</h3>
+                    <p>
+                      {item.description}
+                    </p>
+                    <b>
+                      Open details →
+                    </b>
+                  </button>
+                )
+              )}
             </div>
           </section>
         )}
 
-        {filtered.education.length > 0 && (
-          <section className="hiring-profile-section">
+        {hasSection('education') && (
+          <section
+            id="hiring-education"
+            className="hiring-profile-section"
+          >
             <small>EDUCATION</small>
+
             <div className="hiring-education-grid">
-              {filtered.education.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    open(
-                      'Education',
-                      {
-                        ...item,
-                        title: item.school,
-                        description:
-                          item.description ||
-                          item.qualification,
+              {filtered.education.map(
+                (item) => (
+                  <button
+                    key={item.id}
+                    onClick={() =>
+                      open(
+                        'Education',
+                        {
+                          ...item,
+                          title:
+                            item.school,
+                          description:
+                            item.description ||
+                            item.qualification,
+                        }
+                      )
+                    }
+                  >
+                    <strong>
+                      {item.school}
+                    </strong>
+                    <span>
+                      {item.qualification}
+                    </span>
+                    <small>
+                      {item.period}
+                    </small>
+                  </button>
+                )
+              )}
+            </div>
+          </section>
+        )}
+
+        {relevantMedia.length > 0 && (
+          <section
+            id="hiring-media"
+            className="hiring-profile-section hiring-media-section"
+          >
+            <small>
+              RELEVANT WORK MEDIA
+            </small>
+
+            <div className="hiring-media-grid">
+              {relevantMedia.map(
+                (media, index) => (
+                  <figure
+                    key={
+                      media.itemId +
+                      '-' +
+                      index
+                    }
+                    className="hiring-media-card"
+                  >
+                    <img
+                      src={normalizeAssetPath(
+                        media.src
+                      )}
+                      alt={
+                        media.title ||
+                        media.itemTitle
                       }
-                    )
-                  }
-                >
-                  <strong>{item.school}</strong>
-                  <span>{item.qualification}</span>
-                  <small>{item.period}</small>
-                </button>
-              ))}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <figcaption>
+                      <strong>
+                        {media.title ||
+                          media.itemTitle}
+                      </strong>
+                      <span>
+                        {media.itemTitle}
+                      </span>
+                    </figcaption>
+                  </figure>
+                )
+              )}
             </div>
           </section>
         )}
@@ -1303,7 +1548,10 @@ function HiringPortfolioView({
         </a>
       </footer>
 
-      {selected && selected[0] === 'exp' ? (
+      <Chat content={filtered} />
+
+      {selected &&
+      selected[0] === 'exp' ? (
         <ExpModal
           x={selected[1]}
           close={() =>
