@@ -11,62 +11,6 @@ import './style.css';
 
 const API = import.meta.env.VITE_API_BASE_URL || '';
 
-const ANONYMOUS_DEVICE_KEY = 'portfolio-anonymous-device-id';
-const ANONYMOUS_SESSION_KEY = 'portfolio-comment-session-id';
-
-function getAnonymousIdentity() {
-  let deviceId = '';
-  let sessionId = '';
-
-  try {
-    deviceId =
-      localStorage.getItem(ANONYMOUS_DEVICE_KEY) || '';
-
-    if (!deviceId) {
-      deviceId =
-        globalThis.crypto?.randomUUID?.() ||
-        `anon-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
-
-      localStorage.setItem(
-        ANONYMOUS_DEVICE_KEY,
-        deviceId
-      );
-    }
-
-    sessionId =
-      sessionStorage.getItem(ANONYMOUS_SESSION_KEY) ||
-      '';
-
-    if (!sessionId) {
-      sessionId =
-        globalThis.crypto?.randomUUID?.() ||
-        `session-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
-
-      sessionStorage.setItem(
-        ANONYMOUS_SESSION_KEY,
-        sessionId
-      );
-    }
-  } catch {
-    deviceId =
-      globalThis.crypto?.randomUUID?.() ||
-      `anon-${Date.now()}`;
-
-    sessionId =
-      globalThis.crypto?.randomUUID?.() ||
-      `session-${Date.now()}`;
-  }
-
-  return {
-    deviceId,
-    sessionId,
-  };
-}
-
 const GAMES =
   import.meta.env.VITE_GAMES_URL ||
   'https://YOUR-GAMES-REPO.github.io/';
