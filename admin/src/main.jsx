@@ -855,6 +855,8 @@ function App() {
               updateItem={updateItem}
               addItem={addItem}
               removeItem={removeItem}
+              moveItem={moveItem}
+              duplicateItem={duplicateItem}
             />
           )}
 
