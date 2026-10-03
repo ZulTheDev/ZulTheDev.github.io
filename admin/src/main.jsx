@@ -1658,6 +1658,7 @@ function CardEditor({
   removeItem,
   moveItem,
   duplicateItem,
+  uploadRepositoryMedia,
 }) {
   return (
     <section className="collection">
@@ -1675,7 +1676,7 @@ function CardEditor({
             const open = expanded === `${section}-${index}`;
             return (
               <ItemEditorCard
-                key={`${item.id || item.title || 'item'}-${index}`}
+                key={`${section}-${index}`}
                 item={item}
                 open={open}
                 onToggle={() => setExpanded(open ? null : `${section}-${index}`)}
@@ -1685,6 +1686,12 @@ function CardEditor({
                 onMoveDown={() => moveItem(section, index, 1)}
                 onDuplicate={() => duplicateItem(section, index)}
                 section={section}
+                repositoryFolder={
+                  section === 'certifications'
+                    ? 'certs'
+                    : 'portfolio-media/' + section
+                }
+                uploadRepositoryMedia={uploadRepositoryMedia}
               />
             );
           })}
@@ -1704,6 +1711,8 @@ function ItemEditorCard({
   onMoveDown,
   onDuplicate,
   section,
+  repositoryFolder,
+  uploadRepositoryMedia,
 }) {
   return (
     <article className={open ? 'editor-card open' : 'editor-card'}>
@@ -1731,6 +1740,8 @@ function ItemEditorCard({
           <MediaListEditor
             media={Array.isArray(item.media) ? item.media : []}
             onChange={(value) => onChange('media', value)}
+            repositoryFolder={repositoryFolder}
+            uploadRepositoryMedia={uploadRepositoryMedia}
           />
           <div className="editor-card-actions">
             <button className="ghost small" onClick={onMoveUp}>↑ Move up</button>
@@ -1754,6 +1765,7 @@ function ExperienceEditor({
   removeItem,
   moveItem,
   duplicateItem,
+  uploadRepositoryMedia,
 }) {
   return (
     <section className="collection">
@@ -1768,7 +1780,7 @@ function ExperienceEditor({
             const index = allItems.indexOf(item);
             const open = expanded === `experience-${index}`;
             return (
-              <article key={`${item.id || 'experience'}-${index}`} className={open ? 'editor-card open' : 'editor-card'}>
+              <article key={`experience-${index}`} className={open ? 'editor-card open' : 'editor-card'}>
                 <button className="editor-card-head" onClick={() => setExpanded(open ? null : `experience-${index}`)}>
                   <div>
                     <small>{item.company || 'Company'}</small>
@@ -1794,6 +1806,8 @@ function ExperienceEditor({
                   <MediaListEditor
                     media={Array.isArray(item.media) ? item.media : []}
                     onChange={(value) => updateItem('experience', index, 'media', value)}
+                    repositoryFolder="portfolio-media/experience"
+                    uploadRepositoryMedia={uploadRepositoryMedia}
                   />
                   <div className="editor-card-actions">
                     <button className="ghost small" onClick={() => moveItem('experience', index, -1)}>↑ Move up</button>
@@ -1835,7 +1849,7 @@ function EducationEditor({
             const index = allItems.indexOf(item);
             const open = expanded === `education-${index}`;
             return (
-              <article key={`${item.id || 'education'}-${index}`} className={open ? 'editor-card open' : 'editor-card'}>
+              <article key={`education-${index}`} className={open ? 'editor-card open' : 'editor-card'}>
                 <button className="editor-card-head" onClick={() => setExpanded(open ? null : `education-${index}`)}>
                   <div>
                     <small>{item.school || 'School'}</small>
@@ -1878,7 +1892,7 @@ function ExploreEditor({ items, addItem, update, remove }) {
 
       <div className="explore-editor-list">
         {items.map((item, index) => (
-          <div className="explore-row" key={`${item}-${index}`}>
+          <div className="explore-row" key={`explore-${index}`}>
             <span>{String(index + 1).padStart(2, '0')}</span>
             <input value={item} onChange={(e) => update(index, e.target.value)} />
             <button className="delete-button compact" onClick={() => remove(index)}>×</button>
@@ -1896,7 +1910,7 @@ function StringListEditor({ items, onChange, placeholder, addLabel }) {
   return (
     <div className="string-list-editor">
       {values.map((value, index) => (
-        <div className="string-list-row" key={String(value) + '-' + index}>
+        <div className="string-list-row" key={`string-item-${index}`}>
           <input
             value={value || ''}
             placeholder={placeholder}
@@ -3062,7 +3076,12 @@ function WriteupPreviewData({ writeup }) {
   );
 }
 
-function MediaListEditor({ media, onChange }) {
+function MediaListEditor({
+  media,
+  onChange,
+  repositoryFolder = 'portfolio-media',
+  uploadRepositoryMedia,
+}) {
   const items = Array.isArray(media) ? media : [];
 
   function update(index, field, value) {
