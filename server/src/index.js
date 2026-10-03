@@ -451,19 +451,6 @@ function flattenComments(
     .flat();
 }
 
-function countUserReplies(
-  allComments,
-  deviceId
-) {
-  return flattenComments(allComments)
-    .filter(
-      (item) =>
-        item.parentId &&
-        item.ownerId === deviceId
-    )
-    .length;
-}
-
 function countRawUserReplies(
   comments,
   deviceId
