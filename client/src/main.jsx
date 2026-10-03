@@ -2386,15 +2386,7 @@ function CTFWriteupDocument({
         )
       )}
 
-      {writeup.workspace &&
-        writeup.workspace.nodes?.length > 0 && (
-          <section className="writeup-workflow-session">
-            <WriteupWorkflowViewer
-              workspace={writeup.workspace}
-              blocks={blocks}
-            />
-          </section>
-        )}
+
     </div>
   );
 }
