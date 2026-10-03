@@ -975,7 +975,26 @@ function AdminShell() {
       setSavedSnapshot(JSON.stringify(normalized));
       try { localStorage.removeItem(LOCAL_DRAFT_KEY); } catch {}
       setHasDraft(false);
-      setNotice(`Saved successfully at ${new Date().toLocaleTimeString()}.`);
+
+      const deploy = data.deploy;
+      if (deploy?.pushed) {
+        setNotice(
+          'Saved and pushed to GitHub App (' +
+          (deploy.commitSha || '').slice(0, 7) +
+          ').'
+        );
+      } else if (deploy?.message) {
+        setNotice(
+          'Saved locally. ' +
+          deploy.message
+        );
+      } else {
+        setNotice(
+          'Saved successfully at ' +
+          new Date().toLocaleTimeString() +
+          '.'
+        );
+      }
     } catch (error) {
       setNotice(`Save failed: ${error.message}`);
     } finally {
