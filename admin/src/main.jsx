@@ -894,6 +894,7 @@ function ProfileEditor({ profile, updateProfile, updateImage }) {
         <Field label="LinkedIn" value={profile.linkedin} onChange={(v) => updateProfile('linkedin', v)} />
         <Field label="GitHub" value={profile.github} onChange={(v) => updateProfile('github', v)} />
         <Field label="Website" value={profile.website} onChange={(v) => updateProfile('website', v)} />
+        <Field label="ORCID" value={profile.orcid || ''} onChange={(v) => updateProfile('orcid', v)} />
         <Field wide multiline label="Summary" value={profile.summary} onChange={(v) => updateProfile('summary', v)} />
       </div>
 
@@ -903,6 +904,16 @@ function ProfileEditor({ profile, updateProfile, updateImage }) {
           <Field label="Local image path" value={profile.image?.local || ''} onChange={(v) => updateImage('local', v)} />
           <Field label="Google Drive file ID" value={profile.image?.driveId || ''} onChange={(v) => updateImage('driveId', v)} />
         </div>
+      </div>
+
+      <div className="subpanel">
+        <PanelHeader eyebrow="CONTACT / SOCIAL" title="Profile links" compact />
+        <StringListEditor
+          items={Array.isArray(profile.links) ? profile.links : []}
+          onChange={(value) => updateProfile('links', value)}
+          placeholder="https://example.com or mailto:name@example.com"
+          addLabel="Add link"
+        />
       </div>
     </section>
   );
@@ -1168,6 +1179,42 @@ function ExploreEditor({ items, addItem, update, remove }) {
         {!items.length && <EmptyState action={<button className="accent-button" onClick={addItem}>+ Add category</button>} />}
       </div>
     </section>
+  );
+}
+
+function StringListEditor({ items, onChange, placeholder, addLabel }) {
+  const values = Array.isArray(items) ? items : [];
+
+  return (
+    <div className="string-list-editor">
+      {values.map((value, index) => (
+        <div className="string-list-row" key={String(value) + '-' + index}>
+          <input
+            value={value || ''}
+            placeholder={placeholder}
+            onChange={(e) => {
+              const next = [...values];
+              next[index] = e.target.value;
+              onChange(next);
+            }}
+          />
+          <button
+            className="delete-button compact"
+            type="button"
+            onClick={() => onChange(values.filter((_, i) => i !== index))}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button
+        className="accent-button"
+        type="button"
+        onClick={() => onChange([...values, ''])}
+      >
+        + {addLabel}
+      </button>
+    </div>
   );
 }
 
