@@ -1056,21 +1056,23 @@ function AdminShell() {
       probe('Local API', API + '/api/health'),
       probe('Online API', ONLINE_API + '/api/health'),
       probe('R2', API + '/api/r2/status'),
+      probe('GitHub App', API + '/api/github-app/status'),
+      probe('Local AI', API + '/api/ai-status'),
     ];
-
-    checks.push(probe('Local AI', API + '/api/ai-status'));
 
     const results = await Promise.all(checks);
     const local = results[0];
     const online = results[1];
     const r2 = results[2];
-    const ai = results[3];
+    const github = results[3];
+    const ai = results[4];
 
     setServiceStatus({
       local,
       ai,
       online,
       r2,
+      github,
       checkedAt: new Date().toISOString(),
     });
     setServiceLoading(false);
