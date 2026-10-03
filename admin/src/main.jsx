@@ -945,12 +945,19 @@ function AdminShell({ user, onLogout }) {
     };
   }
 
-  async function loadR2Objects() {
+  async function loadR2Objects(slug = '') {
     setR2Loading(true);
 
     try {
+      const prefixValue = String(slug || '').trim();
+      const prefix = prefixValue
+        ? 'ctf-blog/' + safeWriteupSlug(prefixValue) + '/'
+        : 'ctf-blog/';
+
       const response = await authFetch(
-        API + '/api/r2/objects?prefix=ctf-blog/'
+        API +
+          '/api/r2/objects?prefix=' +
+          encodeURIComponent(prefix)
       );
       const data = await response.json();
 
