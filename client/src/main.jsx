@@ -1931,7 +1931,7 @@ function WriteupMedia({ media }) {
   if (
     type.startsWith('image/') ||
     type === 'image' ||
-    /\\.(png|jpe?g|gif|webp|svg)$/i.test(url)
+    /\.(png|jpe?g|gif|webp|svg)$/i.test(url)
   ) {
     return (
       <figure className="writeup-media-card">
@@ -1993,7 +1993,7 @@ function WriteupMedia({ media }) {
   if (
     type === 'application/pdf' ||
     type === 'pdf' ||
-    /\\.pdf$/i.test(url)
+    /\.pdf$/i.test(url)
   ) {
     return (
       <div className="writeup-file-card">
