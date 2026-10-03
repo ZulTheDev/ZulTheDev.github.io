@@ -1766,6 +1766,7 @@ function ItemEditorCard({
             onChange={(value) => onChange('media', value)}
             repositoryFolder={repositoryFolder}
             uploadRepositoryMedia={uploadRepositoryMedia}
+            setNotice={setNotice}
           />
           <div className="editor-card-actions">
             <button className="ghost small" onClick={onMoveUp}>↑ Move up</button>
