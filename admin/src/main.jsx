@@ -3,8 +3,13 @@ import { createRoot } from 'react-dom/client';
 import './style.css';
 
 const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787';
+const ONLINE_API = import.meta.env.VITE_ONLINE_API_URL || import.meta.env.VITE_COMMENTS_BACKUP_URL || 'https://zulthedevs-projects.vercel.app';
+const PUBLIC_SITE = 'https://zulthedev.github.io/';
+const HIRING_ROUTE = PUBLIC_SITE + 'port_resume?type_of_work_hiring=technical_officer';
+const LOCAL_DRAFT_KEY = 'zul-admin-local-draft-v1';
 
 const SECTION_META = {
+  dashboard: 'Dashboard',
   profile: 'Profile',
   recent: 'Recent activity',
   certifications: 'Certifications',
@@ -16,6 +21,9 @@ const SECTION_META = {
   education: 'Education',
   explore: 'Explore',
   appearance: 'Appearance',
+  media: 'Media library',
+  comments: 'Comments & moderation',
+  system: 'System & AI',
   raw: 'Raw JSON',
 };
 
@@ -51,6 +59,75 @@ const EMPTY_EDUCATION = {
   period: '',
   description: '',
 };
+
+const CONTENT_COLLECTIONS = [
+  'recent',
+  'certifications',
+  'achievements',
+  'awards',
+  'projects',
+  'research',
+  'experience',
+  'education',
+];
+
+function validateContent(value) {
+  const errors = [];
+  const warnings = [];
+  const data = value && typeof value === 'object' ? value : {};
+
+  if (!data.profile?.name?.trim()) errors.push('Profile name is empty.');
+  if (!data.profile?.title?.trim()) warnings.push('Profile title is empty.');
+  if (!data.profile?.headline?.trim()) warnings.push('Profile headline is empty.');
+  if (!data.profile?.summary?.trim()) warnings.push('Profile summary is empty.');
+
+  for (const section of CONTENT_COLLECTIONS) {
+    const items = data[section];
+    if (!Array.isArray(items)) {
+      errors.push(section + ' must be an array.');
+      continue;
+    }
+
+    const ids = new Set();
+
+    for (const item of items) {
+      if (!item || typeof item !== 'object') {
+        errors.push(section + ' contains an invalid item.');
+        continue;
+      }
+
+      if (!item.id?.trim()) {
+        errors.push(section + ' contains an item without an ID.');
+      } else if (ids.has(item.id)) {
+        errors.push('Duplicate ID in ' + section + ': ' + item.id + '.');
+      } else {
+        ids.add(item.id);
+      }
+
+      if (Array.isArray(item.media)) {
+        item.media.forEach((media, index) => {
+          if (!media || typeof media !== 'object') {
+            errors.push(section + '/' + (item.id || 'item') + ' media #' + (index + 1) + ' is invalid.');
+          } else if (!media.type) {
+            warnings.push(section + '/' + (item.id || 'item') + ' media #' + (index + 1) + ' has no type.');
+          }
+        });
+      }
+    }
+  }
+
+  for (const item of Array.isArray(data.experience) ? data.experience : []) {
+    if (item.start && item.end && item.end < item.start) {
+      warnings.push('Experience date range looks reversed: ' + (item.company || item.id) + '.');
+    }
+  }
+
+  return {
+    errors,
+    warnings,
+    valid: errors.length === 0,
+  };
+}
 
 const DEFAULT_CONTENT = {
   profile: {
@@ -145,14 +222,39 @@ function App() {
   const [adminSecret, setAdminSecret] = useState('');
   const [expanded, setExpanded] = useState(null);
   const [raw, setRaw] = useState('');
+  const [savedSnapshot, setSavedSnapshot] = useState('');
+  const [driveMedia, setDriveMedia] = useState([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [commentFilter, setCommentFilter] = useState('all');
+  const [serviceStatus, setServiceStatus] = useState({});
+  const [serviceLoading, setServiceLoading] = useState(false);
+  const [onlineChatTest, setOnlineChatTest] = useState({ loading: false, reply: '', error: '' });
+  const [hiringTarget, setHiringTarget] = useState('technical officer');
+  const [hiringTest, setHiringTest] = useState({ loading: false, data: null, error: '' });
+  const [hasDraft, setHasDraft] = useState(() => {
+    try { return Boolean(localStorage.getItem(LOCAL_DRAFT_KEY)); } catch { return false; }
+  });
 
   useEffect(() => {
     loadContent();
+    refreshSystem();
   }, []);
 
   useEffect(() => {
     if (content) setRaw(JSON.stringify(content, null, 2));
   }, [content]);
+
+  async function setLoadedContent(value, message) {
+    const normalized = normalizeContent(value);
+    setContent(normalized);
+    setSavedSnapshot(JSON.stringify(normalized));
+    setRaw(JSON.stringify(normalized, null, 2));
+    setHasDraft(false);
+    try { localStorage.removeItem(LOCAL_DRAFT_KEY); } catch {}
+    setNotice(message);
+  }
 
   async function loadContent() {
     setNotice('Loading portfolio data...');
@@ -160,10 +262,9 @@ function App() {
     try {
       const response = await fetch(`${API}/api/content`);
       if (!response.ok) throw new Error(`API returned ${response.status}`);
-      const data = normalizeContent(await response.json());
-      setContent(data);
+      const data = await response.json();
       setApiOnline(true);
-      setNotice('Connected to the portfolio API.');
+      await setLoadedContent(data, 'Connected to the portfolio API.');
     } catch (error) {
       console.error(error);
       setApiOnline(false);
@@ -172,14 +273,12 @@ function App() {
       try {
         const local = await fetch('/content.json');
         if (local.ok) {
-          setContent(normalizeContent(await local.json()));
-          setNotice('API offline — editing local content. Saving requires the API.');
+          await setLoadedContent(await local.json(), 'API offline — editing local content. Saving requires the API.');
           return;
         }
       } catch {}
 
-      setContent(clone(DEFAULT_CONTENT));
-      setNotice('API and local content unavailable — started with an empty template.');
+      await setLoadedContent(clone(DEFAULT_CONTENT), 'API and local content unavailable — started with an empty template.');
     }
   }
 
@@ -202,9 +301,13 @@ function App() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || `Save failed (${response.status})`);
+      if (!response.ok) throw new Error(data?.error || ('Save failed (' + response.status + ')'));
 
-      setContent(normalizeContent(data.content || content));
+      const normalized = normalizeContent(data.content || content);
+      setContent(normalized);
+      setSavedSnapshot(JSON.stringify(normalized));
+      try { localStorage.removeItem(LOCAL_DRAFT_KEY); } catch {}
+      setHasDraft(false);
       setNotice(`Saved successfully at ${new Date().toLocaleTimeString()}.`);
     } catch (error) {
       setNotice(`Save failed: ${error.message}`);
@@ -262,6 +365,227 @@ function App() {
     }));
   }
 
+  function moveItem(sectionName, index, direction) {
+    setContent((current) => {
+      const next = [...current[sectionName]];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...current, [sectionName]: next };
+    });
+  }
+
+  function duplicateItem(sectionName, index) {
+    setContent((current) => {
+      const next = [...current[sectionName]];
+      const copy = clone(next[index]);
+      copy.id = makeId(sectionName);
+      next.splice(index + 1, 0, copy);
+      return { ...current, [sectionName]: next };
+    });
+  }
+
+  function restoreDraft() {
+    try {
+      const stored = localStorage.getItem(LOCAL_DRAFT_KEY);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (!parsed?.content) throw new Error('Draft content missing.');
+      setContent(normalizeContent(parsed.content));
+      setNotice('Local draft restored.');
+    } catch (error) {
+      setNotice('Draft restore failed: ' + error.message);
+    }
+  }
+
+  function discardDraft() {
+    try { localStorage.removeItem(LOCAL_DRAFT_KEY); } catch {}
+    setHasDraft(false);
+    setNotice('Local draft cleared.');
+  }
+
+  function revertSaved() {
+    if (!savedSnapshot) return;
+    try {
+      setContent(normalizeContent(JSON.parse(savedSnapshot)));
+      setNotice('Reverted to the last loaded/saved version.');
+    } catch (error) {
+      setNotice('Revert failed: ' + error.message);
+    }
+  }
+
+  function exportBackup() {
+    if (!content) return;
+    const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'portfolio-content-' + new Date().toISOString().slice(0, 10) + '.json';
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setNotice('Portfolio JSON backup exported.');
+  }
+
+  function importBackup(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || ''));
+        setContent(normalizeContent(parsed));
+        setNotice('Imported ' + file.name + '. Review validation and save when ready.');
+      } catch (error) {
+        setNotice('Import failed: ' + error.message);
+      }
+    };
+    reader.onerror = () => setNotice('Import failed: could not read the file.');
+    reader.readAsText(file);
+  }
+
+  async function refreshSystem() {
+    setServiceLoading(true);
+
+    const probe = async (label, url) => {
+      const started = performance.now();
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        let response;
+        try {
+          response = await fetch(url, { signal: controller.signal });
+        } finally {
+          clearTimeout(timeout);
+        }
+        const text = await response.text();
+        let data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch {}
+        return {
+          label,
+          ok: response.ok,
+          status: response.status,
+          latency: Math.round(performance.now() - started),
+          data,
+        };
+      } catch (error) {
+        return {
+          label,
+          ok: false,
+          status: 0,
+          latency: Math.round(performance.now() - started),
+          error: error.message,
+        };
+      }
+    };
+
+    const [local, ai, online] = await Promise.all([
+      probe('Local API', API + '/api/health'),
+      probe('Local AI', API + '/api/ai-status'),
+      probe('Online API', ONLINE_API + '/api/health'),
+    ]);
+
+    setServiceStatus({
+      local,
+      ai,
+      online,
+      checkedAt: new Date().toISOString(),
+    });
+    setServiceLoading(false);
+  }
+
+  async function loadDriveMedia() {
+    setDriveLoading(true);
+    try {
+      const response = await fetch(API + '/api/drive/media');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Drive API returned ' + response.status);
+      setDriveMedia(Array.isArray(data) ? data : []);
+      setNotice('Loaded ' + (Array.isArray(data) ? data.length : 0) + ' Drive media items.');
+    } catch (error) {
+      setDriveMedia([]);
+      setNotice('Drive media unavailable: ' + error.message);
+    } finally {
+      setDriveLoading(false);
+    }
+  }
+
+  async function loadComments() {
+    setCommentLoading(true);
+    try {
+      const response = await fetch(API + '/api/admin/comments', {
+        headers: adminSecret.trim() ? { 'X-Admin-Secret': adminSecret.trim() } : {},
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Comments API returned ' + response.status);
+      setComments(Array.isArray(data.comments) ? data.comments : []);
+      setNotice('Loaded ' + (Array.isArray(data.comments) ? data.comments.length : 0) + ' comments.');
+    } catch (error) {
+      setComments([]);
+      setNotice('Comment moderation unavailable: ' + error.message);
+    } finally {
+      setCommentLoading(false);
+    }
+  }
+
+  async function moderateComment(id) {
+    try {
+      const response = await fetch(API + '/api/admin/comments/' + encodeURIComponent(id), {
+        method: 'DELETE',
+        headers: adminSecret.trim() ? { 'X-Admin-Secret': adminSecret.trim() } : {},
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Moderation failed (' + response.status + ')');
+      setComments((current) => current.map((item) =>
+        item.id === id
+          ? { ...item, deleted: true, comment: '', updatedAt: new Date().toISOString() }
+          : item
+      ));
+      setNotice('Comment hidden from the public portfolio.');
+    } catch (error) {
+      setNotice('Comment moderation failed: ' + error.message);
+    }
+  }
+
+  async function testOnlineChat() {
+    setOnlineChatTest({ loading: true, reply: '', error: '' });
+    try {
+      const response = await fetch(ONLINE_API + '/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: "Give a concise summary of Zulfaqar's current education and cybersecurity focus.",
+          history: [],
+          context: content,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Online AI returned ' + response.status);
+      setOnlineChatTest({ loading: false, reply: data.reply || '', error: '' });
+    } catch (error) {
+      setOnlineChatTest({ loading: false, reply: '', error: error.message });
+    }
+  }
+
+  async function testHiringFilter() {
+    setHiringTest({ loading: true, data: null, error: '' });
+    try {
+      const response = await fetch(ONLINE_API + '/api/hiring', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: hiringTarget, content }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Hiring API returned ' + response.status);
+      setHiringTest({ loading: false, data, error: '' });
+    } catch (error) {
+      setHiringTest({ loading: false, data: null, error: error.message });
+    }
+  }
+
+
+
   function applyRaw() {
     try {
       const parsed = JSON.parse(raw);
@@ -296,6 +620,37 @@ function App() {
     return content[section].filter((item) => JSON.stringify(item).toLowerCase().includes(q));
   }, [content, section, search]);
 
+  const contentSnapshot = useMemo(
+    () => (content ? JSON.stringify(content) : ''),
+    [content]
+  );
+  const isDirty = Boolean(content && savedSnapshot && contentSnapshot !== savedSnapshot);
+  const validation = useMemo(() => validateContent(content), [content]);
+
+  useEffect(() => {
+    if (!content || !isDirty) return undefined;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          LOCAL_DRAFT_KEY,
+          JSON.stringify({ savedAt: new Date().toISOString(), content })
+        );
+        setHasDraft(true);
+      } catch {}
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [content, isDirty]);
+
+  useEffect(() => {
+    const handler = (event) => {
+      if (!isDirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
   if (!content) {
     return <div className="admin-loading">ฅ^•ﻌ•^ฅ <span>Loading content manager...</span></div>;
   }
@@ -321,7 +676,10 @@ function App() {
           />
           <button className="ghost" onClick={loadContent} disabled={saving}>Reload</button>
           <button className="ghost" onClick={syncRaw} disabled={saving}>Sync JSON</button>
-          <button className="save" onClick={saveContent} disabled={saving || !apiOnline}>
+          <span className={isDirty ? 'dirty-badge' : 'saved-badge'}>{isDirty ? 'Unsaved changes' : 'Saved'}</span>
+          <button className="ghost" onClick={() => window.open(PUBLIC_SITE, '_blank')} disabled={saving}>Public site</button>
+          <button className="ghost" onClick={() => window.open(HIRING_ROUTE, '_blank')} disabled={saving}>Hiring view</button>
+          <button className="save" onClick={saveContent} disabled={saving || !apiOnline || !isDirty}>
             {saving ? 'Saving...' : 'Save changes'}
           </button>
         </div>
@@ -373,6 +731,59 @@ function App() {
               <span>{notice}</span>
               <button onClick={() => setNotice('')}>×</button>
             </div>
+          )}
+
+          {section === 'dashboard' && (
+            <DashboardEditor
+              content={content}
+              validation={validation}
+              isDirty={isDirty}
+              hasDraft={hasDraft}
+              serviceStatus={serviceStatus}
+              serviceLoading={serviceLoading}
+              refreshSystem={refreshSystem}
+              saveContent={saveContent}
+              exportBackup={exportBackup}
+              importBackup={importBackup}
+              restoreDraft={restoreDraft}
+              discardDraft={discardDraft}
+              setSection={setSection}
+            />
+          )}
+
+          {section === 'media' && (
+            <MediaLibraryEditor
+              driveMedia={driveMedia}
+              driveLoading={driveLoading}
+              loadDriveMedia={loadDriveMedia}
+              content={content}
+              updateImage={updateImage}
+            />
+          )}
+
+          {section === 'comments' && (
+            <CommentsEditor
+              comments={comments}
+              loading={commentLoading}
+              filter={commentFilter}
+              setFilter={setCommentFilter}
+              loadComments={loadComments}
+              moderateComment={moderateComment}
+            />
+          )}
+
+          {section === 'system' && (
+            <SystemEditor
+              serviceStatus={serviceStatus}
+              serviceLoading={serviceLoading}
+              refreshSystem={refreshSystem}
+              onlineChatTest={onlineChatTest}
+              testOnlineChat={testOnlineChat}
+              hiringTarget={hiringTarget}
+              setHiringTarget={setHiringTarget}
+              hiringTest={hiringTest}
+              testHiringFilter={testHiringFilter}
+            />
           )}
 
           {section === 'profile' && (
@@ -430,6 +841,8 @@ function App() {
               updateItem={updateItem}
               addItem={addItem}
               removeItem={removeItem}
+              moveItem={moveItem}
+              duplicateItem={duplicateItem}
             />
           )}
 
@@ -454,6 +867,8 @@ function App() {
               updateItem={updateItem}
               addItem={addItem}
               removeItem={removeItem}
+              moveItem={moveItem}
+              duplicateItem={duplicateItem}
             />
           )}
         </main>
@@ -511,7 +926,18 @@ function AppearanceEditor({ theme, updateTheme }) {
   );
 }
 
-function CardEditor({ section, items, allItems, expanded, setExpanded, updateItem, addItem, removeItem }) {
+function CardEditor({
+  section,
+  items,
+  allItems,
+  expanded,
+  setExpanded,
+  updateItem,
+  addItem,
+  removeItem,
+  moveItem,
+  duplicateItem,
+}) {
   return (
     <section className="collection">
       <div className="collection-toolbar">
@@ -534,6 +960,9 @@ function CardEditor({ section, items, allItems, expanded, setExpanded, updateIte
                 onToggle={() => setExpanded(open ? null : `${section}-${index}`)}
                 onChange={(field, value) => updateItem(section, index, field, value)}
                 onDelete={() => removeItem(section, index)}
+                onMoveUp={() => moveItem(section, index, -1)}
+                onMoveDown={() => moveItem(section, index, 1)}
+                onDuplicate={() => duplicateItem(section, index)}
                 section={section}
               />
             );
@@ -544,7 +973,17 @@ function CardEditor({ section, items, allItems, expanded, setExpanded, updateIte
   );
 }
 
-function ItemEditorCard({ item, open, onToggle, onChange, onDelete, section }) {
+function ItemEditorCard({
+  item,
+  open,
+  onToggle,
+  onChange,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  onDuplicate,
+  section,
+}) {
   return (
     <article className={open ? 'editor-card open' : 'editor-card'}>
       <button className="editor-card-head" onClick={onToggle}>
@@ -566,11 +1005,16 @@ function ItemEditorCard({ item, open, onToggle, onChange, onDelete, section }) {
             <Field label="Date" value={item.date} onChange={(v) => onChange('date', v)} />
             <Field label="External link" value={item.link} onChange={(v) => onChange('link', v)} />
             <Field wide multiline label="Description" value={item.description} onChange={(v) => onChange('description', v)} />
-            <Field wide multiline label="Media JSON (advanced)" value={JSON.stringify(item.media || [], null, 2)} onChange={(v) => {
-              try { onChange('media', JSON.parse(v)); } catch {}
-            }} />
+
           </div>
-          <div className="danger-row">
+          <MediaListEditor
+            media={Array.isArray(item.media) ? item.media : []}
+            onChange={(value) => onChange('media', value)}
+          />
+          <div className="editor-card-actions">
+            <button className="ghost small" onClick={onMoveUp}>↑ Move up</button>
+            <button className="ghost small" onClick={onMoveDown}>↓ Move down</button>
+            <button className="ghost small" onClick={onDuplicate}>Duplicate</button>
             <button className="delete-button" onClick={onDelete}>Delete card</button>
           </div>
         </div>
@@ -579,7 +1023,17 @@ function ItemEditorCard({ item, open, onToggle, onChange, onDelete, section }) {
   );
 }
 
-function ExperienceEditor({ items, allItems, expanded, setExpanded, updateItem, addItem, removeItem }) {
+function ExperienceEditor({
+  items,
+  allItems,
+  expanded,
+  setExpanded,
+  updateItem,
+  addItem,
+  removeItem,
+  moveItem,
+  duplicateItem,
+}) {
   return (
     <section className="collection">
       <div className="collection-toolbar">
@@ -615,9 +1069,17 @@ function ExperienceEditor({ items, allItems, expanded, setExpanded, updateItem, 
                     <Field wide multiline label="Elaboration" value={item.elaboration} onChange={(v) => updateItem('experience', index, 'elaboration', v)} />
                     <Field wide multiline label="Reflection" value={item.reflection} onChange={(v) => updateItem('experience', index, 'reflection', v)} />
                     <Field wide label="Skills (comma separated)" value={Array.isArray(item.skills) ? item.skills.join(', ') : ''} onChange={(v) => updateItem('experience', index, 'skills', v.split(',').map((x) => x.trim()).filter(Boolean))} />
-                    <Field wide multiline label="Media JSON (advanced)" value={JSON.stringify(item.media || [], null, 2)} onChange={(v) => { try { updateItem('experience', index, 'media', JSON.parse(v)); } catch {} }} />
                   </div>
-                  <div className="danger-row"><button className="delete-button" onClick={() => removeItem('experience', index)}>Delete experience</button></div>
+                  <MediaListEditor
+                    media={Array.isArray(item.media) ? item.media : []}
+                    onChange={(value) => updateItem('experience', index, 'media', value)}
+                  />
+                  <div className="editor-card-actions">
+                    <button className="ghost small" onClick={() => moveItem('experience', index, -1)}>↑ Move up</button>
+                    <button className="ghost small" onClick={() => moveItem('experience', index, 1)}>↓ Move down</button>
+                    <button className="ghost small" onClick={() => duplicateItem('experience', index)}>Duplicate</button>
+                    <button className="delete-button" onClick={() => removeItem('experience', index)}>Delete experience</button>
+                  </div>
                 </div>}
               </article>
             );
@@ -628,7 +1090,17 @@ function ExperienceEditor({ items, allItems, expanded, setExpanded, updateItem, 
   );
 }
 
-function EducationEditor({ items, allItems, expanded, setExpanded, updateItem, addItem, removeItem }) {
+function EducationEditor({
+  items,
+  allItems,
+  expanded,
+  setExpanded,
+  updateItem,
+  addItem,
+  removeItem,
+  moveItem,
+  duplicateItem,
+}) {
   return (
     <section className="collection">
       <div className="collection-toolbar">
@@ -659,7 +1131,12 @@ function EducationEditor({ items, allItems, expanded, setExpanded, updateItem, a
                     <Field label="Period" value={item.period} onChange={(v) => updateItem('education', index, 'period', v)} />
                     <Field wide multiline label="Description" value={item.description} onChange={(v) => updateItem('education', index, 'description', v)} />
                   </div>
-                  <div className="danger-row"><button className="delete-button" onClick={() => removeItem('education', index)}>Delete education</button></div>
+                  <div className="editor-card-actions">
+                    <button className="ghost small" onClick={() => moveItem('education', index, -1)}>↑ Move up</button>
+                    <button className="ghost small" onClick={() => moveItem('education', index, 1)}>↓ Move down</button>
+                    <button className="ghost small" onClick={() => duplicateItem('education', index)}>Duplicate</button>
+                    <button className="delete-button" onClick={() => removeItem('education', index)}>Delete education</button>
+                  </div>
                 </div>}
               </article>
             );
@@ -689,6 +1166,273 @@ function ExploreEditor({ items, addItem, update, remove }) {
         {!items.length && <EmptyState action={<button className="accent-button" onClick={addItem}>+ Add category</button>} />}
       </div>
     </section>
+  );
+}
+
+function MediaListEditor({ media, onChange }) {
+  const items = Array.isArray(media) ? media : [];
+
+  function update(index, field, value) {
+    const next = clone(items);
+    next[index] = { ...(next[index] || {}), [field]: value };
+    onChange(next);
+  }
+
+  function remove(index) {
+    onChange(items.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="media-editor">
+      <div className="panel-head compact">
+        <div><small>ATTACHMENTS</small><h2>Media items</h2></div>
+        <button className="accent-button" type="button" onClick={() => onChange([
+          ...items,
+          { type: 'link', title: '', body: '', url: '', driveId: '', alt: '' },
+        ])}>+ Add media</button>
+      </div>
+
+      {!items.length && <div className="media-empty">No media attached. Add a link or use the Drive library.</div>}
+
+      <div className="media-edit-list">
+        {items.map((item, index) => (
+          <div className="media-edit-card" key={(item.title || 'media') + '-' + index}>
+            <div className="media-edit-grid">
+              <label className="field">
+                <span>Type</span>
+                <select value={item.type || 'link'} onChange={(e) => update(index, 'type', e.target.value)}>
+                  <option value="link">Link</option>
+                  <option value="image">Image</option>
+                  <option value="video">Video</option>
+                  <option value="pdf">PDF</option>
+                </select>
+              </label>
+              <Field label="Title" value={item.title || ''} onChange={(v) => update(index, 'title', v)} />
+              <Field wide label="URL" value={item.url || ''} onChange={(v) => update(index, 'url', v)} />
+              <Field wide label="Drive file ID" value={item.driveId || ''} onChange={(v) => update(index, 'driveId', v)} />
+              <Field wide multiline label="Body / description" value={item.body || ''} onChange={(v) => update(index, 'body', v)} />
+              <Field wide label="Alt text" value={item.alt || ''} onChange={(v) => update(index, 'alt', v)} />
+            </div>
+            <button className="delete-button compact" type="button" onClick={() => remove(index)}>Remove media</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DashboardEditor({
+  content,
+  validation,
+  isDirty,
+  hasDraft,
+  serviceStatus,
+  serviceLoading,
+  refreshSystem,
+  saveContent,
+  exportBackup,
+  importBackup,
+  restoreDraft,
+  discardDraft,
+  setSection,
+}) {
+  const totalRecords = CONTENT_COLLECTIONS.reduce((sum, section) =>
+    sum + (Array.isArray(content[section]) ? content[section].length : 0), 0);
+
+  return (
+    <div className="dashboard-grid">
+      <section className="panel hero-panel">
+        <div className="dashboard-intro">
+          <div>
+            <small>CONTROL ROOM</small>
+            <h2>Portfolio admin dashboard</h2>
+            <p>Manage content, protect drafts, preview the public site and verify the local + online services.</p>
+          </div>
+          <div className={isDirty ? 'dashboard-state dirty' : 'dashboard-state'}>
+            <strong>{isDirty ? 'Draft changes ready' : 'Everything saved'}</strong>
+            <span>{validation.valid ? 'Content structure passes validation.' : validation.errors.length + ' validation error(s) need attention.'}</span>
+          </div>
+        </div>
+      </section>
+
+      <div className="stat-grid">
+        <Stat label="Content records" value={totalRecords} />
+        <Stat label="Experience" value={content.experience.length} />
+        <Stat label="Projects" value={content.projects.length} />
+        <Stat label="Certificates" value={content.certifications.length} />
+        <Stat label="Achievements" value={content.achievements.length} />
+        <Stat label="Education" value={content.education.length} />
+      </div>
+
+      <section className="panel">
+        <PanelHeader eyebrow="DATA HEALTH" title="Validation" />
+        {!validation.errors.length && !validation.warnings.length && <div className="health-good">✓ No validation issues detected.</div>}
+        {validation.errors.length > 0 && <div className="validation-group error"><strong>{validation.errors.length} error(s)</strong>{validation.errors.map((item) => <div key={item}>• {item}</div>)}</div>}
+        {validation.warnings.length > 0 && <div className="validation-group warning"><strong>{validation.warnings.length} warning(s)</strong>{validation.warnings.map((item) => <div key={item}>• {item}</div>)}</div>}
+      </section>
+
+      <section className="panel">
+        <PanelHeader eyebrow="SAFETY" title="Local backup & draft" />
+        <div className="action-grid">
+          <button className="accent-button" onClick={exportBackup}>Export JSON</button>
+          <label className="ghost file-button">Import JSON<input type="file" accept="application/json,.json" onChange={importBackup} /></label>
+          <button className="ghost" onClick={restoreDraft} disabled={!hasDraft}>Restore local draft</button>
+          <button className="ghost" onClick={discardDraft} disabled={!hasDraft}>Discard local draft</button>
+        </div>
+        <p className="helper">Local drafts stay in this browser and are separate from the saved server content.</p>
+      </section>
+
+      <section className="panel">
+        <PanelHeader eyebrow="SERVICES" title="Connection status" />
+        <div className="service-list">
+          {[['local', 'Local API'], ['ai', 'Local AI'], ['online', 'Online Vercel API']].map(([key, label]) => (
+            <ServiceRow key={key} label={label} item={serviceStatus[key]} />
+          ))}
+        </div>
+        <button className="accent-button" onClick={refreshSystem} disabled={serviceLoading}>{serviceLoading ? 'Checking...' : 'Refresh services'}</button>
+      </section>
+
+      <section className="panel">
+        <PanelHeader eyebrow="QUICK NAV" title="Editor shortcuts" />
+        <div className="quick-nav">
+          {CONTENT_COLLECTIONS.map((section) => <button key={section} className="ghost" onClick={() => setSection(section)}>{SECTION_META[section]}</button>)}
+        </div>
+      </section>
+
+      <section className="panel">
+        <PanelHeader eyebrow="PUBLISHING" title="Preview" />
+        <div className="preview-links">
+          <button className="accent-button" onClick={() => window.open(PUBLIC_SITE, '_blank')}>Open public homepage</button>
+          <button className="ghost" onClick={() => window.open(HIRING_ROUTE, '_blank')}>Open technical officer view</button>
+          <button className="save" onClick={saveContent} disabled={!isDirty}>Save current changes</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Stat({ label, value }) {
+  return <div className="stat-card"><small>{label}</small><strong>{value}</strong></div>;
+}
+
+function ServiceRow({ label, item }) {
+  if (!item) return <div className="service-row"><span>{label}</span><b>Not checked</b></div>;
+  return (
+    <div className="service-row">
+      <span>{label}</span>
+      <div>
+        <b className={item.ok ? 'service-ok' : 'service-fail'}>{item.ok ? 'Online' : 'Offline'}</b>
+        {item.status > 0 && <small>{item.status} · {item.latency} ms</small>}
+        {item.error && <small>{item.error}</small>}
+        {item.data?.chatbot !== undefined && <small>Chatbot: {item.data.chatbot ? 'configured' : 'missing'}</small>}
+      </div>
+    </div>
+  );
+}
+
+function MediaLibraryEditor({ driveMedia, driveLoading, loadDriveMedia, content, updateImage }) {
+  return (
+    <section className="panel">
+      <PanelHeader eyebrow="GOOGLE DRIVE" title="Media library" />
+      <div className="media-library-toolbar">
+        <p className="helper">Browse the configured Drive root in read-only mode. Copy IDs into media items or attach a file to the profile image.</p>
+        <button className="accent-button" onClick={loadDriveMedia} disabled={driveLoading}>{driveLoading ? 'Loading...' : 'Refresh Drive'}</button>
+      </div>
+      <div className="profile-drive-row">
+        <Field label="Profile Drive file ID" value={content.profile.image?.driveId || ''} onChange={(v) => updateImage('driveId', v)} />
+      </div>
+      {!driveMedia.length ? <div className="media-empty">No Drive media loaded yet.</div> : (
+        <div className="drive-grid">
+          {driveMedia.map((item) => (
+            <article className="drive-card" key={item.id}>
+              {item.thumbnailLink ? <img src={item.thumbnailLink} alt="" /> : <div className="drive-thumb">FILE</div>}
+              <div><strong title={item.name}>{item.name}</strong><small>{item.mimeType || 'Unknown type'}</small><code>{item.id}</code></div>
+              <div className="drive-actions">
+                <button className="ghost small" onClick={() => navigator.clipboard?.writeText(item.id)}>Copy ID</button>
+                <button className="accent-button small" onClick={() => updateImage('driveId', item.id)}>Use for profile</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CommentsEditor({ comments, loading, filter, setFilter, loadComments, moderateComment }) {
+  const visible = comments.filter((item) => filter === 'active' ? !item.deleted : filter === 'deleted' ? item.deleted : true);
+  return (
+    <section className="panel">
+      <div className="panel-head">
+        <div><small>ONLINE COMMENTS</small><h2>Moderation queue</h2></div>
+        <button className="accent-button" onClick={loadComments} disabled={loading}>{loading ? 'Loading...' : 'Refresh comments'}</button>
+      </div>
+      <div className="comment-toolbar">
+        {['all', 'active', 'deleted'].map((value) => {
+          const count = comments.filter((item) => value === 'all' || (value === 'active' && !item.deleted) || (value === 'deleted' && item.deleted)).length;
+          return <button key={value} className={filter === value ? 'filter-pill active' : 'filter-pill'} onClick={() => setFilter(value)}>{value} ({count})</button>;
+        })}
+      </div>
+      {!visible.length ? <EmptyState action={null} /> : (
+        <div className="comment-admin-list">
+          {visible.map((item) => (
+            <article className={item.deleted ? 'comment-admin-card deleted' : 'comment-admin-card'} key={item.id}>
+              <div className="comment-admin-top"><div><strong>{item.name || 'Anonymous'}</strong><small>{item.term}</small></div><small>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</small></div>
+              <p>{item.deleted ? '[Hidden from public view]' : item.comment}</p>
+              {item.parentId && <small className="comment-reply-label">Reply · parent {item.parentId}</small>}
+              {!item.deleted && <div className="comment-admin-actions"><button className="delete-button" onClick={() => moderateComment(item.id)}>Hide comment</button></div>}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SystemEditor({
+  serviceStatus,
+  serviceLoading,
+  refreshSystem,
+  onlineChatTest,
+  testOnlineChat,
+  hiringTarget,
+  setHiringTarget,
+  hiringTest,
+  testHiringFilter,
+}) {
+  return (
+    <div className="system-grid">
+      <section className="panel">
+        <PanelHeader eyebrow="RUNTIME" title="Service diagnostics" />
+        <div className="service-list">{[['local', 'Local API'], ['ai', 'Local AI'], ['online', 'Online API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
+        <button className="accent-button" onClick={refreshSystem} disabled={serviceLoading}>{serviceLoading ? 'Checking...' : 'Run diagnostic'}</button>
+        {serviceStatus.checkedAt && <small className="system-note">Checked {new Date(serviceStatus.checkedAt).toLocaleString()}</small>}
+      </section>
+
+      <section className="panel">
+        <PanelHeader eyebrow="PUBLIC AI" title="Chatbot smoke test" />
+        <p className="helper">Sends one real request to the online Vercel chatbot using the current portfolio content.</p>
+        <button className="accent-button" onClick={testOnlineChat} disabled={onlineChatTest.loading}>{onlineChatTest.loading ? 'Testing...' : 'Test online AI'}</button>
+        {onlineChatTest.reply && <div className="test-output">{onlineChatTest.reply}</div>}
+        {onlineChatTest.error && <div className="test-error">{onlineChatTest.error}</div>}
+      </section>
+
+      <section className="panel">
+        <PanelHeader eyebrow="HIRING FILTER" title="Relevance test" />
+        <div className="inline-test">
+          <Field label="Target work type" value={hiringTarget} onChange={setHiringTarget} />
+          <button className="accent-button" onClick={testHiringFilter} disabled={hiringTest.loading || !hiringTarget.trim()}>{hiringTest.loading ? 'Testing...' : 'Run hiring filter'}</button>
+        </div>
+        {hiringTest.data && (
+          <div className="selection-grid">
+            {Object.entries(hiringTest.data).map(([key, ids]) => (
+              <div className="selection-card" key={key}><small>{SECTION_META[key] || key}</small><strong>{Array.isArray(ids) ? ids.length : 0}</strong><span>{Array.isArray(ids) ? ids.join(', ') || 'No matches' : 'Invalid response'}</span></div>
+            ))}
+          </div>
+        )}
+        {hiringTest.error && <div className="test-error">{hiringTest.error}</div>}
+      </section>
+    </div>
   );
 }
 
