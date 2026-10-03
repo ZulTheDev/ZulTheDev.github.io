@@ -29,6 +29,9 @@ import {
 
 import {
   checkGitHubAppConnection,
+  githubAppConfigured,
+  publishFilesWithGitHubApp,
+  uploadGitHubAppMedia,
 } from './github-app.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -135,7 +138,7 @@ app.use(
 
 app.use(
   express.json({
-    limit: '4mb',
+    limit: '25mb',
   })
 );
 
@@ -2165,6 +2168,102 @@ app.post(
   }
 );
 
+
+
+app.post(
+  '/api/repo/media/upload',
+  async (request, response) => {
+    const folder =
+      String(
+        request.body?.folder ||
+          'portfolio-media'
+      )
+        .trim()
+        .replace(/^\/+|\/+$/g, '');
+
+    const filename =
+      String(
+        request.body?.filename || ''
+      ).trim();
+
+    const contentBase64 =
+      String(
+        request.body?.contentBase64 || ''
+      ).trim();
+
+    if (
+      folder !== 'certs' &&
+      !/^portfolio-media\/[a-z0-9-]{1,80}$/.test(
+        folder
+      )
+    ) {
+      return response.status(400).json({
+        error:
+          'invalid_repository_media_folder',
+      });
+    }
+
+    const safeName =
+      path
+        .basename(filename)
+        .replace(
+          /[^a-zA-Z0-9._ -]/g,
+          '-'
+        )
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^[-.]+|[-.]+$/g, '')
+        .slice(0, 160);
+
+    if (!safeName) {
+      return response.status(400).json({
+        error:
+          'invalid_repository_media_filename',
+      });
+    }
+
+    if (
+      !contentBase64 ||
+      contentBase64.length > 24_000_000
+    ) {
+      return response.status(400).json({
+        error:
+          'repository_media_too_large_or_empty',
+      });
+    }
+
+    try {
+      const data =
+        await uploadGitHubAppMedia({
+          path:
+            'client/public/' +
+            folder +
+            '/' +
+            Date.now() +
+            '-' +
+            safeName,
+          contentBase64,
+          message:
+            'Add portfolio media: ' +
+            safeName,
+        });
+
+      return response.json(data);
+    } catch (error) {
+      console.error(
+        'Repository media upload error:',
+        error?.message || error
+      );
+
+      return response.status(503).json({
+        error:
+          error?.message ||
+          'repository_media_upload_failed',
+      });
+    }
+  }
+);
+
 app.delete(
   '/api/r2/objects',
   async (request, response) => {
@@ -2331,9 +2430,59 @@ app.put(
     try {
       await writeContent(nextContent);
 
+      let deploy = null;
+
+      if (
+        String(process.env.GITHUB_APP_AUTO_PUSH || '')
+          .toLowerCase() === 'true'
+      ) {
+        if (!githubAppConfigured()) {
+          deploy = {
+            pushed: false,
+            provider: 'github-app',
+            message:
+              'Content saved locally, but GitHub App publishing is not configured.',
+          };
+        } else {
+          try {
+            const contentText =
+              JSON.stringify(nextContent, null, 2) + '\n';
+
+            deploy =
+              await publishFilesWithGitHubApp({
+                title: 'Update portfolio content',
+                files: [
+                  {
+                    path:
+                      'client/public/content.json',
+                    content: contentText,
+                  },
+                ],
+              });
+          } catch (deployError) {
+            console.error(
+              'Portfolio content GitHub App publish error:',
+              deployError?.message ||
+                deployError
+            );
+
+            deploy = {
+              pushed: false,
+              provider: 'github-app',
+              error:
+                deployError?.message ||
+                'github_app_publish_failed',
+              message:
+                'Content saved locally, but the GitHub App push failed.',
+            };
+          }
+        }
+      }
+
       response.json({
         ok: true,
         content: nextContent,
+        deploy,
       });
     } catch (error) {
       console.error(
