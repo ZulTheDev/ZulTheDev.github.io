@@ -10,7 +10,7 @@ Do not attack, hack, scan, fuzz, overload, bypass, exploit, or attempt unauthori
 
 ## Services
 
-- Anonymous comments are stored online through the comments service.
+- Anonymous comments are stored online through the comments service. Each browser gets a persistent anonymous ownership token stored in a first-party cookie with local-storage backup, which lets the same browser return later to edit or delete its own comments. Replies are limited to 10 per anonymous browser identity for each discussion.
 - The AI portfolio assistant is available online through the hosted AI API.
 - AI chat history is kept only in the browser session. Refreshing keeps the current session; ending the browser session clears it. The AI service does not save the conversation.
 - The local chatbot follows Singapore Time (SGT, UTC+8): Monday–Friday 05:00–00:00, Saturday 24 hours, Sunday offline.
