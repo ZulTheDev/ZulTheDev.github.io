@@ -1550,6 +1550,7 @@ function AdminShell() {
               moveItem={moveItem}
               duplicateItem={duplicateItem}
               uploadRepositoryMedia={uploadRepositoryMedia}
+              setNotice={setNotice}
             />
           )}
 
@@ -1565,6 +1566,7 @@ function AdminShell() {
               moveItem={moveItem}
               duplicateItem={duplicateItem}
               uploadRepositoryMedia={uploadRepositoryMedia}
+              setNotice={setNotice}
             />
           )}
 
@@ -1659,6 +1661,7 @@ function CardEditor({
   moveItem,
   duplicateItem,
   uploadRepositoryMedia,
+  setNotice,
 }) {
   return (
     <section className="collection">
@@ -1692,6 +1695,7 @@ function CardEditor({
                     : 'portfolio-media/' + section
                 }
                 uploadRepositoryMedia={uploadRepositoryMedia}
+                setNotice={setNotice}
               />
             );
           })}
@@ -1713,6 +1717,7 @@ function ItemEditorCard({
   section,
   repositoryFolder,
   uploadRepositoryMedia,
+  setNotice,
 }) {
   return (
     <article className={open ? 'editor-card open' : 'editor-card'}>
@@ -1766,6 +1771,7 @@ function ExperienceEditor({
   moveItem,
   duplicateItem,
   uploadRepositoryMedia,
+  setNotice,
 }) {
   return (
     <section className="collection">
@@ -1808,6 +1814,7 @@ function ExperienceEditor({
                     onChange={(value) => updateItem('experience', index, 'media', value)}
                     repositoryFolder="portfolio-media/experience"
                     uploadRepositoryMedia={uploadRepositoryMedia}
+                    setNotice={setNotice}
                   />
                   <div className="editor-card-actions">
                     <button className="ghost small" onClick={() => moveItem('experience', index, -1)}>↑ Move up</button>
@@ -3081,12 +3088,17 @@ function MediaListEditor({
   onChange,
   repositoryFolder = 'portfolio-media',
   uploadRepositoryMedia,
+  setNotice,
 }) {
   const items = Array.isArray(media) ? media : [];
+  const [uploadingIndex, setUploadingIndex] = useState(null);
 
   function update(index, field, value) {
     const next = clone(items);
-    next[index] = { ...(next[index] || {}), [field]: value };
+    next[index] = {
+      ...(next[index] || {}),
+      [field]: value,
+    };
     onChange(next);
   }
 
@@ -3094,38 +3106,206 @@ function MediaListEditor({
     onChange(items.filter((_, i) => i !== index));
   }
 
+  async function upload(index, file) {
+    if (!file || !uploadRepositoryMedia) return;
+
+    setUploadingIndex(index);
+
+    try {
+      const result = await uploadRepositoryMedia(
+        file,
+        repositoryFolder
+      );
+
+      const next = clone(items);
+      next[index] = {
+        ...(next[index] || {}),
+        type: result.type || next[index]?.type || 'image',
+        title: next[index]?.title || file.name,
+        src: result.publicPath || next[index]?.src || '',
+        url: result.publicPath || next[index]?.url || '',
+        alt: next[index]?.alt || file.name,
+        repoPath: result.path || '',
+        mimeType: result.mimeType || file.type || '',
+      };
+
+      onChange(next);
+
+      setNotice?.(
+        'Uploaded ' +
+        file.name +
+        ' to ' +
+        (result.publicPath || repositoryFolder)
+      );
+    } catch (error) {
+      setNotice?.(
+        'Repository media upload failed: ' +
+        error.message
+      );
+    } finally {
+      setUploadingIndex(null);
+    }
+  }
+
   return (
     <div className="media-editor">
       <div className="panel-head compact">
-        <div><small>ATTACHMENTS</small><h2>Media items</h2></div>
-        <button className="accent-button" type="button" onClick={() => onChange([
-          ...items,
-          { type: 'link', title: '', body: '', url: '', driveId: '', alt: '' },
-        ])}>+ Add media</button>
+        <div>
+          <small>ATTACHMENTS</small>
+          <h2>Media items</h2>
+        </div>
+        <button
+          className="accent-button"
+          type="button"
+          onClick={() => onChange([
+            ...items,
+            {
+              type: 'link',
+              title: '',
+              body: '',
+              url: '',
+              src: '',
+              driveId: '',
+              alt: '',
+            },
+          ])}
+        >
+          + Add media
+        </button>
       </div>
 
-      {!items.length && <div className="media-empty">No media attached. Add a link or use the Drive library.</div>}
+      <p className="helper media-repo-helper">
+        Upload an image or PDF directly into
+        <code>/public/{repositoryFolder}</code>
+        through the GitHub App.
+      </p>
+
+      {!items.length && (
+        <div className="media-empty">
+          No media attached. Add a link or upload a repository asset.
+        </div>
+      )}
 
       <div className="media-edit-list">
         {items.map((item, index) => (
-          <div className="media-edit-card" key={(item.title || 'media') + '-' + index}>
+          <div
+            className="media-edit-card"
+            key={'media-item-' + index}
+          >
             <div className="media-edit-grid">
               <label className="field">
                 <span>Type</span>
-                <select value={item.type || 'link'} onChange={(e) => update(index, 'type', e.target.value)}>
+                <select
+                  value={item.type || 'link'}
+                  onChange={(e) => update(index, 'type', e.target.value)}
+                >
                   <option value="link">Link</option>
                   <option value="image">Image</option>
                   <option value="video">Video</option>
                   <option value="pdf">PDF</option>
                 </select>
               </label>
-              <Field label="Title" value={item.title || ''} onChange={(v) => update(index, 'title', v)} />
-              <Field wide label="URL" value={item.url || ''} onChange={(v) => update(index, 'url', v)} />
-              <Field wide label="Drive file ID" value={item.driveId || ''} onChange={(v) => update(index, 'driveId', v)} />
-              <Field wide multiline label="Body / description" value={item.body || ''} onChange={(v) => update(index, 'body', v)} />
-              <Field wide label="Alt text" value={item.alt || ''} onChange={(v) => update(index, 'alt', v)} />
+
+              <Field
+                label="Title"
+                value={item.title || ''}
+                onChange={(v) => update(index, 'title', v)}
+              />
+
+              <Field
+                wide
+                label="Public / external URL"
+                value={item.url || item.src || ''}
+                onChange={(v) => {
+                  const next = clone(items);
+                  next[index] = {
+                    ...(next[index] || {}),
+                    url: v,
+                    src: v,
+                  };
+                  onChange(next);
+                }}
+              />
+
+              <Field
+                wide
+                label="Drive file ID"
+                value={item.driveId || ''}
+                onChange={(v) => update(index, 'driveId', v)}
+              />
+
+              <Field
+                wide
+                label="Repository path"
+                value={item.repoPath || ''}
+                onChange={() => {}}
+                readOnly
+              />
+
+              <Field
+                wide
+                multiline
+                label="Body / description"
+                value={item.body || ''}
+                onChange={(v) => update(index, 'body', v)}
+              />
+
+              <Field
+                wide
+                label="Alt text"
+                value={item.alt || ''}
+                onChange={(v) => update(index, 'alt', v)}
+              />
             </div>
-            <button className="delete-button compact" type="button" onClick={() => remove(index)}>Remove media</button>
+
+            <div className="media-repo-actions">
+              <label className="ghost file-button">
+                {uploadingIndex === index
+                  ? 'Uploading...'
+                  : 'Upload image / PDF to repo'}
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  disabled={uploadingIndex !== null}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    await upload(index, file);
+                  }}
+                />
+              </label>
+
+              {item.src && (
+                <a
+                  className="ghost small"
+                  href={normalizeAdminAssetPath(item.src)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open / view
+                </a>
+              )}
+
+              <button
+                className="delete-button compact"
+                type="button"
+                onClick={() => remove(index)}
+              >
+                Remove media
+              </button>
+            </div>
+
+            {item.src && String(item.type).toLowerCase() === 'image' && (
+              <div className="media-inline-preview">
+                <img
+                  src={normalizeAdminAssetPath(item.src)}
+                  alt={item.alt || item.title || 'Uploaded media'}
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -3133,6 +3313,19 @@ function MediaListEditor({
   );
 }
 
+function normalizeAdminAssetPath(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (
+    raw.startsWith('http://') ||
+    raw.startsWith('https://') ||
+    raw.startsWith('data:') ||
+    raw.startsWith('blob:')
+  ) return raw;
+  return raw.startsWith('/')
+    ? raw
+    : '/' + raw.replace(/^\.?\//, '');
+}
 function DashboardEditor({
   content,
   validation,
@@ -3378,14 +3571,30 @@ function PanelHeader({ eyebrow, title, compact = false }) {
   );
 }
 
-function Field({ label, value, onChange, multiline = false, wide = false }) {
+function Field({
+  label,
+  value,
+  onChange,
+  multiline = false,
+  wide = false,
+  readOnly = false,
+}) {
   return (
     <label className={wide ? 'field wide' : 'field'}>
       <span>{label}</span>
       {multiline ? (
-        <textarea rows={5} value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+        <textarea
+          rows={5}
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          readOnly={readOnly}
+        />
       ) : (
-        <input value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+        <input
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          readOnly={readOnly}
+        />
       )}
     </label>
   );
