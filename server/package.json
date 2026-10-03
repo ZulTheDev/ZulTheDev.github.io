@@ -9,6 +9,10 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "googleapis": "^160.0.0",
-    "redis": "^5.11.0"
+    "redis": "^5.11.0",
+    "redis-cli": "^2.1.2"
+  },
+  "allowScripts": {
+    "core-js@3.50.0": true
   }
 }
