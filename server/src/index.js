@@ -101,17 +101,217 @@ function parseAdminAccounts() {
 }
 
 function verifyPassword(password, storedHash) {
-  const parts = String(storedHash || '').split('
+  const parts = String(storedHash || '').split('$');
+
+  if (
+    parts.length !== 6 ||
+    parts[0] !== 'scrypt'
+  ) {
+    return false;
+  }
+
+  const params = Object.fromEntries(
+    parts[1]
+      .split(',')
+      .map((entry) => entry.split('='))
+  );
+
+  const cost = Number(params.N);
+  const blockSize = Number(params.r);
+  const parallelization = Number(params.p);
+  const salt = parts[2];
+  const expected = parts[3];
+
+  if (
+    !Number.isInteger(cost) ||
+    !Number.isInteger(blockSize) ||
+    !Number.isInteger(parallelization) ||
+    !salt ||
+    !expected
+  ) {
+    return false;
+  }
+
+  try {
+    const derived = scryptSync(
+      String(password),
+      Buffer.from(salt, 'base64'),
+      32,
+      {
+        N: cost,
+        r: blockSize,
+        p: parallelization,
+        maxmem: 256 * 1024 * 1024,
+      }
+    );
+
+    const expectedBuffer = Buffer.from(
+      expected,
+      'base64'
+    );
+
+    return (
+      expectedBuffer.length === derived.length &&
+      timingSafeEqual(
+        expectedBuffer,
+        derived
+      )
+    );
+  } catch {
+    return false;
+  }
+}
+
+function parseCookies(request) {
+  const header = request.get('Cookie') || '';
+
+  return Object.fromEntries(
+    header
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const index = part.indexOf('=');
+
+        if (index < 0) {
+          return [part, ''];
+        }
+
+        return [
+          part.slice(0, index),
+          decodeURIComponent(
+            part.slice(index + 1)
+          ),
+        ];
+      })
+  );
+}
+
+function setAdminCookie(response, token) {
+  const secure =
+    process.env.NODE_ENV === 'production'
+      ? '; Secure'
+      : '';
+
+  response.setHeader(
+    'Set-Cookie',
+    'admin_session=' +
+      encodeURIComponent(token) +
+      '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' +
+      Math.floor(
+        ADMIN_SESSION_TTL_MS / 1000
+      ) +
+      secure
+  );
+}
+
+function clearAdminCookie(response) {
+  response.setHeader(
+    'Set-Cookie',
+    'admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
+  );
+}
+
+function getAdminSession(request) {
+  const token =
+    parseCookies(request).admin_session;
+
+  if (!token) {
+    return null;
+  }
+
+  const session =
+    adminSessions.get(token);
+
+  if (!session) {
+    return null;
+  }
+
+  if (session.expiresAt <= Date.now()) {
+    adminSessions.delete(token);
+    return null;
+  }
+
+  return {
+    token,
+    ...session,
+  };
+}
+
+function requireAdminRole(permission) {
+  return (
+    request,
+    response,
+    next
+  ) => {
+    const session =
+      getAdminSession(request);
+
+    if (!session) {
+      return response.status(401).json({
+        error: 'admin_unauthorized',
+      });
+    }
+
+    const allowed =
+      ROLE_PERMISSIONS[session.role]?.has(
+        permission
+      );
+
+    if (!allowed) {
+      return response.status(403).json({
+        error: 'admin_forbidden',
+        role: session.role,
+        permission,
+      });
+    }
+
+    request.admin = session;
+    return next();
+  };
+}
+
+function cleanupAdminSessions() {
+  const now = Date.now();
+
+  for (
+    const [token, session]
+    of adminSessions
+  ) {
+    if (session.expiresAt <= now) {
+      adminSessions.delete(token);
+    }
+  }
+}
+
+setInterval(
+  cleanupAdminSessions,
+  15 * 60 * 1000
+).unref();
 
 function withCommentsLock(task) {
-  const run = commentsWriteQueue.then(task, task);
-  commentsWriteQueue = run.catch(() => {});
+  const run =
+    commentsWriteQueue.then(
+      task,
+      task
+    );
+
+  commentsWriteQueue =
+    run.catch(() => {});
+
   return run;
 }
 
 function withVisitorsLock(task) {
-  const run = visitorsWriteQueue.then(task, task);
-  visitorsWriteQueue = run.catch(() => {});
+  const run =
+    visitorsWriteQueue.then(
+      task,
+      task
+    );
+
+  visitorsWriteQueue =
+    run.catch(() => {});
+
   return run;
 }
 
