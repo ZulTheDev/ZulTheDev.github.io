@@ -30,6 +30,27 @@ npm install
 vercel
 ```
 
+### Public Judge0 protection
+
+The public `/api/judge0` endpoint uses the same Redis Cloud database for persistent abuse controls. Limits are shared across Vercel instances rather than stored only in one serverless process:
+
+- 8 executions per IP per minute
+- 40 executions per IP per hour
+- 2 identical submissions per fingerprint per 15 seconds
+- 120 executions per minute globally
+
+The limiter returns HTTP `429` with `Retry-After` and `X-RateLimit-*` headers. If Redis is unavailable, the code runner fails closed with HTTP `503` instead of bypassing the protection.
+
+Vercel documents `x-forwarded-for` as the requester's public IP and notes that Vercel overwrites it to prevent spoofed client IPs; `x-vercel-forwarded-for` is also available. citeturn897335search0
+
+Set a random secret for stable one-way hashing of rate-limit identifiers:
+
+```env
+RATE_LIMIT_HASH_SECRET=
+```
+
+The raw IP address is not written into the rate-limit keys; the key uses a SHA-256-derived identifier.
+
 Then set the resulting project URL as the GitHub repository secret:
 
 `COMMENTS_BACKUP_URL`
