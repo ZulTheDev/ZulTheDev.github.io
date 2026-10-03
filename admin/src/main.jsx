@@ -478,12 +478,14 @@ function LoginScreen({ onLogin, error }) {
 
 function AdminShell({ user, onLogout }) {
   const [content, setContent] = useState(null);
-  const [section, setSection] = useState('dashboard');
+  const [section, setSectionState] = useState(() => {
+    const requested = sectionFromRoute();
+    return canAccessSection(user, requested) ? requested : 'dashboard';
+  });
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
   const [apiOnline, setApiOnline] = useState(false);
-  const [adminSecret, setAdminSecret] = useState('');
   const [expanded, setExpanded] = useState(null);
   const [raw, setRaw] = useState('');
   const [savedSnapshot, setSavedSnapshot] = useState('');
