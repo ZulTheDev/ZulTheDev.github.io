@@ -1652,6 +1652,1001 @@ function HiringPortfolioView({
   );
 }
 
+
+function safeWriteupHtml(value) {
+  const html = String(value || '');
+
+  if (typeof DOMParser === 'undefined') {
+    return html.replace(/<script[\\s\\S]*?<\\/script>/gi, '');
+  }
+
+  const documentNode =
+    new DOMParser().parseFromString(
+      html,
+      'text/html'
+    );
+
+  documentNode
+    .querySelectorAll(
+      'script,style,iframe,object,embed,form'
+    )
+    .forEach((node) => node.remove());
+
+  documentNode
+    .querySelectorAll('*')
+    .forEach((node) => {
+      [...node.attributes].forEach((attribute) => {
+        if (
+          attribute.name.toLowerCase().startsWith('on')
+        ) {
+          node.removeAttribute(attribute.name);
+        }
+      });
+    });
+
+  return documentNode.body.innerHTML;
+}
+
+function writeupDate(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+
+  return Number.isNaN(parsed.getTime())
+    ? String(value)
+    : parsed.toLocaleDateString('en-SG', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+}
+
+function WriteupCodeRunner({ block }) {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState(null);
+  const [stdin, setStdin] = useState(block.stdin || '');
+
+  async function run() {
+    setRunning(true);
+    setResult(null);
+
+    try {
+      const base =
+        ONLINE_API ||
+        '';
+
+      if (!base) {
+        throw new Error(
+          'Online code runner is not configured.'
+        );
+      }
+
+      const response = await fetch(
+        base + '/api/judge0',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source_code:
+              block.code || '',
+            language_id:
+              Number(
+                block.languageId || 71
+              ),
+            stdin,
+          }),
+        }
+      );
+
+      const data =
+        await response.json()
+          .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail ||
+          data?.error ||
+          'Code runner failed.'
+        );
+      }
+
+      setResult(data);
+    } catch (error) {
+      setResult({
+        error: error.message,
+      });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="writeup-code-runner">
+      <div className="writeup-code-head">
+        <span>
+          {block.languageName ||
+            ({
+              71: 'Python 3',
+              63: 'JavaScript',
+              54: 'C++',
+              50: 'C',
+              62: 'Java',
+              60: 'Go',
+              73: 'Rust',
+              74: 'TypeScript',
+              72: 'Ruby',
+              46: 'Bash',
+            }[Number(block.languageId)] ||
+              'Code')}
+        </span>
+
+        <button
+          className="writeup-run-button"
+          onClick={run}
+          disabled={
+            running ||
+            !block.code?.trim()
+          }
+        >
+          {running
+            ? 'Running...'
+            : 'Run code'}
+        </button>
+      </div>
+
+      <pre className="writeup-code">
+        {block.code || ''}
+      </pre>
+
+      <label className="writeup-stdin">
+        <span>STDIN</span>
+        <textarea
+          value={stdin}
+          onChange={(event) =>
+            setStdin(event.target.value)
+          }
+          placeholder="Optional input"
+        />
+      </label>
+
+      {result && (
+        <div className="writeup-code-result">
+          <div className="writeup-code-result-status">
+            <strong>
+              {result.status?.description ||
+                (result.error
+                  ? 'Error'
+                  : 'Result')}
+            </strong>
+
+            {result.time && (
+              <span>
+                {result.time}s
+              </span>
+            )}
+
+            {result.memory && (
+              <span>
+                {result.memory} KB
+              </span>
+            )}
+          </div>
+
+          {result.stdout && (
+            <div>
+              <small>STDOUT</small>
+              <pre>{result.stdout}</pre>
+            </div>
+          )}
+
+          {(result.stderr ||
+            result.compile_output ||
+            result.message ||
+            result.error) && (
+            <div>
+              <small>STDERR / MESSAGE</small>
+              <pre>
+                {result.stderr ||
+                  result.compile_output ||
+                  result.message ||
+                  result.error}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WriteupMedia({ media }) {
+  const url = media?.url || '';
+
+  if (!url) {
+    return (
+      <div className="writeup-media-empty">
+        Media URL unavailable.
+      </div>
+    );
+  }
+
+  const type =
+    String(media.type || media.mimeType || '')
+      .toLowerCase();
+
+  if (
+    type.startsWith('image/') ||
+    type === 'image' ||
+    /\\.(png|jpe?g|gif|webp|svg)$/i.test(url)
+  ) {
+    return (
+      <figure className="writeup-media-card">
+        <img
+          src={url}
+          alt={media.alt || media.name || ''}
+          loading="lazy"
+        />
+        {(media.name ||
+          media.alt) && (
+          <figcaption>
+            {media.name || media.alt}
+          </figcaption>
+        )}
+      </figure>
+    );
+  }
+
+  if (
+    type.startsWith('video/') ||
+    type === 'video'
+  ) {
+    return (
+      <figure className="writeup-media-card">
+        <video
+          src={url}
+          controls
+          preload="metadata"
+        />
+        {media.name && (
+          <figcaption>
+            {media.name}
+          </figcaption>
+        )}
+      </figure>
+    );
+  }
+
+  if (
+    type.startsWith('audio/') ||
+    type === 'audio'
+  ) {
+    return (
+      <figure className="writeup-media-card">
+        <audio
+          src={url}
+          controls
+          preload="metadata"
+        />
+        {media.name && (
+          <figcaption>
+            {media.name}
+          </figcaption>
+        )}
+      </figure>
+    );
+  }
+
+  if (
+    type === 'application/pdf' ||
+    type === 'pdf' ||
+    /\\.pdf$/i.test(url)
+  ) {
+    return (
+      <div className="writeup-file-card">
+        <span>PDF</span>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {media.name || 'Open PDF'}
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="writeup-file-card">
+      <span>FILE</span>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {media.name || 'Open attachment'}
+      </a>
+    </div>
+  );
+}
+
+function WriteupWorkflowViewer({ workspace, blocks }) {
+  const nodes =
+    Array.isArray(workspace?.nodes)
+      ? workspace.nodes
+      : [];
+
+  const edges =
+    Array.isArray(workspace?.edges)
+      ? workspace.edges
+      : [];
+
+  const [selectedNode, setSelectedNode] =
+    useState(null);
+
+  function openNode(node) {
+    setSelectedNode(node.id);
+
+    if (!node.refBlockId) {
+      return;
+    }
+
+    const element =
+      document.getElementById(
+        'writeup-block-' +
+          node.refBlockId
+      );
+
+    if (element) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }
+
+  if (!nodes.length) {
+    return (
+      <div className="writeup-workflow-empty">
+        This writeup has no interactive workflow
+        objects yet.
+      </div>
+    );
+  }
+
+  const width = Math.max(
+    760,
+    ...nodes.map((node) =>
+      Number(node.x || 0) + 220
+    )
+  );
+
+  const height = Math.max(
+    470,
+    ...nodes.map((node) =>
+      Number(node.y || 0) + 150
+    )
+  );
+
+  return (
+    <section className="writeup-workflow">
+      <div className="writeup-workflow-header">
+        <div>
+          <small>INTERACTIVE WORKFLOW</small>
+          <h3>
+            {workspace.title ||
+              'Challenge workflow'}
+          </h3>
+        </div>
+        <span>
+          {nodes.length} objects ·{' '}
+          {edges.length} connections
+        </span>
+      </div>
+
+      <div
+        className="writeup-workflow-canvas"
+        style={{
+          minWidth: width,
+          minHeight: height,
+        }}
+      >
+        <svg
+          className="writeup-workflow-lines"
+          width={width}
+          height={height}
+          viewBox={
+            '0 0 ' +
+            width +
+            ' ' +
+            height
+          }
+        >
+          <defs>
+            <marker
+              id="writeup-workflow-arrow"
+              markerWidth="8"
+              markerHeight="8"
+              refX="7"
+              refY="3"
+              orient="auto"
+            >
+              <path
+                d="M0,0 L0,6 L8,3 z"
+              />
+            </marker>
+          </defs>
+
+          {edges.map((edge) => {
+            const from =
+              nodes.find(
+                (node) =>
+                  node.id === edge.from
+              );
+
+            const to =
+              nodes.find(
+                (node) =>
+                  node.id === edge.to
+              );
+
+            if (!from || !to) {
+              return null;
+            }
+
+            return (
+              <line
+                key={edge.id}
+                x1={
+                  Number(from.x || 0) +
+                  85
+                }
+                y1={
+                  Number(from.y || 0) +
+                  42
+                }
+                x2={
+                  Number(to.x || 0) + 85
+                }
+                y2={
+                  Number(to.y || 0) + 42
+                }
+                markerEnd="url(#writeup-workflow-arrow)"
+              />
+            );
+          })}
+        </svg>
+
+        {nodes.map((node) => {
+          const block =
+            blocks.find(
+              (item) =>
+                item.id ===
+                node.refBlockId
+            );
+
+          return (
+            <button
+              key={node.id}
+              className={
+                selectedNode === node.id
+                  ? 'writeup-workflow-node selected'
+                  : 'writeup-workflow-node'
+              }
+              style={{
+                left: node.x,
+                top: node.y,
+              }}
+              onClick={() =>
+                openNode(node)
+              }
+            >
+              <span>
+                {node.type ||
+                  'object'}
+              </span>
+
+              <strong>
+                {node.label ||
+                  'Object'}
+              </strong>
+
+              {block && (
+                <small>
+                  Jump to{' '}
+                  {block.type}
+                </small>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function CTFWriteupBlock({
+  block,
+  blocks,
+}) {
+  if (
+    !block ||
+    !block.type
+  ) {
+    return null;
+  }
+
+  if (
+    block.type === 'paragraph' ||
+    block.type === 'heading' ||
+    block.type === 'quote' ||
+    block.type === 'list'
+  ) {
+    return (
+      <div
+        className={
+          'writeup-rich-content writeup-' +
+          block.type
+        }
+        dangerouslySetInnerHTML={{
+          __html: safeWriteupHtml(
+            block.html || ''
+          ),
+        }}
+      />
+    );
+  }
+
+  if (block.type === 'table') {
+    const headers =
+      Array.isArray(block.headers)
+        ? block.headers
+        : [];
+
+    const rows =
+      Array.isArray(block.rows)
+        ? block.rows
+        : [];
+
+    return (
+      <div className="writeup-table-view">
+        <table>
+          <thead>
+            <tr>
+              {headers.map(
+                (header, index) => (
+                  <th key={index}>
+                    {header}
+                  </th>
+                )
+              )}
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map(
+              (row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {headers.map(
+                    (_, columnIndex) => (
+                      <td
+                        key={columnIndex}
+                      >
+                        {
+                          row?.[
+                            columnIndex
+                          ] || ''
+                        }
+                      </td>
+                    )
+                  )}
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (block.type === 'code') {
+    return (
+      <WriteupCodeRunner
+        block={block}
+      />
+    );
+  }
+
+  if (block.type === 'media') {
+    return (
+      <WriteupMedia
+        media={block.media}
+      />
+    );
+  }
+
+  if (block.type === 'workflow') {
+    return (
+      <WriteupWorkflowViewer
+        workspace={
+          blocks.workspace ||
+          null
+        }
+        blocks={
+          Array.isArray(
+            blocks.blocks
+          )
+            ? blocks.blocks
+            : []
+        }
+      />
+    );
+  }
+
+  return null;
+}
+
+function WriteupSessionNav({
+  sessions,
+}) {
+  return (
+    <aside className="writeup-toc">
+      <div>
+        <small>WRITEUP NAV</small>
+        <strong>Skip to session</strong>
+      </div>
+
+      <nav>
+        {sessions.map(
+          (session, index) => (
+            <a
+              key={session.id}
+              href={
+                '#writeup-session-' +
+                session.id
+              }
+            >
+              <span>
+                {String(index + 1).padStart(
+                  2,
+                  '0'
+                )}
+              </span>
+              {session.title}
+            </a>
+          )
+        )}
+      </nav>
+    </aside>
+  );
+}
+
+function CTFWriteupDocument({
+  writeup,
+}) {
+  const sessions =
+    Array.isArray(
+      writeup.sessions
+    )
+      ? writeup.sessions
+      : [];
+
+  const blocks =
+    Array.isArray(
+      writeup.blocks
+    )
+      ? writeup.blocks
+      : [];
+
+  return (
+    <div className="writeup-document-view">
+      {sessions.map(
+        (session) => (
+          <section
+            key={session.id}
+            id={
+              'writeup-session-' +
+              session.id
+            }
+            className="writeup-session"
+          >
+            <div className="writeup-session-marker">
+              <small>SESSION</small>
+              <strong>
+                {session.title}
+              </strong>
+            </div>
+
+            {blocks
+              .filter(
+                (block) =>
+                  block.sessionId ===
+                  session.id
+              )
+              .map((block) => (
+                <article
+                  key={block.id}
+                  id={
+                    'writeup-block-' +
+                    block.id
+                  }
+                  className="writeup-block-view"
+                >
+                  <CTFWriteupBlock
+                    block={block}
+                    blocks={{
+                      blocks,
+                      workspace:
+                        writeup.workspace,
+                    }}
+                  />
+                </article>
+              ))}
+          </section>
+        )
+      )}
+
+      {writeup.workspace &&
+        writeup.workspace.nodes?.length > 0 && (
+          <section className="writeup-workflow-session">
+            <WriteupWorkflowViewer
+              workspace={writeup.workspace}
+              blocks={blocks}
+            />
+          </section>
+        )}
+    </div>
+  );
+}
+
+function CTFBlogIndexView() {
+  const [items, setItems] =
+    useState([]);
+
+  useEffect(() => {
+    fetch('/ctf-blog/index.json')
+      .then((response) =>
+        response.ok
+          ? response.json()
+          : { writeups: [] }
+      )
+      .then((data) =>
+        setItems(
+          Array.isArray(
+            data?.writeups
+          )
+            ? data.writeups
+            : []
+        )
+      )
+      .catch(() => setItems([]));
+  }, []);
+
+  return (
+    <>
+      <nav className="writeup-site-nav">
+        <a href="/">
+          <b>
+            ZUL<span>/</span>JAMAL
+          </b>
+        </a>
+        <a href="/ctf-blog/">
+          CTF Blog
+        </a>
+      </nav>
+
+      <main className="writeup-index">
+        <small>CTF / WRITEUPS</small>
+        <h1>
+          Challenge notes,
+          <br />
+          <i>workflows & proof.</i>
+        </h1>
+        <p>
+          Interactive writeups built from
+          challenge sessions, evidence and
+          runnable experiments.
+        </p>
+
+        {!items.length ? (
+          <div className="writeup-index-empty">
+            No public writeups yet.
+          </div>
+        ) : (
+          <div className="writeup-index-grid">
+            {items.map((item) => (
+              <a
+                key={item.slug}
+                href={
+                  '/ctf-blog/' +
+                  item.slug
+                }
+                className="writeup-index-card"
+              >
+                <small>
+                  {writeupDate(
+                    item.updatedAt
+                  )}
+                </small>
+                <h2>
+                  {item.title}
+                </h2>
+                <p>
+                  {item.excerpt}
+                </p>
+                <span>
+                  Open writeup →
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
+      </main>
+    </>
+  );
+}
+
+function CTFWriteupView({ slug }) {
+  const [writeup, setWriteup] =
+    useState(null);
+  const [error, setError] =
+    useState('');
+  const [loading, setLoading] =
+    useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetch(
+      '/ctf-blog/' +
+        encodeURIComponent(slug) +
+        '.json'
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(
+            'Writeup not found'
+          );
+        }
+
+        return response.json();
+      })
+      .then((data) => {
+        if (mounted) {
+          setWriteup(data);
+          setLoading(false);
+        }
+      })
+      .catch((requestError) => {
+        if (mounted) {
+          setError(
+            requestError.message
+          );
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="writeup-loading">
+        Loading writeup...
+      </div>
+    );
+  }
+
+  if (!writeup) {
+    return (
+      <>
+        <nav className="writeup-site-nav">
+          <a href="/">
+            ZUL/JAMAL
+          </a>
+          <a href="/ctf-blog/">
+            CTF Blog
+          </a>
+        </nav>
+        <main className="writeup-error">
+          <small>CTF BLOG</small>
+          <h1>{error || 'Writeup not found'}</h1>
+          <a href="/ctf-blog/">
+            Back to writeups
+          </a>
+        </main>
+      </>
+    );
+  }
+
+  const sessions =
+    Array.isArray(writeup.sessions)
+      ? writeup.sessions
+      : [];
+
+  return (
+    <>
+      <nav className="writeup-site-nav">
+        <a href="/">
+          <b>
+            ZUL<span>/</span>JAMAL
+          </b>
+        </a>
+
+        <a href="/ctf-blog/">
+          CTF Blog
+        </a>
+      </nav>
+
+      <div className="writeup-layout">
+        <WriteupSessionNav
+          sessions={sessions}
+        />
+
+        <main className="writeup-page">
+          <header className="writeup-header">
+            <small>
+              CTF WRITEUP
+            </small>
+            <h1>
+              {writeup.title}
+            </h1>
+            {writeup.excerpt && (
+              <p>
+                {writeup.excerpt}
+              </p>
+            )}
+
+            <div className="writeup-meta">
+              <span>
+                {writeup.author ||
+                  'Zulfaqar Jamal'}
+              </span>
+              {writeup.updatedAt && (
+                <span>
+                  Updated{' '}
+                  {writeupDate(
+                    writeup.updatedAt
+                  )}
+                </span>
+              )}
+              {writeup.tags
+                ?.length > 0 && (
+                <div>
+                  {writeup.tags.map(
+                    (tag) => (
+                      <span
+                        key={tag}
+                      >
+                        {tag}
+                      </span>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+          </header>
+
+          <CTFWriteupDocument
+            writeup={writeup}
+          />
+
+          <section className="writeup-discussion">
+            <GiscusComments
+              discussionTerm={
+                'ctf-blog:' +
+                slug
+              }
+            />
+          </section>
+        </main>
+      </div>
+    </>
+  );
+}
+
 /* =========================================================
    MAIN APPLICATION
 ========================================================= */
@@ -1787,6 +2782,28 @@ function App() {
         progress={loadProgress}
       />
     );
+  }
+
+  /* =======================================================
+     CTF BLOG ROUTES
+  ======================================================= */
+
+  const ctfPath =
+    location.pathname.replace(/\\+$/, '');
+
+  if (ctfPath === '/ctf-blog' || ctfPath === '/ctf-blog/') {
+    return <CTFBlogIndexView />;
+  }
+
+  if (ctfPath.startsWith('/ctf-blog/')) {
+    const slug =
+      decodeURIComponent(
+        ctfPath.slice('/ctf-blog/'.length)
+      );
+
+    if (slug) {
+      return <CTFWriteupView slug={slug} />;
+    }
   }
 
   /* =======================================================
