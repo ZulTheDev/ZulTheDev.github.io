@@ -774,6 +774,226 @@ function LoadingScreen({ progress = 0 }) {
   );
 }
 /* =========================================================
+   PROFESSIONAL HIRING RESUME VIEW
+   Route: /port_resume?type_of_work_hiring=...
+========================================================= */
+
+function formatHiringTarget(value) {
+  if (!value) {
+    return 'Professional Resume';
+  }
+
+  return decodeURIComponent(value)
+    .replace(/[+_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function HiringResume({ content, target }) {
+  const experience = Array.isArray(content.experience)
+    ? content.experience
+    : [];
+
+  const education = Array.isArray(content.education)
+    ? content.education
+    : [];
+
+  const certifications = Array.isArray(content.certifications)
+    ? content.certifications
+    : [];
+
+  const projects = Array.isArray(content.projects)
+    ? content.projects
+    : [];
+
+  const awards = Array.isArray(content.awards)
+    ? content.awards
+    : [];
+
+  const skills = Array.from(
+    new Set(
+      experience.flatMap((item) =>
+        Array.isArray(item.skills) ? item.skills : []
+      )
+    )
+  ).slice(0, 14);
+
+  const formatLink = (value) => {
+    if (value.startsWith('mailto:')) {
+      return value.replace('mailto:', '');
+    }
+
+    return value
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
+  };
+
+  return (
+    <div className="hiring-resume-page">
+      <div className="hiring-resume-toolbar">
+        <a href="/">Interactive portfolio</a>
+        <button
+          type="button"
+          onClick={() => window.print()}
+        >
+          Print / Save PDF
+        </button>
+      </div>
+
+      <main className="hiring-resume">
+        <header className="hiring-resume-header">
+          <div>
+            <div className="hiring-resume-eyebrow">
+              PROFESSIONAL PORTFOLIO / HIRING VIEW
+            </div>
+
+            <h1>{content.profile.name}</h1>
+
+            <p className="hiring-resume-title">
+              {target || content.profile.title}
+            </p>
+
+            <p className="hiring-resume-location">
+              {content.profile.location}
+            </p>
+          </div>
+
+          <div className="hiring-resume-contact">
+            {[
+              content.profile.email
+                ? 'mailto:' + content.profile.email
+                : '',
+              content.profile.linkedin,
+              content.profile.website,
+              content.profile.orcid,
+            ]
+              .filter(Boolean)
+              .map((link) => (
+                <a
+                  key={link}
+                  href={link}
+                  target={link.startsWith('mailto:') ? undefined : '_blank'}
+                  rel={link.startsWith('mailto:') ? undefined : 'noreferrer'}
+                >
+                  {formatLink(link)}
+                </a>
+              ))}
+          </div>
+        </header>
+
+        <section className="hiring-resume-section hiring-resume-summary">
+          <h2>Professional summary</h2>
+          <p>{content.profile.summary}</p>
+        </section>
+
+        {skills.length > 0 && (
+          <section className="hiring-resume-section">
+            <h2>Core skills</h2>
+            <div className="hiring-skill-grid">
+              {skills.map((skill) => (
+                <span key={skill}>{skill}</span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {experience.length > 0 && (
+          <section className="hiring-resume-section">
+            <h2>Experience</h2>
+
+            <div className="hiring-entry-list">
+              {experience.map((item) => (
+                <article className="hiring-entry" key={item.id}>
+                  <div className="hiring-entry-meta">
+                    <span>{date(item.start)} — {date(item.end)}</span>
+                    <span>{item.location}</span>
+                  </div>
+
+                  <h3>{item.role}</h3>
+                  <h4>{item.company}</h4>
+                  <p>{item.summary}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {education.length > 0 && (
+          <section className="hiring-resume-section">
+            <h2>Education</h2>
+
+            <div className="hiring-entry-list hiring-entry-list-tight">
+              {education.map((item) => (
+                <article className="hiring-entry" key={item.id}>
+                  <div className="hiring-entry-meta">
+                    <span>{item.period}</span>
+                  </div>
+
+                  <h3>{item.qualification}</h3>
+                  <h4>{item.school}</h4>
+                  {item.description && <p>{item.description}</p>}
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="hiring-resume-columns">
+          {certifications.length > 0 && (
+            <section className="hiring-resume-section">
+              <h2>Certifications</h2>
+              {certifications.map((item) => (
+                <div className="hiring-list-item" key={item.id}>
+                  <strong>{item.title}</strong>
+                  <span>{item.issuer}</span>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {projects.length > 0 && (
+            <section className="hiring-resume-section">
+              <h2>Selected projects</h2>
+              {projects.map((item) => (
+                <div className="hiring-list-item" key={item.id}>
+                  <strong>{item.title}</strong>
+                  <span>{item.description}</span>
+                </div>
+              ))}
+            </section>
+          )}
+        </div>
+
+        {awards.length > 0 && (
+          <section className="hiring-resume-section hiring-awards">
+            <h2>Recognition</h2>
+            <div className="hiring-award-grid">
+              {awards.map((item) => (
+                <div className="hiring-list-item" key={item.id}>
+                  <strong>{item.title}</strong>
+                  <span>
+                    {item.issuer}
+                    {item.date ? ' · ' + item.date : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <footer className="hiring-resume-footer">
+          <span>
+            Target: {target || 'General hiring review'}
+          </span>
+          <a href="/">zulthedev.github.io</a>
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+/* =========================================================
    MAIN APPLICATION
 ========================================================= */
 
@@ -906,6 +1126,26 @@ function App() {
     return (
       <LoadingScreen
         progress={loadProgress}
+      />
+    );
+  }
+
+  /* =======================================================
+     PROFESSIONAL HIRING ROUTE
+  ======================================================= */
+
+  const hiringPath =
+    location.pathname.replace(/\/+$/, '') === '/port_resume';
+
+  if (hiringPath) {
+    const params = new URLSearchParams(location.search);
+    const rawTarget =
+      params.get('type_of_work_hiring') || '';
+
+    return (
+      <HiringResume
+        content={content}
+        target={formatHiringTarget(rawTarget)}
       />
     );
   }
@@ -1050,6 +1290,13 @@ function App() {
         <a href="#explore">
           Explore{' '}
           <Sparkles size={13} />
+        </a>
+
+        <a
+          href="/port_resume?type_of_work_hiring"
+          className="professional-resume-link"
+        >
+          Resume
         </a>
 
         <a href="#games">
