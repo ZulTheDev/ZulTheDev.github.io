@@ -17,9 +17,10 @@ function commentApiCandidates() {
 }
 
 const DEVICE_KEY = 'portfolio-anonymous-device-id';
-const SESSION_KEY = 'portfolio-comment-session-id';
+const DEVICE_COOKIE = 'portfolio-anonymous-device-id';
 const NAME_KEY = 'portfolio-anonymous-display-name';
-const MAX_SESSION_REPLIES = 10;
+const MAX_USER_REPLIES = 10;
+const DEVICE_COOKIE_MAX_AGE = 60 * 60 * 24 * 730;
 
 function createId() {
   if (globalThis.crypto?.randomUUID) {
@@ -29,34 +30,61 @@ function createId() {
   return `anon-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function getPersistentId() {
+function readCookie(name) {
   try {
-    let id = localStorage.getItem(DEVICE_KEY);
+    const prefix = name + '=';
+    const item = document.cookie
+      .split('; ')
+      .find((entry) => entry.startsWith(prefix));
 
-    if (!id) {
-      id = createId();
-      localStorage.setItem(DEVICE_KEY, id);
-    }
-
-    return id;
+    return item ? decodeURIComponent(item.slice(prefix.length)) : '';
   } catch {
-    return createId();
+    return '';
   }
 }
 
-function getSessionId() {
+function writeCookie(name, value) {
   try {
-    let id = sessionStorage.getItem(SESSION_KEY);
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie =
+      name + '=' + encodeURIComponent(value) +
+      '; Max-Age=' + DEVICE_COOKIE_MAX_AGE +
+      '; Path=/; SameSite=Lax' + secure;
+  } catch {
+    // Ignore unavailable cookies.
+  }
+}
 
-    if (!id) {
-      id = createId();
-      sessionStorage.setItem(SESSION_KEY, id);
+function validBrowserId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[a-zA-Z0-9-]{20,100}$/.test(value)
+  );
+}
+
+function getPersistentId() {
+  let id = '';
+
+  try {
+    id = readCookie(DEVICE_COOKIE);
+
+    if (!validBrowserId(id)) {
+      id = localStorage.getItem(DEVICE_KEY) || '';
     }
 
-    return id;
+    if (!validBrowserId(id)) {
+      id = createId();
+    }
+
+    localStorage.setItem(DEVICE_KEY, id);
   } catch {
-    return createId();
+    if (!validBrowserId(id)) {
+      id = createId();
+    }
   }
+
+  writeCookie(DEVICE_COOKIE, id);
+  return id;
 }
 
 function getSavedName() {
