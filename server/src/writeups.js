@@ -14,8 +14,10 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-export const writeupDraftDir = path.resolve(process.cwd(), 'server', 'writeups');
-export const writeupPublishDir = path.resolve(process.cwd(), 'client', 'public', 'ctf-blog');
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+export const writeupDraftDir = path.join(repoRoot, 'server', 'writeups');
+export const writeupPublishDir = path.join(repoRoot, 'client', 'public', 'ctf-blog');
 
 export function slugify(value) {
   return String(value || '')
