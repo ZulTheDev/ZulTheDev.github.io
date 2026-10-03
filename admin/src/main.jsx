@@ -3151,6 +3151,7 @@ function ServiceRow({ label, item }) {
         {item.status > 0 && <small>{item.status} · {item.latency} ms</small>}
         {item.error && <small>{item.error}</small>}
         {item.data?.chatbot !== undefined && <small>Chatbot: {item.data.chatbot ? 'configured' : 'missing'}</small>}
+        {item.data?.repository && <small>{item.data.repository}{item.data.branch ? ' · ' + item.data.branch : ''}</small>}
       </div>
     </div>
   );
