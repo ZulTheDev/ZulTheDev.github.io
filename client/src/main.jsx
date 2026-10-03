@@ -137,6 +137,40 @@ function normalizeAssetPath(value) {
   return normalized;
 }
 
+function resolvePortfolioMediaSrc(media) {
+  if (!media || typeof media !== 'object') {
+    return '';
+  }
+
+  const direct =
+    media.src ||
+    media.url ||
+    media.local ||
+    '';
+
+  const normalized =
+    normalizeAssetPath(direct);
+
+  if (normalized) {
+    return normalized;
+  }
+
+  const driveId =
+    media.driveId ||
+    media.googleDriveId ||
+    '';
+
+  if (driveId && API) {
+    return (
+      API +
+      '/api/drive/image/' +
+      encodeURIComponent(driveId)
+    );
+  }
+
+  return '';
+}
+
 function normalizeContent(data) {
   const source = data || {};
   const profile = source.profile || {};
@@ -272,14 +306,23 @@ function Modal({ item, type, close }) {
 
         <section>
           <div className="preview">
-            {media[0].type === 'image' ? (
-              <img
-                src={normalizeAssetPath(media[0].src)}
-                alt={
-                  media[0].title ||
-                  item.title
-                }
-              />
+            {media[0].type === 'image' &&
+            resolvePortfolioMediaSrc(media[0]) ? (
+              <a
+                className="modal-image-link"
+                href={resolvePortfolioMediaSrc(media[0])}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <img
+                  src={resolvePortfolioMediaSrc(media[0])}
+                  alt={
+                    media[0].title ||
+                    item.title
+                  }
+                  loading="lazy"
+                />
+              </a>
             ) : (
               <div>
                 <Sparkles />
@@ -1147,7 +1190,7 @@ function HiringPortfolioView({
             (media) =>
               media &&
               media.type === 'image' &&
-              media.src
+              (media.src || media.url || media.local)
           )
           .map((media) => ({
             ...media,
@@ -1591,9 +1634,7 @@ function HiringPortfolioView({
                     className="hiring-media-card"
                   >
                     <img
-                      src={normalizeAssetPath(
-                        media.src
-                      )}
+                      src={resolvePortfolioMediaSrc(media)}
                       alt={
                         media.title ||
                         media.itemTitle
