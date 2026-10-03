@@ -202,6 +202,7 @@ button{color:inherit}
 .writeup-editor-head small{color:var(--pink);font-size:9px;letter-spacing:.12em;text-transform:uppercase;font-weight:800}
 .writeup-editor-head h2{margin:7px 0 5px;font-size:27px;letter-spacing:-.03em}
 .writeup-editor-head>div>span{color:#766a79;font-size:10px}
+.writeup-publish-status{display:block!important;margin-top:6px;color:#766a79!important;font-size:9px!important;letter-spacing:.04em!important;text-transform:none!important;font-weight:600!important}
 .writeup-editor-actions{display:flex;gap:7px;flex-wrap:wrap}
 .writeup-tabs{display:flex;gap:4px;overflow:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px 2px;margin-bottom:17px}
 .writeup-tabs button{border:1px solid transparent;background:transparent;color:#7e7282;padding:9px 11px;border-radius:8px;cursor:pointer;white-space:nowrap;font-size:10px}
