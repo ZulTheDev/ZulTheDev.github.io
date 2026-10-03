@@ -992,13 +992,21 @@ function AdminShell({ user, onLogout }) {
             <small>{roleLabel(user.role)}</small>
           </span>
           <button className="ghost" onClick={loadContent} disabled={saving}>Reload</button>
-          <button className="ghost" onClick={syncRaw} disabled={saving}>Sync JSON</button>
-          <span className={isDirty ? 'dirty-badge' : 'saved-badge'}>{isDirty ? 'Unsaved changes' : 'Saved'}</span>
+          {canAccessSection(user, 'profile') && (
+            <>
+              <button className="ghost" onClick={syncRaw} disabled={saving}>Sync JSON</button>
+              <span className={isDirty ? 'dirty-badge' : 'saved-badge'}>{isDirty ? 'Unsaved changes' : 'Saved'}</span>
+            </>
+          )}
           <button className="ghost" onClick={() => window.open(PUBLIC_SITE, '_blank')} disabled={saving}>Public site</button>
-          <button className="ghost" onClick={() => window.open(HIRING_ROUTE, '_blank')} disabled={saving}>Hiring view</button>
-          <button className="save" onClick={saveContent} disabled={saving || !apiOnline || !isDirty || !canAccessSection(user, 'profile')}>
-            {saving ? 'Saving...' : 'Save changes'}
-          </button>
+          {canAccessSection(user, 'profile') && (
+            <button className="ghost" onClick={() => window.open(HIRING_ROUTE, '_blank')} disabled={saving}>Hiring view</button>
+          )}
+          {canAccessSection(user, 'profile') && (
+            <button className="save" onClick={saveContent} disabled={saving || !apiOnline || !isDirty}>
+              {saving ? 'Saving...' : 'Save changes'}
+            </button>
+          )}
           <button className="ghost logout-button" onClick={onLogout} disabled={saving}>Sign out</button>
         </div>
       </header>
