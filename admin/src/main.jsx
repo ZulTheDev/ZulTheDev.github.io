@@ -607,13 +607,11 @@ function AdminShell({ user, onLogout }) {
     setNotice('Saving content...');
 
     try {
-      const response = await fetch(`${API}/api/content`, {
+      const response = await authFetch(`${API}/api/content`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          ...(adminSecret.trim()
-            ? { 'X-Admin-Secret': adminSecret.trim() }
-            : {}),
+
         },
         body: JSON.stringify(content),
       });
@@ -816,7 +814,7 @@ function AdminShell({ user, onLogout }) {
   async function loadDriveMedia() {
     setDriveLoading(true);
     try {
-      const response = await fetch(API + '/api/drive/media');
+      const response = await authFetch(API + '/api/drive/media');
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || 'Drive API returned ' + response.status);
       setDriveMedia(Array.isArray(data) ? data : []);
@@ -832,9 +830,7 @@ function AdminShell({ user, onLogout }) {
   async function loadComments() {
     setCommentLoading(true);
     try {
-      const response = await fetch(API + '/api/admin/comments', {
-        headers: adminSecret.trim() ? { 'X-Admin-Secret': adminSecret.trim() } : {},
-      });
+      const response = await authFetch(API + '/api/admin/comments');
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || 'Comments API returned ' + response.status);
       setComments(Array.isArray(data.comments) ? data.comments : []);
@@ -849,9 +845,8 @@ function AdminShell({ user, onLogout }) {
 
   async function moderateComment(id) {
     try {
-      const response = await fetch(API + '/api/admin/comments/' + encodeURIComponent(id), {
+      const response = await authFetch(API + '/api/admin/comments/' + encodeURIComponent(id), {
         method: 'DELETE',
-        headers: adminSecret.trim() ? { 'X-Admin-Secret': adminSecret.trim() } : {},
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || 'Moderation failed (' + response.status + ')');
