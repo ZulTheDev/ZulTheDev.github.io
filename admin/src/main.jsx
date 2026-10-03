@@ -780,6 +780,92 @@ function AdminShell() {
     };
   }
 
+  async function uploadRepositoryMedia(file, folder = 'portfolio-media') {
+    if (!file) return null;
+
+    if (
+      !file.type.startsWith('image/') &&
+      file.type !== 'application/pdf'
+    ) {
+      throw new Error(
+        'Only image files and PDF files can be uploaded to the portfolio repository.'
+      );
+    }
+
+    if (file.size > 18_000_000) {
+      throw new Error(
+        'Repository media must be smaller than 18 MB.'
+      );
+    }
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () =>
+        resolve(String(reader.result || ''));
+      reader.onerror = () =>
+        reject(
+          new Error(
+            'Could not read the selected file.'
+          )
+        );
+      reader.readAsDataURL(file);
+    });
+
+    const commaIndex = dataUrl.indexOf(',');
+    const contentBase64 =
+      commaIndex >= 0
+        ? dataUrl.slice(commaIndex + 1)
+        : '';
+
+    if (!contentBase64) {
+      throw new Error(
+        'Selected file did not contain readable data.'
+      );
+    }
+
+    const response = await authFetch(
+      API + '/api/repo/media/upload',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          contentBase64,
+          folder,
+        }),
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          'Repository media upload failed (' +
+          response.status +
+          ')'
+      );
+    }
+
+    return {
+      ...data,
+      type:
+        file.type === 'application/pdf'
+          ? 'pdf'
+          : file.type.startsWith('image/')
+            ? 'image'
+            : 'link',
+      name: file.name,
+      mimeType: file.type,
+      size: file.size,
+    };
+  }
+
   async function loadR2Objects(slug = '') {
     setR2Loading(true);
 
@@ -1463,6 +1549,7 @@ function AdminShell() {
               removeItem={removeItem}
               moveItem={moveItem}
               duplicateItem={duplicateItem}
+              uploadRepositoryMedia={uploadRepositoryMedia}
             />
           )}
 
@@ -1477,6 +1564,7 @@ function AdminShell() {
               removeItem={removeItem}
               moveItem={moveItem}
               duplicateItem={duplicateItem}
+              uploadRepositoryMedia={uploadRepositoryMedia}
             />
           )}
 
