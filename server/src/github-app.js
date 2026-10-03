@@ -83,7 +83,7 @@ function githubAppJwt() {
   const unsigned = header + '.' + payload;
 
   const privateKey = createPrivateKey({
-    key: privateKeyValue.replaceAll('\\\\n', '\n'),
+    key: privateKeyValue.replaceAll('\\n', '\n'),
     format: 'pem',
   });
 
