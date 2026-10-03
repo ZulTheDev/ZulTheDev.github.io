@@ -1,18 +1,20 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
-
 import {
   S3Client,
   PutObjectCommand,
   ListObjectsV2Command,
   GetObjectCommand,
+  DeleteObjectCommand,
+  HeadBucketCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+import {
+  githubAppConfigured,
+  publishFilesWithGitHubApp,
+} from './github-app.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -82,65 +84,50 @@ async function readPublishedIndex() {
   }
 }
 
-async function deployPublishedWriteup(title) {
-  if (
-    String(process.env.GIT_AUTO_PUSH || '')
-      .toLowerCase() !== 'true'
-  ) {
+async function deployPublishedWriteup(title, files) {
+  const githubAppAutoPush =
+    String(process.env.GITHUB_APP_AUTO_PUSH || '')
+      .toLowerCase() === 'true';
+
+  if (!githubAppAutoPush) {
     return {
       pushed: false,
+      provider: 'github-app',
       message:
-        'Published locally. Set GIT_AUTO_PUSH=true to push automatically.',
+        'Published locally. Set GITHUB_APP_AUTO_PUSH=true to publish through the GitHub App.',
     };
   }
 
-  const repositoryRoot =
-    process.env.GIT_REPO_ROOT ||
-    repoRoot;
-
-  const branch =
-    process.env.GIT_BRANCH ||
-    'main';
-
-  const commitTitle =
-    'Publish CTF writeup: ' +
-    String(title || 'Untitled writeup')
-      .replace(/[^a-zA-Z0-9 _-]/g, '')
-      .slice(0, 120);
-
-  await execFileAsync(
-    'git',
-    ['add', 'client/public/ctf-blog'],
-    { cwd: repositoryRoot }
-  );
-
-  try {
-    await execFileAsync(
-      'git',
-      ['commit', '-m', commitTitle],
-      { cwd: repositoryRoot }
-    );
-  } catch (error) {
-    const combined =
-      String(error?.stdout || '') +
-      String(error?.stderr || '');
-
-    if (!/nothing to commit/i.test(combined)) {
-      throw error;
-    }
+  if (!githubAppConfigured()) {
+    return {
+      pushed: false,
+      provider: 'github-app',
+      message:
+        'Published locally, but the GitHub App is not configured on the local server.',
+    };
   }
 
-  await execFileAsync(
-    'git',
-    ['push', 'origin', branch],
-    { cwd: repositoryRoot }
-  );
+  try {
+    return await publishFilesWithGitHubApp({
+      title,
+      files,
+    });
+  } catch (error) {
+    console.error(
+      'GitHub App publish error:',
+      error?.message || error
+    );
 
-  return {
-    pushed: true,
-    message:
-      'Published and pushed to GitHub Pages source.',
-  };
+    return {
+      pushed: false,
+      provider: 'github-app',
+      error:
+        error?.message ||
+        'github_app_publish_failed',
+      message:
+        'Published locally, but GitHub App publishing failed.',
+    };
+  }
 }
 
 export async function publishWriteup(writeup) {
@@ -187,9 +174,17 @@ export async function publishWriteup(writeup) {
     });
   }
 
+  const publishedWriteupPath =
+    'client/public/ctf-blog/' +
+    slug +
+    '.json';
+
+  const publishedWriteupContent =
+    JSON.stringify(next, null, 2) + '\n';
+
   await fs.writeFile(
     path.join(writeupPublishDir, slug + '.json'),
-    JSON.stringify(next, null, 2) + '\n',
+    publishedWriteupContent,
     'utf8'
   );
 
@@ -208,13 +203,32 @@ export async function publishWriteup(writeup) {
   filtered.push(summary);
   filtered.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
 
+  const publishedIndexContent =
+    JSON.stringify(
+      { version: 1, writeups: filtered },
+      null,
+      2
+    ) + '\n';
+
   await fs.writeFile(
     path.join(writeupPublishDir, 'index.json'),
-    JSON.stringify({ version: 1, writeups: filtered }, null, 2) + '\n',
+    publishedIndexContent,
     'utf8'
   );
 
-  const deploy = await deployPublishedWriteup(next.title);
+  const deploy = await deployPublishedWriteup(
+    next.title,
+    [
+      {
+        path: publishedWriteupPath,
+        content: publishedWriteupContent,
+      },
+      {
+        path: 'client/public/ctf-blog/index.json',
+        content: publishedIndexContent,
+      },
+    ]
+  );
 
   return {
     ...next,
@@ -244,34 +258,106 @@ function r2Client() {
   });
 }
 
+export function safeR2Key(value) {
+  const key = String(value || '').trim().replace(/^\/+/, '');
+
+  if (
+    !key ||
+    key.includes('..') ||
+    !key.startsWith('ctf-blog/')
+  ) {
+    throw new Error('invalid_r2_key');
+  }
+
+  return key;
+}
+
+export function safeR2Prefix(value = 'ctf-blog/') {
+  const prefix = String(value || '').trim().replace(/^\/+/, '');
+
+  if (
+    !prefix ||
+    prefix.includes('..') ||
+    prefix === 'ctf-blog' ||
+    (!prefix.startsWith('ctf-blog/') && prefix !== 'ctf-blog/')
+  ) {
+    throw new Error('invalid_r2_prefix');
+  }
+
+  return prefix;
+}
+
+export async function checkR2Connection() {
+  await r2Client().send(
+    new HeadBucketCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+    })
+  );
+
+  return true;
+}
+
 export async function createUploadUrl({ key, contentType, expiresIn = 3600 }) {
+  const safeKey = safeR2Key(key);
+
   return getSignedUrl(
     r2Client(),
     new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: key,
+      Key: safeKey,
       ContentType: contentType,
     }),
     { expiresIn }
   );
 }
 
-export async function createReadUrl({ key, expiresIn = 3600 }) {
+export async function createReadUrl({ key, expiresIn = 900 }) {
+  const safeKey = safeR2Key(key);
+
   return getSignedUrl(
     r2Client(),
     new GetObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: key,
+      Key: safeKey,
     }),
     { expiresIn }
   );
 }
 
-export async function listR2Objects(prefix = '') {
+export async function deleteR2Object(key) {
+  const safeKey = safeR2Key(key);
+
+  await r2Client().send(
+    new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: safeKey,
+    })
+  );
+
+  return { key: safeKey };
+}
+
+export function r2PublicUrl(key) {
+  const publicBase = String(process.env.R2_PUBLIC_BASE_URL || '')
+    .trim()
+    .replace(/\/+$/, '');
+
+  if (!publicBase) return '';
+
+  return publicBase + '/' +
+    safeR2Key(key)
+      .split('/')
+      .map((part) => encodeURIComponent(part))
+      .join('/');
+}
+
+export async function listR2Objects(prefix = 'ctf-blog/') {
+  const safePrefix = safeR2Prefix(prefix);
+
   const result = await r2Client().send(
     new ListObjectsV2Command({
       Bucket: process.env.R2_BUCKET_NAME,
-      Prefix: prefix,
+      Prefix: safePrefix,
       MaxKeys: 1000,
     })
   );

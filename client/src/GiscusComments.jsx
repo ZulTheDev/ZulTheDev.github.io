@@ -17,9 +17,10 @@ function commentApiCandidates() {
 }
 
 const DEVICE_KEY = 'portfolio-anonymous-device-id';
-const SESSION_KEY = 'portfolio-comment-session-id';
+const DEVICE_COOKIE = 'portfolio-anonymous-device-id';
 const NAME_KEY = 'portfolio-anonymous-display-name';
-const MAX_SESSION_REPLIES = 10;
+const MAX_USER_REPLIES = 10;
+const DEVICE_COOKIE_MAX_AGE = 60 * 60 * 24 * 730;
 
 function createId() {
   if (globalThis.crypto?.randomUUID) {
@@ -29,34 +30,61 @@ function createId() {
   return `anon-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function getPersistentId() {
+function readCookie(name) {
   try {
-    let id = localStorage.getItem(DEVICE_KEY);
+    const prefix = name + '=';
+    const item = document.cookie
+      .split('; ')
+      .find((entry) => entry.startsWith(prefix));
 
-    if (!id) {
-      id = createId();
-      localStorage.setItem(DEVICE_KEY, id);
-    }
-
-    return id;
+    return item ? decodeURIComponent(item.slice(prefix.length)) : '';
   } catch {
-    return createId();
+    return '';
   }
 }
 
-function getSessionId() {
+function writeCookie(name, value) {
   try {
-    let id = sessionStorage.getItem(SESSION_KEY);
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie =
+      name + '=' + encodeURIComponent(value) +
+      '; Max-Age=' + DEVICE_COOKIE_MAX_AGE +
+      '; Path=/; SameSite=Lax' + secure;
+  } catch {
+    // Ignore unavailable cookies.
+  }
+}
 
-    if (!id) {
-      id = createId();
-      sessionStorage.setItem(SESSION_KEY, id);
+function validBrowserId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[a-zA-Z0-9-]{20,100}$/.test(value)
+  );
+}
+
+function getPersistentId() {
+  let id = '';
+
+  try {
+    id = readCookie(DEVICE_COOKIE);
+
+    if (!validBrowserId(id)) {
+      id = localStorage.getItem(DEVICE_KEY) || '';
     }
 
-    return id;
+    if (!validBrowserId(id)) {
+      id = createId();
+    }
+
+    localStorage.setItem(DEVICE_KEY, id);
   } catch {
-    return createId();
+    if (!validBrowserId(id)) {
+      id = createId();
+    }
   }
+
+  writeCookie(DEVICE_COOKIE, id);
+  return id;
 }
 
 function getSavedName() {
@@ -108,6 +136,27 @@ function writeLocalState(state) {
   }
 }
 
+function cacheReplyCount(
+  deviceId,
+  discussionTerm,
+  count
+) {
+  const state = readLocalState();
+
+  state[deviceId] = {
+    ...(state[deviceId] || {}),
+    repliesByTerm: {
+      ...(state[deviceId]?.repliesByTerm || {}),
+      [discussionTerm]: Math.max(
+        0,
+        Number(count) || 0
+      ),
+    },
+  };
+
+  writeLocalState(state);
+}
+
 function formatDate(value) {
   if (!value) {
     return '';
@@ -133,7 +182,6 @@ function normalizeComment(comment) {
 
 export default function GiscusComments({ discussionTerm }) {
   const deviceId = useMemo(() => getPersistentId(), []);
-  const sessionId = useMemo(() => getSessionId(), []);
 
   const [comments, setComments] = useState([]);
   const [name, setName] = useState(() => getSavedName());
@@ -162,8 +210,6 @@ export default function GiscusComments({ discussionTerm }) {
             discussionTerm
           )}&deviceId=${encodeURIComponent(
             deviceId
-          )}&sessionId=${encodeURIComponent(
-            sessionId
           )}`
         );
 
@@ -176,8 +222,17 @@ export default function GiscusComments({ discussionTerm }) {
               : []
           );
 
+          const remoteReplyCount =
+            Number(data.replyCount || 0);
+
           setReplyCount(
-            Number(data.replyCount || 0)
+            remoteReplyCount
+          );
+
+          cacheReplyCount(
+            deviceId,
+            discussionTerm,
+            remoteReplyCount
           );
 
           setLoading(false);
@@ -206,7 +261,8 @@ export default function GiscusComments({ discussionTerm }) {
 
       setReplyCount(
         Number(
-          localState?.[sessionId]?.replies || 0
+          localState?.[deviceId]
+            ?.repliesByTerm?.[discussionTerm] || 0
         )
       );
     } catch {
@@ -219,7 +275,7 @@ export default function GiscusComments({ discussionTerm }) {
 
   useEffect(() => {
     loadComments();
-  }, [discussionTerm, deviceId, sessionId]);
+  }, [discussionTerm, deviceId]);
 
   function resetComposer() {
     setReplyTo(null);
@@ -478,10 +534,12 @@ export default function GiscusComments({ discussionTerm }) {
 
     if (
       isReply &&
-      replyCount >= MAX_SESSION_REPLIES
+      replyCount >= MAX_USER_REPLIES
     ) {
       setNotice(
-        `Reply limit reached for this session (${MAX_SESSION_REPLIES}).`
+        'Reply limit reached for this anonymous browser (' +
+          MAX_USER_REPLIES +
+          ').'
       );
       return;
     }
@@ -496,7 +554,6 @@ export default function GiscusComments({ discussionTerm }) {
       parentId:
         replyTo?.id || null,
       deviceId,
-      sessionId,
     };
 
     try {
@@ -537,9 +594,17 @@ export default function GiscusComments({ discussionTerm }) {
           setReplyTo(null);
 
           if (isReply) {
+            const nextReplyCount =
+              replyCount + 1;
+
             setReplyCount(
-              (current) =>
-                current + 1
+              nextReplyCount
+            );
+
+            cacheReplyCount(
+              deviceId,
+              discussionTerm,
+              nextReplyCount
             );
           }
 
@@ -555,7 +620,9 @@ export default function GiscusComments({ discussionTerm }) {
         if (response.status === 429) {
           setNotice(
             data?.message ||
-              `Reply limit reached for this session (${MAX_SESSION_REPLIES}).`
+              'Reply limit reached for this anonymous browser (' +
+              MAX_USER_REPLIES +
+              ').'
           );
           return;
         }
@@ -588,7 +655,6 @@ export default function GiscusComments({ discussionTerm }) {
           parentId:
             replyTo?.id || null,
           ownerId: deviceId,
-          sessionId,
           canEdit: true,
           localOnly: true,
         };
@@ -619,13 +685,16 @@ export default function GiscusComments({ discussionTerm }) {
           const state =
             readLocalState();
 
-          state[sessionId] = {
-            ...(state[sessionId] || {}),
-            replies:
-              Number(
-                state?.[sessionId]
-                  ?.replies || 0
-              ) + 1,
+          state[deviceId] = {
+            ...(state[deviceId] || {}),
+            repliesByTerm: {
+              ...(state[deviceId]?.repliesByTerm || {}),
+              [discussionTerm]:
+                Number(
+                  state[deviceId]
+                    ?.repliesByTerm?.[discussionTerm] || 0
+                ) + 1,
+            },
           };
 
           writeLocalState(
@@ -787,7 +856,7 @@ export default function GiscusComments({ discussionTerm }) {
   }
 
   const canReply =
-    replyCount < MAX_SESSION_REPLIES;
+    replyCount < MAX_USER_REPLIES;
 
   return (
     <section className="portfolio-comments">
@@ -801,9 +870,11 @@ export default function GiscusComments({ discussionTerm }) {
         </h3>
 
         <p>
-          Anonymous comments use a private browser ID.
-          Your name is remembered on this browser.
-          No IP address or device fingerprint is required.
+          Anonymous comments use a private browser ID stored in a
+          first-party cookie and local browser storage. Your name is
+          remembered on this browser. No IP address or device fingerprint
+          is required. Clearing browser storage or cookies removes the
+          anonymous ownership access.
         </p>
       </div>
 
@@ -877,10 +948,12 @@ export default function GiscusComments({ discussionTerm }) {
           <small>
             {comment.length}/2000
             {replyTo
-              ? ` · ${Math.max(
+              ? ' · ' +
+                Math.max(
                   0,
-                  MAX_SESSION_REPLIES - replyCount
-                )} replies left`
+                  MAX_USER_REPLIES - replyCount
+                ) +
+                ' replies left'
               : ''}
           </small>
         </div>

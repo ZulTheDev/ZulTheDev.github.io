@@ -4023,3 +4023,12 @@ html::before{
   .writeup-header h1{font-size:44px}
   .writeup-workflow-header{align-items:flex-start;flex-direction:column}
 }
+
+
+.modal-image-link{display:block;max-width:100%;max-height:100%;cursor:zoom-in}
+.modal-image-link img{display:block;width:auto;max-width:100%;max-height:100%;object-fit:contain}
+
+
+.modal-file-preview{display:grid;gap:12px;place-items:center;text-align:center;padding:30px}
+.modal-file-link{border:1px solid var(--l);padding:10px 14px;border-radius:9px;color:var(--p);text-decoration:none;background:#1b1521}
+.modal-file-link:hover{background:#251b2b}

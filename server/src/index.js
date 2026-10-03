@@ -17,10 +17,22 @@ import {
   deleteDraft,
   publishWriteup,
   r2Configured,
+  checkR2Connection,
   createUploadUrl,
   createReadUrl,
+  deleteR2Object,
   listR2Objects,
+  r2PublicUrl,
+  safeR2Key,
+  safeR2Prefix,
 } from './writeups.js';
+
+import {
+  checkGitHubAppConnection,
+  githubAppConfigured,
+  publishFilesWithGitHubApp,
+  uploadGitHubAppMedia,
+} from './github-app.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,7 +138,7 @@ app.use(
 
 app.use(
   express.json({
-    limit: '4mb',
+    limit: '25mb',
   })
 );
 
@@ -439,34 +451,16 @@ function flattenComments(
     .flat();
 }
 
-function countSessionReplies(
-  allComments,
-  deviceId,
-  sessionId
-) {
-  return flattenComments(allComments)
-    .filter(
-      (item) =>
-        item.parentId &&
-        item.ownerId === deviceId &&
-        item.authorSessionId === sessionId
-    )
-    .length;
-}
-
-function countRawSessionReplies(
+function countRawUserReplies(
   comments,
-  deviceId,
-  sessionId
+  deviceId
 ) {
   return comments.filter(
     (item) =>
       item.parentId &&
-      item.ownerId === deviceId &&
-      item.authorSessionId === sessionId
+      item.ownerId === deviceId
   ).length;
 }
-
 function publicComment(
   item,
   deviceId
@@ -594,11 +588,6 @@ app.get(
         request.query.deviceId || ''
       ).trim();
 
-    const sessionId =
-      String(
-        request.query.sessionId || ''
-      ).trim();
-
     if (
       !term ||
       !validCommentTerm(term)
@@ -678,14 +667,10 @@ app.get(
             replyCount:
               validAnonymousId(
                 deviceId
-              ) &&
-              validAnonymousId(
-                sessionId
               )
-                ? countRawSessionReplies(
+                ? countRawUserReplies(
                     rawComments,
-                    deviceId,
-                    sessionId
+                    deviceId
                   )
                 : 0,
           });
@@ -720,14 +705,10 @@ app.get(
         replyCount:
           validAnonymousId(
             deviceId
-          ) &&
-          validAnonymousId(
-            sessionId
           )
-            ? countSessionReplies(
-                allComments,
-                deviceId,
-                sessionId
+            ? countRawUserReplies(
+                rawComments,
+                deviceId
               )
             : 0,
       });
@@ -777,11 +758,6 @@ app.post(
         request.body?.deviceId || ''
       ).trim();
 
-    const sessionId =
-      String(
-        request.body?.sessionId || ''
-      ).trim();
-
     if (
       !term ||
       !validCommentTerm(term)
@@ -796,9 +772,6 @@ app.post(
     if (
       !validAnonymousId(
         deviceId
-      ) ||
-      !validAnonymousId(
-        sessionId
       )
     ) {
       return response
@@ -905,10 +878,9 @@ app.post(
             }
 
             const replies =
-              countRawSessionReplies(
+              countRawUserReplies(
                 existing,
-                deviceId,
-                sessionId
+                deviceId
               );
 
             if (replies >= 10) {
@@ -918,7 +890,7 @@ app.post(
                   error:
                     'reply_limit_reached',
                   message:
-                    'Reply limit reached for this session (10).',
+                    'Reply limit reached for this anonymous browser (10).',
                 });
             }
           }
@@ -936,8 +908,6 @@ app.post(
             parentId,
             deleted: false,
             ownerId: deviceId,
-            authorSessionId:
-              sessionId,
           };
 
           await saveRedisComment(
@@ -1009,10 +979,9 @@ app.post(
               }
 
               const replies =
-                countSessionReplies(
-                  allComments,
-                  deviceId,
-                  sessionId
+                countRawUserReplies(
+                  allComments[term] || [],
+                  deviceId
                 );
 
               if (replies >= 10) {
@@ -1022,7 +991,7 @@ app.post(
                     error:
                       'reply_limit_reached',
                     message:
-                      'Reply limit reached for this session (10).',
+                      'Reply limit reached for this anonymous browser (10).',
                   },
                 };
               }
@@ -1041,8 +1010,6 @@ app.post(
               parentId,
               deleted: false,
               ownerId: deviceId,
-              authorSessionId:
-                sessionId,
             };
 
             allComments[
@@ -1968,8 +1935,7 @@ app.post(
         url:
           '/ctf-blog/' +
           published.slug,
-        deploy:
-          'Run git push from the local repository to trigger GitHub Pages.',
+        deploy: published.deploy || null,
       });
     } catch (error) {
       console.error('Writeup publish error:', error?.message || error);
@@ -1983,20 +1949,90 @@ app.post(
 
 app.get(
   '/api/r2/status',
-  (request, response) => {
-    response.json({
-      configured: r2Configured(),
-      publicBaseUrl:
-        process.env.R2_PUBLIC_BASE_URL || '',
-    });
+  async (request, response) => {
+    const configured = r2Configured();
+
+    if (!configured) {
+      return response.json({
+        configured: false,
+        reachable: false,
+        publicBaseUrl:
+          process.env.R2_PUBLIC_BASE_URL || '',
+      });
+    }
+
+    try {
+      await checkR2Connection();
+
+      return response.json({
+        configured: true,
+        reachable: true,
+        publicBaseUrl:
+          process.env.R2_PUBLIC_BASE_URL || '',
+      });
+    } catch (error) {
+      console.error(
+        'R2 status check failed:',
+        error?.message || error
+      );
+
+      return response.status(503).json({
+        configured: true,
+        reachable: false,
+        publicBaseUrl:
+          process.env.R2_PUBLIC_BASE_URL || '',
+        error: 'r2_unreachable',
+        detail: error?.message || 'R2 connection failed',
+      });
+    }
   }
 );
+
+app.get(
+  '/api/github-app/status',
+  async (request, response) => {
+    try {
+      return response.json(
+        await checkGitHubAppConnection()
+      );
+    } catch (error) {
+      console.error(
+        'GitHub App status check failed:',
+        error?.message || error
+      );
+
+      return response.status(503).json({
+        configured: true,
+        reachable: false,
+        repository:
+          process.env.GITHUB_OWNER &&
+          process.env.GITHUB_REPO
+            ? process.env.GITHUB_OWNER +
+              '/' +
+              process.env.GITHUB_REPO
+            : null,
+        branch:
+          process.env.GITHUB_BRANCH ||
+          'main',
+        error:
+          error?.message ||
+          'github_app_unreachable',
+      });
+    }
+  }
+);
+
 
 app.get(
   '/api/r2/objects',
   async (request, response) => {
     try {
-      const prefix = String(request.query.prefix || '').slice(0, 200);
+      const rawPrefix = String(
+        request.query.prefix || 'ctf-blog/'
+      ).slice(0, 200);
+
+      const prefix = safeR2Prefix(rawPrefix);
+
       return response.json({
         objects: await listR2Objects(prefix),
       });
@@ -2035,16 +2071,33 @@ app.post(
       });
     }
 
+    let slug;
+
+    try {
+      slug = writeupId(writeupSlug);
+    } catch {
+      return response.status(400).json({
+        error: 'invalid_writeup_slug',
+      });
+    }
+
     try {
       const safeName = filename
         .replace(/\\/g, '/')
         .split('/')
         .pop()
-        .replace(/[^a-zA-Z0-9._-]+/g, '-');
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/^\.+$/, '');
+
+      if (!safeName) {
+        return response.status(400).json({
+          error: 'invalid_filename',
+        });
+      }
 
       const key =
         'ctf-blog/' +
-        writeupId(writeupSlug) +
+        slug +
         '/' +
         Date.now() +
         '-' +
@@ -2055,17 +2108,10 @@ app.post(
         contentType,
       });
 
-      const publicBase =
-        String(
-          process.env.R2_PUBLIC_BASE_URL || ''
-        ).replace(/\/+$/, '');
-
       return response.json({
         key,
         uploadUrl,
-        publicUrl: publicBase
-          ? publicBase + '/' + key
-          : '',
+        publicUrl: r2PublicUrl(key),
         expiresIn: 3600,
       });
     } catch (error) {
@@ -2077,12 +2123,159 @@ app.post(
   }
 );
 
+
+
+app.post(
+  '/api/repo/media/upload',
+  async (request, response) => {
+    const folder =
+      String(
+        request.body?.folder ||
+          'portfolio-media'
+      )
+        .trim()
+        .replace(/^\/+|\/+$/g, '');
+
+    const filename =
+      String(
+        request.body?.filename || ''
+      ).trim();
+
+    const contentBase64 =
+      String(
+        request.body?.contentBase64 || ''
+      ).trim();
+
+    if (
+      folder !== 'certs' &&
+      !/^portfolio-media\/[a-z0-9-]{1,80}$/.test(
+        folder
+      )
+    ) {
+      return response.status(400).json({
+        error:
+          'invalid_repository_media_folder',
+      });
+    }
+
+    const safeName =
+      path
+        .basename(filename)
+        .replace(
+          /[^a-zA-Z0-9._ -]/g,
+          '-'
+        )
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^[-.]+|[-.]+$/g, '')
+        .slice(0, 160);
+
+    if (!safeName) {
+      return response.status(400).json({
+        error:
+          'invalid_repository_media_filename',
+      });
+    }
+
+    if (
+      !contentBase64 ||
+      contentBase64.length > 24_000_000
+    ) {
+      return response.status(400).json({
+        error:
+          'repository_media_too_large_or_empty',
+      });
+    }
+
+    try {
+      const data =
+        await uploadGitHubAppMedia({
+          path:
+            'client/public/' +
+            folder +
+            '/' +
+            Date.now() +
+            '-' +
+            safeName,
+          contentBase64,
+          message:
+            'Add portfolio media: ' +
+            safeName,
+        });
+
+      return response.json(data);
+    } catch (error) {
+      console.error(
+        'Repository media upload error:',
+        error?.message || error
+      );
+
+      return response.status(503).json({
+        error:
+          error?.message ||
+          'repository_media_upload_failed',
+      });
+    }
+  }
+);
+
+app.delete(
+  '/api/r2/objects',
+  async (request, response) => {
+    const rawKey = String(request.body?.key || '').trim();
+
+    if (!rawKey || rawKey.length > 500) {
+      return response.status(400).json({
+        error: 'invalid_r2_key',
+      });
+    }
+
+    let key;
+
+    try {
+      key = safeR2Key(rawKey);
+    } catch {
+      return response.status(400).json({
+        error: 'invalid_r2_key',
+      });
+    }
+
+    try {
+      await deleteR2Object(key);
+
+      return response.json({
+        ok: true,
+        key,
+      });
+    } catch (error) {
+      console.error(
+        'R2 delete error:',
+        error?.message || error
+      );
+
+      return response.status(503).json({
+        error: error?.message || 'r2_unavailable',
+      });
+    }
+  }
+);
+
 app.get(
   '/api/r2/read-url',
   async (request, response) => {
-    const key = String(request.query.key || '').trim();
+    const rawKey = String(request.query.key || '').trim();
 
-    if (!key || key.length > 500) {
+    if (!rawKey || rawKey.length > 500) {
+      return response.status(400).json({
+        error: 'invalid_r2_key',
+      });
+    }
+
+    let key;
+
+    try {
+      key = safeR2Key(rawKey);
+    } catch {
       return response.status(400).json({
         error: 'invalid_r2_key',
       });
@@ -2192,9 +2385,59 @@ app.put(
     try {
       await writeContent(nextContent);
 
+      let deploy = null;
+
+      if (
+        String(process.env.GITHUB_APP_AUTO_PUSH || '')
+          .toLowerCase() === 'true'
+      ) {
+        if (!githubAppConfigured()) {
+          deploy = {
+            pushed: false,
+            provider: 'github-app',
+            message:
+              'Content saved locally, but GitHub App publishing is not configured.',
+          };
+        } else {
+          try {
+            const contentText =
+              JSON.stringify(nextContent, null, 2) + '\n';
+
+            deploy =
+              await publishFilesWithGitHubApp({
+                title: 'Update portfolio content',
+                files: [
+                  {
+                    path:
+                      'client/public/content.json',
+                    content: contentText,
+                  },
+                ],
+              });
+          } catch (deployError) {
+            console.error(
+              'Portfolio content GitHub App publish error:',
+              deployError?.message ||
+                deployError
+            );
+
+            deploy = {
+              pushed: false,
+              provider: 'github-app',
+              error:
+                deployError?.message ||
+                'github_app_publish_failed',
+              message:
+                'Content saved locally, but the GitHub App push failed.',
+            };
+          }
+        }
+      }
+
       response.json({
         ok: true,
         content: nextContent,
+        deploy,
       });
     } catch (error) {
       console.error(
