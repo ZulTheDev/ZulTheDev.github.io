@@ -37,6 +37,24 @@ npm install
 npm run dev
 ```
 
+### Role-based local admin
+
+Create a password hash:
+
+```powershell
+cd server
+npm run hash-admin-password -- "your-password"
+```
+
+Add the resulting hash to the local `server/.env`:
+
+```env
+ADMIN_SESSION_TTL_MINUTES=480
+ADMIN_ACCOUNTS_JSON=[{"username":"admin","passwordHash":"PASTE_HASH_HERE","role":"admin"},{"username":"editor","passwordHash":"PASTE_HASH_HERE","role":"editor"},{"username":"moderator","passwordHash":"PASTE_HASH_HERE","role":"moderator"},{"username":"diagnostics","passwordHash":"PASTE_HASH_HERE","role":"diagnostics"}]
+```
+
+Roles are separated as follows: `admin` can access everything, `editor` can edit portfolio content and media, `moderator` can moderate public comments, and `diagnostics` can use API/AI diagnostics. The browser does not store the session token; the server keeps the session and sends an HttpOnly cookie.
+
 ### Local API
 
 ```powershell
