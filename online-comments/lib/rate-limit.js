@@ -44,7 +44,6 @@ for i = 1, count do
 
   redis.call('ZADD', key, now, request_id .. ':' .. i)
   redis.call('PEXPIRE', key, window_ms)
-  remaining = limit
 end
 
 return {1, math.max(0, remaining - 1), 0}
@@ -127,6 +126,8 @@ export async function consumeJudge0RateLimit({
     'portfolio:judge0:rl:v1:ip:m:' + ipHash,
     'portfolio:judge0:rl:v1:ip:h:' + ipHash,
     'portfolio:judge0:rl:v1:fingerprint:' +
+      ipHash +
+      ':' +
       hashIdentifier(fingerprint),
     'portfolio:judge0:rl:v1:global:m',
   ];
