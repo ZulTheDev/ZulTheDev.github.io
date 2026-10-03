@@ -1,5 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
 import {
   S3Client,
   PutObjectCommand,
@@ -72,6 +77,67 @@ async function readPublishedIndex() {
   } catch {
     return { version: 1, writeups: [] };
   }
+}
+
+async function deployPublishedWriteup(title) {
+  if (
+    String(process.env.GIT_AUTO_PUSH || '')
+      .toLowerCase() !== 'true'
+  ) {
+    return {
+      pushed: false,
+      message:
+        'Published locally. Set GIT_AUTO_PUSH=true to push automatically.',
+    };
+  }
+
+  const repoRoot =
+    process.env.GIT_REPO_ROOT ||
+    path.resolve(process.cwd());
+
+  const branch =
+    process.env.GIT_BRANCH ||
+    'main';
+
+  const commitTitle =
+    'Publish CTF writeup: ' +
+    String(title || 'Untitled writeup')
+      .replace(/[^a-zA-Z0-9 _-]/g, '')
+      .slice(0, 120);
+
+  await execFileAsync(
+    'git',
+    ['add', 'client/public/ctf-blog'],
+    { cwd: repoRoot }
+  );
+
+  try {
+    await execFileAsync(
+      'git',
+      ['commit', '-m', commitTitle],
+      { cwd: repoRoot }
+    );
+  } catch (error) {
+    const combined =
+      String(error?.stdout || '') +
+      String(error?.stderr || '');
+
+    if (!/nothing to commit/i.test(combined)) {
+      throw error;
+    }
+  }
+
+  await execFileAsync(
+    'git',
+    ['push', 'origin', branch],
+    { cwd: repoRoot }
+  );
+
+  return {
+    pushed: true,
+    message:
+      'Published and pushed to GitHub Pages source.',
+  };
 }
 
 export async function publishWriteup(writeup) {
