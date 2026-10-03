@@ -332,7 +332,11 @@ export function r2PublicUrl(key) {
 
   if (!publicBase) return '';
 
-  return publicBase + '/' + encodeURI(safeR2Key(key));
+  return publicBase + '/' +
+    safeR2Key(key)
+      .split('/')
+      .map((part) => encodeURIComponent(part))
+      .join('/');
 }
 
 export async function listR2Objects(prefix = 'ctf-blog/') {
