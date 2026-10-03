@@ -71,6 +71,116 @@ const CONTENT_COLLECTIONS = [
   'education',
 ];
 
+
+const ROLE_META = {
+  admin: {
+    label: 'Administrator',
+    sections: new Set([
+      'dashboard',
+      'profile',
+      ...CONTENT_COLLECTIONS,
+      'experience',
+      'education',
+      'explore',
+      'appearance',
+      'media',
+      'raw',
+      'comments',
+      'system',
+    ]),
+  },
+  editor: {
+    label: 'Content Editor',
+    sections: new Set([
+      'dashboard',
+      'profile',
+      ...CONTENT_COLLECTIONS,
+      'experience',
+      'education',
+      'explore',
+      'appearance',
+      'media',
+      'raw',
+    ]),
+  },
+  moderator: {
+    label: 'Comments Moderator',
+    sections: new Set([
+      'dashboard',
+      'comments',
+    ]),
+  },
+  diagnostics: {
+    label: 'API Diagnostics',
+    sections: new Set([
+      'dashboard',
+      'system',
+    ]),
+  },
+};
+
+const NAV_GROUPS = [
+  {
+    label: 'Overview',
+    sections: ['dashboard'],
+  },
+  {
+    label: 'Content',
+    sections: [
+      'profile',
+      'recent',
+      'certifications',
+      'achievements',
+      'awards',
+      'projects',
+      'research',
+      'experience',
+      'education',
+      'explore',
+      'appearance',
+      'media',
+      'raw',
+    ],
+  },
+  {
+    label: 'Moderation',
+    sections: ['comments'],
+  },
+  {
+    label: 'Operations',
+    sections: ['system'],
+  },
+];
+
+function sectionRoute(section) {
+  if (section === 'dashboard') return '#/dashboard';
+  if (section === 'comments') return '#/moderation/comments';
+  if (section === 'system') return '#/ops/system';
+  return '#/content/' + section;
+}
+
+function sectionFromRoute() {
+  const hash = window.location.hash || '#/dashboard';
+
+  if (hash === '#/dashboard') return 'dashboard';
+  if (hash === '#/moderation/comments') return 'comments';
+  if (hash === '#/ops/system') return 'system';
+
+  const match = hash.match(/^#\/content\/([^/]+)$/);
+  return match?.[1] || 'dashboard';
+}
+
+function canAccessSection(user, section) {
+  return Boolean(
+    user &&
+    ROLE_META[user.role]?.sections.has(section)
+  );
+}
+
+function roleLabel(role) {
+  return ROLE_META[role]?.label || role || 'Unknown role';
+}
+
 function validateContent(value) {
   const errors = [];
   const warnings = [];
@@ -213,6 +323,160 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const makeId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 function App() {
+  const [authState, setAuthState] = useState('loading');
+  const [adminUser, setAdminUser] = useState(null);
+  const [loginError, setLoginError] = useState('');
+
+  useEffect(() => {
+    checkSession();
+  }, []);
+
+  async function checkSession() {
+    try {
+      const response = await fetch(API + '/api/admin/me', {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        setAuthState('logged-out');
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!data?.user?.role || !ROLE_META[data.user.role]) {
+        setAuthState('logged-out');
+        return;
+      }
+
+      setAdminUser(data.user);
+      setAuthState('authenticated');
+    } catch {
+      setAuthState('logged-out');
+    }
+  }
+
+  async function login(credentials) {
+    setLoginError('');
+
+    try {
+      const response = await fetch(API + '/api/admin/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error === 'invalid_credentials'
+          ? 'Invalid username or password.'
+          : (data?.error || 'Login failed.'));
+      }
+
+      setAdminUser(data.user);
+      setAuthState('authenticated');
+      setLoginError('');
+
+      const requestedSection = sectionFromRoute();
+      const safeSection = canAccessSection(data.user, requestedSection)
+        ? requestedSection
+        : 'dashboard';
+
+      if (window.location.hash !== sectionRoute(safeSection)) {
+        window.location.hash = sectionRoute(safeSection);
+      }
+    } catch (error) {
+      setLoginError(error.message);
+    }
+  }
+
+  async function logout() {
+    try {
+      await fetch(API + '/api/admin/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {}
+
+    setAdminUser(null);
+    setAuthState('logged-out');
+    window.location.hash = '#/dashboard';
+  }
+
+  if (authState === 'loading') {
+    return <div className="admin-loading">ฅ^•ﻌ•^ฅ <span>Checking admin session...</span></div>;
+  }
+
+  if (authState !== 'authenticated') {
+    return <LoginScreen onLogin={login} error={loginError} />;
+  }
+
+  return <AdminShell user={adminUser} onLogout={logout} />;
+}
+
+function LoginScreen({ onLogin, error }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    setLoading(true);
+
+    try {
+      await onLogin({ username, password });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="admin-login-shell">
+      <form className="admin-login-card" onSubmit={submit}>
+        <div className="admin-login-mark">ฅ^•ﻌ•^ฅ</div>
+        <small>LOCAL ADMIN</small>
+        <h1>Sign in to ZUL / ADMIN</h1>
+        <p>Content editing, comment moderation and API diagnostics are separated by role.</p>
+
+        <label className="login-field">
+          <span>Username</span>
+          <input
+            autoFocus
+            autoComplete="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+          />
+        </label>
+
+        <label className="login-field">
+          <span>Password</span>
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </label>
+
+        {error && <div className="login-error">{error}</div>}
+
+        <button className="save login-submit" disabled={loading || !username || !password}>
+          {loading ? 'Signing in...' : 'Sign in'}
+        </button>
+
+        <small className="login-note">
+          Local admin session is held by the server in an HttpOnly cookie.
+        </small>
+      </form>
+    </div>
+  );
+}
+
+function AdminShell({ user, onLogout }) {
   const [content, setContent] = useState(null);
   const [section, setSection] = useState('dashboard');
   const [search, setSearch] = useState('');
