@@ -360,6 +360,13 @@ function newWriteup() {
     excerpt: '',
     author: 'Zulfaqar Jamal',
     tags: [],
+    ctf: {
+      event: '',
+      category: '',
+      difficulty: '',
+      points: '',
+      flag: '',
+    },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     publishedAt: null,
@@ -646,6 +653,10 @@ function AdminShell({ user, onLogout }) {
     return {
       ...newWriteup(),
       ...base,
+      ctf: {
+        ...newWriteup().ctf,
+        ...(base.ctf || {}),
+      },
       sessions: Array.isArray(base.sessions) && base.sessions.length
         ? base.sessions
         : newWriteup().sessions,
@@ -2196,6 +2207,14 @@ function WriteupDocumentEditor({
               onChange={(e) => updateField('tags', e.target.value.split(',').map((x) => x.trim()).filter(Boolean))}
             />
           </label>
+
+          <div className="writeup-ctf-meta-grid">
+            <Field label="Event / CTF" value={writeup.ctf?.event || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), event: v })} />
+            <Field label="Category" value={writeup.ctf?.category || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), category: v })} />
+            <Field label="Difficulty" value={writeup.ctf?.difficulty || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), difficulty: v })} />
+            <Field label="Points" value={writeup.ctf?.points || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), points: v })} />
+            <Field wide label="Flag (optional)" value={writeup.ctf?.flag || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), flag: v })} />
+          </div>
         </div>
 
         <div className="writeup-session-list">
