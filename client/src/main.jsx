@@ -323,6 +323,23 @@ function Modal({ item, type, close }) {
                   loading="lazy"
                 />
               </a>
+            ) : String(media[0].type || '').toLowerCase() === 'pdf' &&
+              resolvePortfolioMediaSrc(media[0]) ? (
+              <div className="modal-file-preview">
+                <Sparkles />
+                <h2>
+                  {media[0].title ||
+                    item.title}
+                </h2>
+                <a
+                  className="modal-file-link"
+                  href={resolvePortfolioMediaSrc(media[0])}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open certificate PDF
+                </a>
+              </div>
             ) : (
               <div>
                 <Sparkles />
