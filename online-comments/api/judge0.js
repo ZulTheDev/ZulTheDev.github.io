@@ -69,6 +69,24 @@ export default async function handler(request, response) {
     headers['X-Auth-User'] = process.env.JUDGE0_AUTH_USER;
   }
 
+  async function fetchJson(url, options) {
+    const upstream = await fetch(url, options);
+    const raw = await upstream.text();
+
+    let data = {};
+
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      data = { raw };
+    }
+
+    return {
+      upstream,
+      data,
+    };
+  }
+
   try {
     const created = await fetchJson(
       judgeUrl +
