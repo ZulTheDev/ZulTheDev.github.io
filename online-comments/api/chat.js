@@ -1,11 +1,18 @@
-const ALLOWED_ORIGIN = 'https://zultthedev.github.io';
+const ALLOWED_ORIGINS = [
+  'https://zulthedev.github.io',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+];
 
 function cors(response, origin) {
+  const selected = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : ALLOWED_ORIGINS[0];
+
   response.setHeader(
     'Access-Control-Allow-Origin',
-    origin === ALLOWED_ORIGIN
-      ? origin
-      : ALLOWED_ORIGIN
+    selected
   );
   response.setHeader(
     'Access-Control-Allow-Methods',
