@@ -231,7 +231,8 @@ export default function GiscusComments({ discussionTerm }) {
 
       setReplyCount(
         Number(
-          localState?.[deviceId]?.replies || 0
+          localState?.[deviceId]
+            ?.repliesByTerm?.[discussionTerm] || 0
         )
       );
     } catch {
@@ -648,11 +649,14 @@ export default function GiscusComments({ discussionTerm }) {
 
           state[deviceId] = {
             ...(state[deviceId] || {}),
-            replies:
-              Number(
-                state?.[deviceId]
-                  ?.replies || 0
-              ) + 1,
+            repliesByTerm: {
+              ...(state[deviceId]?.repliesByTerm || {}),
+              [discussionTerm]:
+                Number(
+                  state[deviceId]
+                    ?.repliesByTerm?.[discussionTerm] || 0
+                ) + 1,
+            },
           };
 
           writeLocalState(
