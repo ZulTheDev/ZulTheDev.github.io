@@ -11,6 +11,8 @@ import {
   PutObjectCommand,
   ListObjectsV2Command,
   GetObjectCommand,
+  DeleteObjectCommand,
+  HeadBucketCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -244,34 +246,100 @@ function r2Client() {
   });
 }
 
+export function safeR2Key(value) {
+  const key = String(value || '').trim().replace(/^\/+/, '');
+
+  if (
+    !key ||
+    key.includes('..') ||
+    !key.startsWith('ctf-blog/')
+  ) {
+    throw new Error('invalid_r2_key');
+  }
+
+  return key;
+}
+
+export function safeR2Prefix(value = 'ctf-blog/') {
+  const prefix = String(value || '').trim().replace(/^\/+/, '');
+
+  if (
+    !prefix ||
+    prefix.includes('..') ||
+    prefix === 'ctf-blog' ||
+    (!prefix.startsWith('ctf-blog/') && prefix !== 'ctf-blog/')
+  ) {
+    throw new Error('invalid_r2_prefix');
+  }
+
+  return prefix;
+}
+
+export async function checkR2Connection() {
+  await r2Client().send(
+    new HeadBucketCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+    })
+  );
+
+  return true;
+}
+
 export async function createUploadUrl({ key, contentType, expiresIn = 3600 }) {
+  const safeKey = safeR2Key(key);
+
   return getSignedUrl(
     r2Client(),
     new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: key,
+      Key: safeKey,
       ContentType: contentType,
     }),
     { expiresIn }
   );
 }
 
-export async function createReadUrl({ key, expiresIn = 3600 }) {
+export async function createReadUrl({ key, expiresIn = 900 }) {
+  const safeKey = safeR2Key(key);
+
   return getSignedUrl(
     r2Client(),
     new GetObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: key,
+      Key: safeKey,
     }),
     { expiresIn }
   );
 }
 
-export async function listR2Objects(prefix = '') {
+export async function deleteR2Object(key) {
+  const safeKey = safeR2Key(key);
+
+  await r2Client().send(
+    new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: safeKey,
+    })
+  );
+
+  return { key: safeKey };
+}
+
+export function r2PublicUrl(key) {
+  const publicBase = String(process.env.R2_PUBLIC_BASE_URL || '')
+    .trim()
+    .replace(/\/+$/, '');
+
+  if (!publicBase) return '';
+
+  return publicBase + '/' + encodeURI(safeR2Key(key));
+}
+
+export async function listR2Objects(prefix = 'ctf-blog/') {
   const result = await r2Client().send(
     new ListObjectsV2Command({
       Bucket: process.env.R2_BUCKET_NAME,
-      Prefix: prefix,
+      Prefix: safePrefix,
       MaxKeys: 1000,
     })
   );
