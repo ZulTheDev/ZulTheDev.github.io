@@ -505,12 +505,64 @@ function AdminShell({ user, onLogout }) {
 
   useEffect(() => {
     loadContent();
-    refreshSystem();
-  }, []);
+
+    if (canAccessSection(user, 'system')) {
+      refreshSystem();
+    }
+
+    const handleHashChange = () => {
+      const requested = sectionFromRoute();
+
+      if (canAccessSection(user, requested)) {
+        setSectionState(requested);
+        setSearch('');
+        setExpanded(null);
+      } else {
+        setSectionState('dashboard');
+        window.location.hash = '#/dashboard';
+        setNotice('This route is not available for your role.');
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange();
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [user.role]);
 
   useEffect(() => {
     if (content) setRaw(JSON.stringify(content, null, 2));
   }, [content]);
+
+  function setSection(nextSection) {
+    if (!canAccessSection(user, nextSection)) {
+      setNotice('Access denied for the ' + roleLabel(user.role) + ' role.');
+      return;
+    }
+
+    setSectionState(nextSection);
+    setSearch('');
+    setExpanded(null);
+
+    const nextRoute = sectionRoute(nextSection);
+
+    if (window.location.hash !== nextRoute) {
+      window.location.hash = nextRoute;
+    }
+  }
+
+  async function authFetch(url, options = {}) {
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+    });
+
+    if (response.status === 401) {
+      onLogout();
+    }
+
+    return response;
+  }
 
   async function setLoadedContent(value, message) {
     const normalized = normalizeContent(value);
