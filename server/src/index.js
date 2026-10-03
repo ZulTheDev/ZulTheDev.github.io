@@ -2446,7 +2446,7 @@ app.post(
       const publicBase =
         String(
           process.env.R2_PUBLIC_BASE_URL || ''
-        ).replace(/\\/+$/, '');
+        ).replace(/\/+$/, '');
 
       return response.json({
         key,
