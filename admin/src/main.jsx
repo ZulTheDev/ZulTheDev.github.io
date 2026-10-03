@@ -796,11 +796,19 @@ function AdminShell({ user, onLogout }) {
       }
     };
 
-    const [local, ai, online] = await Promise.all([
+    const checks = [
       probe('Local API', API + '/api/health'),
-      probe('Local AI', API + '/api/ai-status'),
       probe('Online API', ONLINE_API + '/api/health'),
-    ]);
+    ];
+
+    if (canAccessSection(user, 'system')) {
+      checks.push(probe('Local AI', API + '/api/ai-status'));
+    }
+
+    const results = await Promise.all(checks);
+    const local = results[0];
+    const online = results[1];
+    const ai = canAccessSection(user, 'system') ? results[2] : null;
 
     setServiceStatus({
       local,
@@ -1595,6 +1603,7 @@ function DashboardEditor({
   content,
   validation,
   isDirty,
+  user,
   hasDraft,
   serviceStatus,
   serviceLoading,
@@ -1655,7 +1664,11 @@ function DashboardEditor({
       <section className="panel">
         <PanelHeader eyebrow="SERVICES" title="Connection status" />
         <div className="service-list">
-          {[['local', 'Local API'], ['ai', 'Local AI'], ['online', 'Online Vercel API']].map(([key, label]) => (
+          {[
+            ['local', 'Local API'],
+            ...(canAccessSection(user, 'system') ? [['ai', 'Local AI']] : []),
+            ['online', 'Online Vercel API'],
+          ].map(([key, label]) => (
             <ServiceRow key={key} label={label} item={serviceStatus[key]} />
           ))}
         </div>
@@ -1665,7 +1678,23 @@ function DashboardEditor({
       <section className="panel">
         <PanelHeader eyebrow="QUICK NAV" title="Editor shortcuts" />
         <div className="quick-nav">
-          {CONTENT_COLLECTIONS.map((section) => <button key={section} className="ghost" onClick={() => setSection(section)}>{SECTION_META[section]}</button>)}
+          {[
+            'profile',
+            ...CONTENT_COLLECTIONS,
+            'explore',
+            'appearance',
+            'media',
+            'raw',
+            'comments',
+            'system',
+          ]
+            .filter((key) => canAccessSection(user, key))
+            .filter((key, index, array) => array.indexOf(key) === index)
+            .map((key) => (
+              <button key={key} className="ghost" onClick={() => setSection(key)}>
+                {SECTION_META[key]}
+              </button>
+            ))}
         </div>
       </section>
 
