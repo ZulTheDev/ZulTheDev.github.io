@@ -423,6 +423,70 @@ function ExpModal({ x, close }) {
    persist chat history.
 ========================================================= */
 
+function BotAvatar({ size = 28 }) {
+  return (
+    <svg
+      className="chat-bot-avatar"
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+    >
+      <rect
+        x="8"
+        y="13"
+        width="32"
+        height="25"
+        rx="10"
+        fill="#b9e8f3"
+        stroke="#173a5c"
+        strokeWidth="2"
+      />
+      <path
+        d="M24 8v5"
+        stroke="#173a5c"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <circle
+        cx="24"
+        cy="6"
+        r="2.5"
+        fill="#f2b7c8"
+        stroke="#173a5c"
+        strokeWidth="1.5"
+      />
+      <circle cx="18" cy="24" r="2.2" fill="#173a5c" />
+      <circle cx="30" cy="24" r="2.2" fill="#173a5c" />
+      <path
+        d="M18 30c2.2 3 9.8 3 12 0"
+        fill="none"
+        stroke="#173a5c"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14 18h-3M37 18h-3"
+        stroke="#173a5c"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14 34l-3 3M34 34l3 3"
+        stroke="#173a5c"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M18 15h12"
+        stroke="#f2b7c8"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 const CHAT_SESSION_KEY = 'portfolio-ai-chat-session';
 
 function readChatSession() {
@@ -565,8 +629,11 @@ function Chat({ content }) {
     <div className="chat">
       {open && (
         <div className="cw">
-          <header>
-            ฅ^•ﻌ•^ฅ Zul's AI
+          <header className="chat-header">
+            <div className="chat-title">
+              <BotAvatar size={22} />
+              <span>Zul's AI</span>
+            </div>
 
             <button
               onClick={() =>
@@ -630,7 +697,7 @@ function Chat({ content }) {
         }
         aria-label="Open Zul's AI"
       >
-        ฅ^•ﻌ•^ฅ
+        <BotAvatar size={36} />
       </button>
     </div>
   );
