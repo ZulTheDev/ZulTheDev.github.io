@@ -979,22 +979,19 @@ function AdminShell({ user, onLogout }) {
         </div>
 
         <div className="top-actions">
-          <input
-            className="secret-input"
-            type="password"
-            value={adminSecret}
-            onChange={(e) => setAdminSecret(e.target.value)}
-            placeholder="Admin key"
-            aria-label="Admin write key"
-          />
+          <span className="admin-user-chip">
+            <strong>{user.username}</strong>
+            <small>{roleLabel(user.role)}</small>
+          </span>
           <button className="ghost" onClick={loadContent} disabled={saving}>Reload</button>
           <button className="ghost" onClick={syncRaw} disabled={saving}>Sync JSON</button>
           <span className={isDirty ? 'dirty-badge' : 'saved-badge'}>{isDirty ? 'Unsaved changes' : 'Saved'}</span>
           <button className="ghost" onClick={() => window.open(PUBLIC_SITE, '_blank')} disabled={saving}>Public site</button>
           <button className="ghost" onClick={() => window.open(HIRING_ROUTE, '_blank')} disabled={saving}>Hiring view</button>
-          <button className="save" onClick={saveContent} disabled={saving || !apiOnline || !isDirty}>
+          <button className="save" onClick={saveContent} disabled={saving || !apiOnline || !isDirty || !canAccessSection(user, 'profile')}>
             {saving ? 'Saving...' : 'Save changes'}
           </button>
+          <button className="ghost logout-button" onClick={onLogout} disabled={saving}>Sign out</button>
         </div>
       </header>
 
@@ -1007,16 +1004,26 @@ function AdminShell({ user, onLogout }) {
           </div>
 
           <nav className="section-nav">
-            {Object.entries(SECTION_META).map(([key, label]) => (
-              <button
-                key={key}
-                className={section === key ? 'active' : ''}
-                onClick={() => { setSection(key); setSearch(''); setExpanded(null); }}
-              >
-                <span>{label}</span>
-                {Array.isArray(content[key]) && <em>{content[key].length}</em>}
-              </button>
-            ))}
+            {NAV_GROUPS.map((group) => {
+              const available = group.sections.filter((key) => canAccessSection(user, key));
+              if (!available.length) return null;
+
+              return (
+                <div className="nav-group" key={group.label}>
+                  <small>{group.label}</small>
+                  {available.map((key) => (
+                    <button
+                      key={key}
+                      className={section === key ? 'active' : ''}
+                      onClick={() => setSection(key)}
+                    >
+                      <span>{SECTION_META[key]}</span>
+                      {Array.isArray(content[key]) && <em>{content[key].length}</em>}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
           </nav>
         </aside>
 
@@ -1061,6 +1068,7 @@ function AdminShell({ user, onLogout }) {
               restoreDraft={restoreDraft}
               discardDraft={discardDraft}
               setSection={setSection}
+              user={user}
             />
           )}
 
