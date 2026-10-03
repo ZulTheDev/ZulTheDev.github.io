@@ -1977,8 +1977,7 @@ app.post(
         url:
           '/ctf-blog/' +
           published.slug,
-        deploy:
-          'Run git push from the local repository to trigger GitHub Pages.',
+        deploy: published.deploy || null,
       });
     } catch (error) {
       console.error('Writeup publish error:', error?.message || error);
