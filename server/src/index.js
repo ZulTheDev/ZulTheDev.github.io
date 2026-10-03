@@ -451,34 +451,29 @@ function flattenComments(
     .flat();
 }
 
-function countSessionReplies(
+function countUserReplies(
   allComments,
-  deviceId,
-  sessionId
+  deviceId
 ) {
   return flattenComments(allComments)
     .filter(
       (item) =>
         item.parentId &&
-        item.ownerId === deviceId &&
-        item.authorSessionId === sessionId
+        item.ownerId === deviceId
     )
     .length;
 }
 
-function countRawSessionReplies(
+function countRawUserReplies(
   comments,
-  deviceId,
-  sessionId
+  deviceId
 ) {
   return comments.filter(
     (item) =>
       item.parentId &&
-      item.ownerId === deviceId &&
-      item.authorSessionId === sessionId
+      item.ownerId === deviceId
   ).length;
 }
-
 function publicComment(
   item,
   deviceId
@@ -606,11 +601,6 @@ app.get(
         request.query.deviceId || ''
       ).trim();
 
-    const sessionId =
-      String(
-        request.query.sessionId || ''
-      ).trim();
-
     if (
       !term ||
       !validCommentTerm(term)
@@ -690,14 +680,10 @@ app.get(
             replyCount:
               validAnonymousId(
                 deviceId
-              ) &&
-              validAnonymousId(
-                sessionId
               )
-                ? countRawSessionReplies(
+                ? countRawUserReplies(
                     rawComments,
-                    deviceId,
-                    sessionId
+                    deviceId
                   )
                 : 0,
           });
@@ -732,14 +718,10 @@ app.get(
         replyCount:
           validAnonymousId(
             deviceId
-          ) &&
-          validAnonymousId(
-            sessionId
           )
-            ? countSessionReplies(
+            ? countUserReplies(
                 allComments,
-                deviceId,
-                sessionId
+                deviceId
               )
             : 0,
       });
@@ -789,11 +771,6 @@ app.post(
         request.body?.deviceId || ''
       ).trim();
 
-    const sessionId =
-      String(
-        request.body?.sessionId || ''
-      ).trim();
-
     if (
       !term ||
       !validCommentTerm(term)
@@ -808,9 +785,6 @@ app.post(
     if (
       !validAnonymousId(
         deviceId
-      ) ||
-      !validAnonymousId(
-        sessionId
       )
     ) {
       return response
@@ -917,10 +891,9 @@ app.post(
             }
 
             const replies =
-              countRawSessionReplies(
+              countRawUserReplies(
                 existing,
-                deviceId,
-                sessionId
+                deviceId
               );
 
             if (replies >= 10) {
@@ -930,7 +903,7 @@ app.post(
                   error:
                     'reply_limit_reached',
                   message:
-                    'Reply limit reached for this session (10).',
+                    'Reply limit reached for this anonymous browser (10).',
                 });
             }
           }
@@ -948,8 +921,6 @@ app.post(
             parentId,
             deleted: false,
             ownerId: deviceId,
-            authorSessionId:
-              sessionId,
           };
 
           await saveRedisComment(
@@ -1021,10 +992,9 @@ app.post(
               }
 
               const replies =
-                countSessionReplies(
+                countUserReplies(
                   allComments,
-                  deviceId,
-                  sessionId
+                  deviceId
                 );
 
               if (replies >= 10) {
@@ -1034,7 +1004,7 @@ app.post(
                     error:
                       'reply_limit_reached',
                     message:
-                      'Reply limit reached for this session (10).',
+                      'Reply limit reached for this anonymous browser (10).',
                   },
                 };
               }
@@ -1053,8 +1023,6 @@ app.post(
               parentId,
               deleted: false,
               ownerId: deviceId,
-              authorSessionId:
-                sessionId,
             };
 
             allComments[
