@@ -340,6 +340,8 @@ export function r2PublicUrl(key) {
 }
 
 export async function listR2Objects(prefix = 'ctf-blog/') {
+  const safePrefix = safeR2Prefix(prefix);
+
   const result = await r2Client().send(
     new ListObjectsV2Command({
       Bucket: process.env.R2_BUCKET_NAME,
