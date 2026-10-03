@@ -652,6 +652,70 @@ function AdminShell() {
     }
   }
 
+  async function deleteR2Object(key) {
+    const cleanKey = String(key || '').trim();
+
+    if (!cleanKey) return;
+
+    if (!window.confirm('Delete this R2 object? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await authFetch(
+        API + '/api/r2/objects',
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            key: cleanKey,
+          }),
+        }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'R2 delete failed');
+      }
+
+      updateWriteup((current) => ({
+        ...current,
+        mediaLibrary: Array.isArray(current.mediaLibrary)
+          ? current.mediaLibrary.filter(
+              (item) => item?.key !== cleanKey
+            )
+          : [],
+        blocks: Array.isArray(current.blocks)
+          ? current.blocks.map((block) => {
+              if (
+                block?.type !== 'media' ||
+                block.media?.key !== cleanKey
+              ) {
+                return block;
+              }
+
+              return {
+                ...block,
+                media: {
+                  ...(block.media || {}),
+                  key: '',
+                  url: '',
+                },
+              };
+            })
+          : [],
+      }));
+
+      setNotice('Deleted R2 object: ' + cleanKey);
+      await loadR2Objects(activeWriteup?.slug || activeWriteup?.title || '');
+    } catch (error) {
+      setNotice('R2 delete failed: ' + error.message);
+    }
+  }
+
   async function uploadWriteupFile(file, slug) {
     if (!file) return null;
 
@@ -2750,6 +2814,7 @@ function WriteupR2MediaTab({
   r2Loading,
   loadR2Objects,
   openR2Object,
+  deleteR2Object,
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(null);
@@ -2845,6 +2910,13 @@ function WriteupR2MediaTab({
                   onClick={() => openR2Object(item.key)}
                 >
                   Open
+                </button>
+                <button
+                  className="delete-button compact"
+                  type="button"
+                  onClick={() => deleteR2Object(item.key)}
+                >
+                  Delete
                 </button>
               </div>
             </div>
