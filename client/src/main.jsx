@@ -2971,6 +2971,10 @@ function App() {
         <a href="#games">
           Games
         </a>
+
+        <a href="/ctf-blog/">
+          CTF Blog
+        </a>
       </nav>
 
       <main>
