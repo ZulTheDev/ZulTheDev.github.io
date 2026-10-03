@@ -136,6 +136,27 @@ function writeLocalState(state) {
   }
 }
 
+function cacheReplyCount(
+  deviceId,
+  discussionTerm,
+  count
+) {
+  const state = readLocalState();
+
+  state[deviceId] = {
+    ...(state[deviceId] || {}),
+    repliesByTerm: {
+      ...(state[deviceId]?.repliesByTerm || {}),
+      [discussionTerm]: Math.max(
+        0,
+        Number(count) || 0
+      ),
+    },
+  };
+
+  writeLocalState(state);
+}
+
 function formatDate(value) {
   if (!value) {
     return '';
@@ -201,8 +222,17 @@ export default function GiscusComments({ discussionTerm }) {
               : []
           );
 
+          const remoteReplyCount =
+            Number(data.replyCount || 0);
+
           setReplyCount(
-            Number(data.replyCount || 0)
+            remoteReplyCount
+          );
+
+          cacheReplyCount(
+            deviceId,
+            discussionTerm,
+            remoteReplyCount
           );
 
           setLoading(false);
@@ -564,9 +594,17 @@ export default function GiscusComments({ discussionTerm }) {
           setReplyTo(null);
 
           if (isReply) {
+            const nextReplyCount =
+              replyCount + 1;
+
             setReplyCount(
-              (current) =>
-                current + 1
+              nextReplyCount
+            );
+
+            cacheReplyCount(
+              deviceId,
+              discussionTerm,
+              nextReplyCount
             );
           }
 
