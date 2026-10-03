@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -91,9 +92,9 @@ async function deployPublishedWriteup(title) {
     };
   }
 
-  const repoRoot =
+  const repositoryRoot =
     process.env.GIT_REPO_ROOT ||
-    path.resolve(process.cwd());
+    repoRoot;
 
   const branch =
     process.env.GIT_BRANCH ||
@@ -108,14 +109,14 @@ async function deployPublishedWriteup(title) {
   await execFileAsync(
     'git',
     ['add', 'client/public/ctf-blog'],
-    { cwd: repoRoot }
+    { cwd: repositoryRoot }
   );
 
   try {
     await execFileAsync(
       'git',
       ['commit', '-m', commitTitle],
-      { cwd: repoRoot }
+      { cwd: repositoryRoot }
     );
   } catch (error) {
     const combined =
@@ -130,7 +131,7 @@ async function deployPublishedWriteup(title) {
   await execFileAsync(
     'git',
     ['push', 'origin', branch],
-    { cwd: repoRoot }
+    { cwd: repositoryRoot }
   );
 
   return {
