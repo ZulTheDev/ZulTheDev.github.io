@@ -214,7 +214,7 @@ const makeId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36)
 
 function App() {
   const [content, setContent] = useState(null);
-  const [section, setSection] = useState('profile');
+  const [section, setSection] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
