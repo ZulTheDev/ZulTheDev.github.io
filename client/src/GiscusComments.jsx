@@ -161,7 +161,6 @@ function normalizeComment(comment) {
 
 export default function GiscusComments({ discussionTerm }) {
   const deviceId = useMemo(() => getPersistentId(), []);
-  const sessionId = useMemo(() => getSessionId(), []);
 
   const [comments, setComments] = useState([]);
   const [name, setName] = useState(() => getSavedName());
@@ -190,8 +189,6 @@ export default function GiscusComments({ discussionTerm }) {
             discussionTerm
           )}&deviceId=${encodeURIComponent(
             deviceId
-          )}&sessionId=${encodeURIComponent(
-            sessionId
           )}`
         );
 
@@ -234,7 +231,7 @@ export default function GiscusComments({ discussionTerm }) {
 
       setReplyCount(
         Number(
-          localState?.[sessionId]?.replies || 0
+          localState?.[deviceId]?.replies || 0
         )
       );
     } catch {
@@ -247,7 +244,7 @@ export default function GiscusComments({ discussionTerm }) {
 
   useEffect(() => {
     loadComments();
-  }, [discussionTerm, deviceId, sessionId]);
+  }, [discussionTerm, deviceId]);
 
   function resetComposer() {
     setReplyTo(null);
@@ -506,10 +503,12 @@ export default function GiscusComments({ discussionTerm }) {
 
     if (
       isReply &&
-      replyCount >= MAX_SESSION_REPLIES
+      replyCount >= MAX_USER_REPLIES
     ) {
       setNotice(
-        `Reply limit reached for this session (${MAX_SESSION_REPLIES}).`
+        'Reply limit reached for this anonymous browser (' +
+          MAX_USER_REPLIES +
+          ').'
       );
       return;
     }
@@ -524,7 +523,6 @@ export default function GiscusComments({ discussionTerm }) {
       parentId:
         replyTo?.id || null,
       deviceId,
-      sessionId,
     };
 
     try {
@@ -583,7 +581,9 @@ export default function GiscusComments({ discussionTerm }) {
         if (response.status === 429) {
           setNotice(
             data?.message ||
-              `Reply limit reached for this session (${MAX_SESSION_REPLIES}).`
+              'Reply limit reached for this anonymous browser (' +
+              MAX_USER_REPLIES +
+              ').'
           );
           return;
         }
@@ -616,7 +616,6 @@ export default function GiscusComments({ discussionTerm }) {
           parentId:
             replyTo?.id || null,
           ownerId: deviceId,
-          sessionId,
           canEdit: true,
           localOnly: true,
         };
@@ -647,11 +646,11 @@ export default function GiscusComments({ discussionTerm }) {
           const state =
             readLocalState();
 
-          state[sessionId] = {
-            ...(state[sessionId] || {}),
+          state[deviceId] = {
+            ...(state[deviceId] || {}),
             replies:
               Number(
-                state?.[sessionId]
+                state?.[deviceId]
                   ?.replies || 0
               ) + 1,
           };
@@ -815,7 +814,7 @@ export default function GiscusComments({ discussionTerm }) {
   }
 
   const canReply =
-    replyCount < MAX_SESSION_REPLIES;
+    replyCount < MAX_USER_REPLIES;
 
   return (
     <section className="portfolio-comments">
@@ -829,9 +828,11 @@ export default function GiscusComments({ discussionTerm }) {
         </h3>
 
         <p>
-          Anonymous comments use a private browser ID.
-          Your name is remembered on this browser.
-          No IP address or device fingerprint is required.
+          Anonymous comments use a private browser ID stored in a
+          first-party cookie and local browser storage. Your name is
+          remembered on this browser. No IP address or device fingerprint
+          is required. Clearing browser storage or cookies removes the
+          anonymous ownership access.
         </p>
       </div>
 
@@ -905,10 +906,12 @@ export default function GiscusComments({ discussionTerm }) {
           <small>
             {comment.length}/2000
             {replyTo
-              ? ` · ${Math.max(
+              ? ' · ' +
+                Math.max(
                   0,
-                  MAX_SESSION_REPLIES - replyCount
-                )} replies left`
+                  MAX_USER_REPLIES - replyCount
+                ) +
+                ' replies left'
               : ''}
           </small>
         </div>
