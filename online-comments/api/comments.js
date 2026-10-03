@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
-  countSessionReplies,
+  countUserReplies,
   corsHeaders,
   json,
   MAX_REPLY_COUNT,
@@ -42,9 +42,6 @@ export default async function handler(
         request.query?.deviceId || ''
       ).trim();
 
-      const sessionId = String(
-        request.query?.sessionId || ''
-      ).trim();
 
       if (!term || !validTerm(term)) {
         return response
@@ -117,9 +114,6 @@ export default async function handler(
         request.body?.deviceId || ''
       ).trim();
 
-      const sessionId = String(
-        request.body?.sessionId || ''
-      ).trim();
 
       if (!term || !validTerm(term)) {
         return response
@@ -129,10 +123,7 @@ export default async function handler(
           });
       }
 
-      if (
-        !validAnonymousId(deviceId) ||
-        !validAnonymousId(sessionId)
-      ) {
+      if (!validAnonymousId(deviceId)) {
         return response
           .status(400)
           .json({
@@ -253,8 +244,6 @@ export default async function handler(
         parentId,
         deleted: false,
         ownerId: deviceId,
-        authorSessionId:
-          sessionId,
       };
 
       await saveComment(item);
