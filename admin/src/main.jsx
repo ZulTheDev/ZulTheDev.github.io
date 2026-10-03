@@ -559,6 +559,15 @@ function AdminShell({ user, onLogout }) {
   const [hasDraft, setHasDraft] = useState(() => {
     try { return Boolean(localStorage.getItem(LOCAL_DRAFT_KEY)); } catch { return false; }
   });
+  const [writeups, setWriteups] = useState([]);
+  const [activeWriteup, setActiveWriteup] = useState(null);
+  const [writeupTab, setWriteupTab] = useState('document');
+  const [writeupLoading, setWriteupLoading] = useState(false);
+  const [writeupSaving, setWriteupSaving] = useState(false);
+  const [writeupPublishing, setWriteupPublishing] = useState(false);
+  const [r2Objects, setR2Objects] = useState([]);
+  const [r2Loading, setR2Loading] = useState(false);
+
 
   useEffect(() => {
     loadContent();
@@ -591,6 +600,16 @@ function AdminShell({ user, onLogout }) {
     if (content) setRaw(JSON.stringify(content, null, 2));
   }, [content]);
 
+  useEffect(() => {
+    if (
+      section === 'ctf-writeups' &&
+      canAccessSection(user, 'ctf-writeups')
+    ) {
+      loadWriteups();
+    }
+  }, [section]);
+
+
   function setSection(nextSection) {
     if (!canAccessSection(user, nextSection)) {
       setNotice('Access denied for the ' + roleLabel(user.role) + ' role.');
@@ -619,6 +638,286 @@ function AdminShell({ user, onLogout }) {
     }
 
     return response;
+  }
+
+  function buildWriteupFrom(value) {
+    const base = value && typeof value === 'object' ? clone(value) : newWriteup();
+
+    return {
+      ...newWriteup(),
+      ...base,
+      sessions: Array.isArray(base.sessions) && base.sessions.length
+        ? base.sessions
+        : newWriteup().sessions,
+      blocks: Array.isArray(base.blocks)
+        ? base.blocks
+        : [],
+      workspace: {
+        ...newWriteup().workspace,
+        ...(base.workspace || {}),
+        nodes: Array.isArray(base.workspace?.nodes) ? base.workspace.nodes : [],
+        edges: Array.isArray(base.workspace?.edges) ? base.workspace.edges : [],
+      },
+    };
+  }
+
+  async function loadWriteups() {
+    setWriteupLoading(true);
+
+    try {
+      const response = await authFetch(API + '/api/writeups');
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || 'Writeup API returned ' + response.status
+        );
+      }
+
+      setWriteups(
+        Array.isArray(data.drafts)
+          ? data.drafts
+          : []
+      );
+    } catch (error) {
+      setNotice('Writeups unavailable: ' + error.message);
+    } finally {
+      setWriteupLoading(false);
+    }
+  }
+
+  function startNewWriteup() {
+    setActiveWriteup(newWriteup());
+    setWriteupTab('document');
+  }
+
+  async function openWriteup(slug) {
+    setWriteupLoading(true);
+
+    try {
+      const response = await authFetch(
+        API + '/api/writeups/' + encodeURIComponent(slug)
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || 'Writeup returned ' + response.status
+        );
+      }
+
+      setActiveWriteup(buildWriteupFrom(data));
+      setWriteupTab('document');
+    } catch (error) {
+      setNotice('Unable to open writeup: ' + error.message);
+    } finally {
+      setWriteupLoading(false);
+    }
+  }
+
+  function updateActiveWriteup(updater) {
+    setActiveWriteup((current) => {
+      if (!current) return current;
+      return typeof updater === 'function'
+        ? updater(current)
+        : updater;
+    });
+  }
+
+  async function saveWriteupDraft() {
+    if (!activeWriteup) return;
+
+    setWriteupSaving(true);
+
+    try {
+      const slug =
+        safeWriteupSlug(activeWriteup.slug || activeWriteup.title);
+
+      const payload = {
+        ...activeWriteup,
+        slug,
+        updatedAt: new Date().toISOString(),
+        status: 'draft',
+      };
+
+      const response = await authFetch(
+        API + '/api/writeups/' + encodeURIComponent(slug),
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || 'Writeup save failed'
+        );
+      }
+
+      setActiveWriteup(
+        buildWriteupFrom(data.writeup || payload)
+      );
+
+      await loadWriteups();
+      setNotice('Writeup draft saved.');
+    } catch (error) {
+      setNotice('Writeup save failed: ' + error.message);
+    } finally {
+      setWriteupSaving(false);
+    }
+  }
+
+  async function publishActiveWriteup() {
+    if (!activeWriteup) return;
+
+    setWriteupPublishing(true);
+
+    try {
+      await saveWriteupDraft();
+
+      const slug =
+        safeWriteupSlug(
+          activeWriteup.slug ||
+          activeWriteup.title
+        );
+
+      const response = await authFetch(
+        API +
+          '/api/writeups/' +
+          encodeURIComponent(slug) +
+          '/publish',
+        {
+          method: 'POST',
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || 'Writeup publish failed'
+        );
+      }
+
+      setActiveWriteup(
+        buildWriteupFrom(data.writeup || activeWriteup)
+      );
+
+      await loadWriteups();
+
+      setNotice(
+        'Published: ' +
+          (data.url || '/ctf-blog/' + slug)
+      );
+    } catch (error) {
+      setNotice('Writeup publish failed: ' + error.message);
+    } finally {
+      setWriteupPublishing(false);
+    }
+  }
+
+  async function uploadWriteupFile(file, slug) {
+    if (!file) return null;
+
+    const response = await authFetch(
+      API + '/api/r2/upload-url',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+          writeupSlug: slug,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error || 'R2 upload URL unavailable'
+      );
+    }
+
+    const uploadResponse = await fetch(
+      data.uploadUrl,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type':
+            file.type ||
+            'application/octet-stream',
+        },
+        body: file,
+      }
+    );
+
+    if (!uploadResponse.ok) {
+      throw new Error(
+        'R2 upload returned ' +
+          uploadResponse.status
+      );
+    }
+
+    return {
+      key: data.key,
+      url: data.publicUrl || '',
+      type: file.type || 'application/octet-stream',
+      name: file.name,
+      size: file.size,
+    };
+  }
+
+  async function loadR2Objects() {
+    setR2Loading(true);
+
+    try {
+      const response = await authFetch(
+        API + '/api/r2/objects?prefix=ctf-blog/'
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || 'R2 list failed'
+        );
+      }
+
+      setR2Objects(
+        Array.isArray(data.objects)
+          ? data.objects
+          : []
+      );
+    } catch (error) {
+      setNotice('R2 library unavailable: ' + error.message);
+    } finally {
+      setR2Loading(false);
+    }
+  }
+
+  function safeWriteupSlug(value) {
+    const slug = String(value || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 96);
+
+    if (!slug) {
+      throw new Error('Writeup title/slug is required.');
+    }
+
+    return slug;
   }
 
   async function setLoadedContent(value, message) {
@@ -1177,6 +1476,28 @@ function AdminShell({ user, onLogout }) {
               setHiringTarget={setHiringTarget}
               hiringTest={hiringTest}
               testHiringFilter={testHiringFilter}
+            />
+          )}
+
+          {section === 'ctf-writeups' && (
+            <WriteupsEditor
+              writeups={writeups}
+              activeWriteup={activeWriteup}
+              setActiveWriteup={setActiveWriteup}
+              loading={writeupLoading}
+              saving={writeupSaving}
+              publishing={writeupPublishing}
+              tab={writeupTab}
+              setTab={setWriteupTab}
+              startNew={startNewWriteup}
+              openWriteup={openWriteup}
+              saveDraft={saveWriteupDraft}
+              publish={publishActiveWriteup}
+              updateWriteup={updateActiveWriteup}
+              uploadFile={uploadWriteupFile}
+              r2Objects={r2Objects}
+              r2Loading={r2Loading}
+              loadR2Objects={loadR2Objects}
             />
           )}
 
