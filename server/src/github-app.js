@@ -382,6 +382,25 @@ export async function uploadGitHubAppMedia({
         /^client\/public/,
         ''
       ),
+    rawUrl:
+      'https://raw.githubusercontent.com/' +
+      owner +
+      '/' +
+      repo +
+      '/' +
+      branch
+        .split('/')
+        .map((part) =>
+          encodeURIComponent(part)
+        )
+        .join('/') +
+      '/' +
+      safePath
+        .split('/')
+        .map((part) =>
+          encodeURIComponent(part)
+        )
+        .join('/'),
     commitSha:
       result?.commit?.sha || '',
     message:
