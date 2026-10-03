@@ -23,6 +23,10 @@ Use:
 
 The hiring view is a professional, minimal version of the interactive portfolio. The requested work type is used to select relevant skills, experience, projects, certifications and achievements instead of generating a separate static resume.
 
+## Local admin capabilities
+
+The local admin panel includes a dashboard with content-health validation, unsaved-change protection, browser-local draft recovery, JSON backup/import, public and hiring-view preview links, Google Drive media browsing, anonymous comment moderation, local/online service diagnostics, an online AI smoke test, and a hiring-filter relevance test. Collection editors support create, edit, duplicate, delete, reorder and structured media editing.
+
 ## Development
 
 ### Client
