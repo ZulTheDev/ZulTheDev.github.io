@@ -63,12 +63,10 @@ export default async function handler(
         await readCommentsForTerm(term);
 
       const replyCount =
-        validAnonymousId(deviceId) &&
-        validAnonymousId(sessionId)
-          ? countSessionReplies(
+        validAnonymousId(deviceId)
+          ? countUserReplies(
               comments,
-              deviceId,
-              sessionId
+              deviceId
             )
           : 0;
 
@@ -210,10 +208,9 @@ export default async function handler(
           );
 
         const replyCount =
-          countSessionReplies(
+          countUserReplies(
             comments,
-            deviceId,
-            sessionId
+            deviceId
           );
 
         if (
@@ -226,7 +223,7 @@ export default async function handler(
               error:
                 'reply_limit_reached',
               message:
-                'Reply limit reached for this session (10).',
+                'Reply limit reached for this anonymous browser (10).',
             });
         }
       }
