@@ -209,7 +209,9 @@ export async function checkGitHubAppConnection() {
       configured: false,
       reachable: false,
       repository: null,
-      branch: githubBranch(),
+      branch:
+        required('GITHUB_BRANCH') ||
+        'main',
     };
   }
 
