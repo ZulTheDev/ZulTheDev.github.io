@@ -54,6 +54,7 @@ ADMIN_ACCOUNTS_JSON=[{"username":"admin","passwordHash":"PASTE_HASH_HERE","role"
 ```
 
 Roles are separated as follows: `admin` can access everything, `editor` can edit portfolio content and media, `moderator` can moderate public comments, and `diagnostics` can use API/AI diagnostics. The browser does not store the session token; the server keeps the session and sends an HttpOnly cookie.
+Sessions are held in server memory and expire after the configured TTL; restarting the local API requires signing in again. `ADMIN_WRITE_SECRET` remains only as a legacy single-admin fallback when no `ADMIN_ACCOUNTS_JSON` is configured.
 
 ### Local API
 
