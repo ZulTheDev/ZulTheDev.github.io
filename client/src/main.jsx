@@ -1160,6 +1160,18 @@ function HiringPortfolioView({
             </a>
           )}
 
+          {hasSection('awards') && (
+            <a href="#hiring-awards">
+              Recognition
+            </a>
+          )}
+
+          {hasSection('education') && (
+            <a href="#hiring-education">
+              Education
+            </a>
+          )}
+
           {relevantMedia.length > 0 && (
             <a href="#hiring-media">Media</a>
           )}
