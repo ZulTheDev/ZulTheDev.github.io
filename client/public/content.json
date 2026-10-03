@@ -11,7 +11,6 @@
     "linkedin": "https://www.linkedin.com/in/zulfaqarnet",
     "github": "",
     "website": "https://zulthedev.github.io/",
-    "orcid": "https://orcid.org/0009-0004-2126-7780",
     "image": {
       "local": "/images/profile.png",
       "driveId": ""
@@ -21,9 +20,9 @@
       "https://www.linkedin.com/in/zulfaqarnet",
       "https://zulthedev.github.io/",
       "https://orcid.org/0009-0004-2126-7780"
-    ]
+    ],
+    "orcid": "https://orcid.org/0009-0004-2126-7780"
   },
-
   "settings": {
     "theme": {
       "bg": "#0e0b13",
@@ -34,7 +33,6 @@
       "line": "#302635"
     }
   },
-
   "recent": [
     {
       "id": "recent-nitec-cyber",
@@ -57,7 +55,6 @@
       "description": "Developing software and exploring technical projects driven by curiosity, automation and practical problem-solving."
     }
   ],
-
   "certifications": [
     {
       "id": "cert-cct",
@@ -66,8 +63,17 @@
       "category": "Cybersecurity Certification",
       "description": "Certified Cybersecurity Technician (CCT) certification associated with EC-Council.",
       "date": "",
-      "link": "",
-      "media": []
+      "link": "https://learn.eccouncil.org/certificate/3679b7b7-4d15-4ad0-82ec-7b23f539e916",
+      "media": [
+        {
+          "type": "link",
+          "title": "Certs",
+          "body": "This is my completion cert and upon this learning more technical deepn my skill on has on and ability to perform cybersecuity work at work",
+          "url": "https://learn.eccouncil.org/certificate/3679b7b7-4d15-4ad0-82ec-7b23f539e916?logged=true",
+          "driveId": "1Zsbanvkmgk2ZAzXX0BlR9EeFusUoQfRB",
+          "alt": ""
+        }
+      ]
     },
     {
       "id": "cert-htb-cyber-apocalypses-2023",
@@ -110,7 +116,6 @@
       "media": []
     }
   ],
-
   "achievements": [
     {
       "id": "achievement-infinity-code",
@@ -143,7 +148,6 @@
       "media": []
     }
   ],
-
   "awards": [
     {
       "id": "award-edusave-2022",
@@ -176,7 +180,6 @@
       "media": []
     }
   ],
-
   "projects": [
     {
       "id": "project-vapt-python",
@@ -209,7 +212,6 @@
       "media": []
     }
   ],
-
   "research": [
     {
       "id": "research-dfir",
@@ -242,7 +244,6 @@
       "media": []
     }
   ],
-
   "experience": [
     {
       "id": "exp-infinity-code",
@@ -390,7 +391,6 @@
       "media": []
     }
   ],
-
   "education": [
     {
       "id": "edu-ite-higher-nitec",
@@ -414,7 +414,6 @@
       "description": "Primary education."
     }
   ],
-
   "explore": [
     "Cybersecurity",
     "DFIR",
