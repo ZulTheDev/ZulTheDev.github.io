@@ -7,6 +7,20 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { google } from 'googleapis';
 import { createClient } from 'redis';
+import {
+  writeupDraftDir,
+  writeupPublishDir,
+  safeSlug,
+  saveDraft,
+  readDraft,
+  listDrafts,
+  deleteDraft,
+  publishWriteup,
+  r2Configured,
+  createUploadUrl,
+  createReadUrl,
+  listR2Objects,
+} from './writeups.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2049,6 +2063,276 @@ app.delete(
 
       return response.status(500).json({
         error: 'admin_comment_delete_failed',
+      });
+    }
+  }
+);
+
+
+/* =========================================================
+   CTF WRITEUPS + R2
+========================================================= */
+
+function writeupId(value) {
+  return safeSlug(value);
+}
+
+function validateWriteupPayload(value) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    typeof value.title === 'string' &&
+    typeof value.slug === 'string' &&
+    Array.isArray(value.sessions) &&
+    Array.isArray(value.blocks) &&
+    value.workspace &&
+    typeof value.workspace === 'object'
+  );
+}
+
+app.get(
+  '/api/writeups',
+  requireAdminRole('content'),
+  async (request, response) => {
+    try {
+      return response.json({
+        drafts: await listDrafts(),
+      });
+    } catch (error) {
+      console.error('Writeup list error:', error?.message || error);
+      return response.status(500).json({
+        error: 'writeups_unavailable',
+      });
+    }
+  }
+);
+
+app.get(
+  '/api/writeups/:slug',
+  requireAdminRole('content'),
+  async (request, response) => {
+    try {
+      return response.json(
+        await readDraft(writeupId(request.params.slug))
+      );
+    } catch (error) {
+      return response.status(404).json({
+        error: 'writeup_not_found',
+      });
+    }
+  }
+);
+
+app.put(
+  '/api/writeups/:slug',
+  requireAdminRole('content'),
+  async (request, response) => {
+    const slug = writeupId(request.params.slug);
+    const payload = request.body || {};
+
+    if (
+      !validateWriteupPayload(payload) ||
+      writeupId(payload.slug) !== slug
+    ) {
+      return response.status(400).json({
+        error: 'invalid_writeup',
+      });
+    }
+
+    try {
+      const next = {
+        ...payload,
+        slug,
+        status: 'draft',
+        updatedAt: new Date().toISOString(),
+      };
+
+      await saveDraft(next);
+
+      return response.json({
+        ok: true,
+        writeup: next,
+        draftFile: path.relative(
+          process.cwd(),
+          path.join(writeupDraftDir, slug + '.json')
+        ),
+      });
+    } catch (error) {
+      console.error('Writeup save error:', error?.message || error);
+      return response.status(500).json({
+        error: 'writeup_save_failed',
+      });
+    }
+  }
+);
+
+app.delete(
+  '/api/writeups/:slug',
+  requireAdminRole('content'),
+  async (request, response) => {
+    try {
+      await deleteDraft(writeupId(request.params.slug));
+      return response.json({
+        ok: true,
+      });
+    } catch (error) {
+      return response.status(500).json({
+        error: 'writeup_delete_failed',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/writeups/:slug/publish',
+  requireAdminRole('content'),
+  async (request, response) => {
+    try {
+      const draft = await readDraft(writeupId(request.params.slug));
+      const published = await publishWriteup(draft);
+
+      return response.json({
+        ok: true,
+        writeup: published,
+        url:
+          '/ctf-blog/' +
+          published.slug,
+        deploy:
+          'Run git push from the local repository to trigger GitHub Pages.',
+      });
+    } catch (error) {
+      console.error('Writeup publish error:', error?.message || error);
+      return response.status(500).json({
+        error: 'writeup_publish_failed',
+        message: error?.message || 'publish failed',
+      });
+    }
+  }
+);
+
+app.get(
+  '/api/r2/status',
+  requireAdminRole('content'),
+  (request, response) => {
+    response.json({
+      configured: r2Configured(),
+      publicBaseUrl:
+        process.env.R2_PUBLIC_BASE_URL || '',
+    });
+  }
+);
+
+app.get(
+  '/api/r2/objects',
+  requireAdminRole('content'),
+  async (request, response) => {
+    try {
+      const prefix = String(request.query.prefix || '').slice(0, 200);
+      return response.json({
+        objects: await listR2Objects(prefix),
+      });
+    } catch (error) {
+      return response.status(503).json({
+        error: error?.message || 'r2_unavailable',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/r2/upload-url',
+  requireAdminRole('content'),
+  async (request, response) => {
+    const filename = String(
+      request.body?.filename || ''
+    ).trim();
+
+    const contentType = String(
+      request.body?.contentType ||
+      'application/octet-stream'
+    ).trim();
+
+    const writeupSlug = String(
+      request.body?.writeupSlug ||
+      'general'
+    ).trim();
+
+    if (
+      !filename ||
+      filename.length > 180 ||
+      contentType.length > 120
+    ) {
+      return response.status(400).json({
+        error: 'invalid_upload_request',
+      });
+    }
+
+    try {
+      const safeName = filename
+        .replace(/\\/g, '/')
+        .split('/')
+        .pop()
+        .replace(/[^a-zA-Z0-9._-]+/g, '-');
+
+      const key =
+        'ctf-blog/' +
+        writeupId(writeupSlug) +
+        '/' +
+        Date.now() +
+        '-' +
+        safeName;
+
+      const uploadUrl = await createUploadUrl({
+        key,
+        contentType,
+      });
+
+      const publicBase =
+        String(
+          process.env.R2_PUBLIC_BASE_URL || ''
+        ).replace(/\\/+$/, '');
+
+      return response.json({
+        key,
+        uploadUrl,
+        publicUrl: publicBase
+          ? publicBase + '/' + key
+          : '',
+        expiresIn: 3600,
+      });
+    } catch (error) {
+      console.error('R2 upload URL error:', error?.message || error);
+      return response.status(503).json({
+        error: error?.message || 'r2_unavailable',
+      });
+    }
+  }
+);
+
+app.get(
+  '/api/r2/read-url',
+  requireAdminRole('content'),
+  async (request, response) => {
+    const key = String(request.query.key || '').trim();
+
+    if (!key || key.length > 500) {
+      return response.status(400).json({
+        error: 'invalid_r2_key',
+      });
+    }
+
+    try {
+      return response.json({
+        key,
+        url: await createReadUrl({
+          key,
+          expiresIn: 900,
+        }),
+      });
+    } catch (error) {
+      return response.status(503).json({
+        error: error?.message || 'r2_unavailable',
       });
     }
   }
