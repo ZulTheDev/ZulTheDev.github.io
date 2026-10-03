@@ -1595,15 +1595,8 @@ app.post(
     }
 
     if (
-      account = {
-        username: 'admin',
-        role: 'admin',
-        passwordHash: '',
-      };
-    }
-
-    if (
       !account ||
+
       (account.passwordHash &&
         !verifyPassword(
           password,
