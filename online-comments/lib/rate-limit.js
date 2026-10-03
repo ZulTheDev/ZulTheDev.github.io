@@ -7,16 +7,21 @@ local request_id = ARGV[2]
 local count = #KEYS
 local allowed = 1
 local retry_ms = 0
-local remaining = 0
+local remaining = 9007199254740991
 
 for i = 1, count do
-  local window_ms = tonumber(ARGV[2 + ((i - 1) * 2)])
-  local limit = tonumber(ARGV[3 + ((i - 1) * 2)])
+  local window_ms = tonumber(ARGV[3 + ((i - 1) * 2)])
+  local limit = tonumber(ARGV[4 + ((i - 1) * 2)])
   local key = KEYS[i]
 
   redis.call('ZREMRANGEBYSCORE', key, 0, now - window_ms)
 
   local current = redis.call('ZCARD', key)
+  local available = math.max(0, limit - current)
+
+  if available < remaining then
+    remaining = available
+  end
 
   if current >= limit then
     allowed = 0
@@ -33,8 +38,8 @@ if allowed == 0 then
 end
 
 for i = 1, count do
-  local window_ms = tonumber(ARGV[2 + ((i - 1) * 2)])
-  local limit = tonumber(ARGV[3 + ((i - 1) * 2)])
+  local window_ms = tonumber(ARGV[3 + ((i - 1) * 2)])
+  local limit = tonumber(ARGV[4 + ((i - 1) * 2)])
   local key = KEYS[i]
 
   redis.call('ZADD', key, now, request_id .. ':' .. i)
@@ -42,7 +47,7 @@ for i = 1, count do
   remaining = limit
 end
 
-return {1, remaining, 0}
+return {1, math.max(0, remaining - 1), 0}
 `;
 
 const DEFAULT_LIMITS = [
