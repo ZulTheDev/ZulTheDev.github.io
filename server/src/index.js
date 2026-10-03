@@ -1735,17 +1735,6 @@ app.delete(
 );
 
 /* =========================================================
-   ADMIN AUTH
-========================================================= */
-
-function isWriteAuthorized(request) {
-  return Boolean(
-    request.admin &&
-    ROLE_PERMISSIONS[request.admin.role]?.has('content')
-  );
-}
-
-/* =========================================================
    ADMIN AUTH ROUTES
 ========================================================= */
 
@@ -1869,7 +1858,7 @@ app.get(
       },
       expiresAt: new Date(session.expiresAt).toISOString(),
       permissions: [
-        ...ROLE_PERMISSIONS[session.role] || [],
+        ...(ROLE_PERMISSIONS[session.role] || []),
       ],
     });
   }
