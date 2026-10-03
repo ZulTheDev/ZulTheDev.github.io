@@ -20,10 +20,16 @@ export default async function handler(
   return response.json({
     ok: true,
     service:
-      'portfolio-comment-backup',
+      'portfolio-online-services',
     redisConfigured:
       redisConfigured(),
-    chatbot: false,
-    storesCommentsOnly: true,
+    chatbot:
+      Boolean(
+        process.env.DEEPSEEK_API_KEY
+      ),
+    commentStorage:
+      'redis',
+    chatStorage:
+      'browser-session-only',
   });
 }
