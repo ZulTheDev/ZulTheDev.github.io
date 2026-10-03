@@ -73,55 +73,6 @@ const CONTENT_COLLECTIONS = [
 ];
 
 
-const ROLE_META = {
-  admin: {
-    label: 'Administrator',
-    sections: new Set([
-      'dashboard',
-      'profile',
-      ...CONTENT_COLLECTIONS,
-      'experience',
-      'education',
-      'explore',
-      'appearance',
-      'media',
-      'ctf-writeups',
-      'raw',
-      'comments',
-      'system',
-    ]),
-  },
-  editor: {
-    label: 'Content Editor',
-    sections: new Set([
-      'dashboard',
-      'profile',
-      ...CONTENT_COLLECTIONS,
-      'experience',
-      'education',
-      'explore',
-      'appearance',
-      'media',
-      'ctf-writeups',
-      'raw',
-    ]),
-  },
-  moderator: {
-    label: 'Comments Moderator',
-    sections: new Set([
-      'dashboard',
-      'comments',
-    ]),
-  },
-  diagnostics: {
-    label: 'API Diagnostics',
-    sections: new Set([
-      'dashboard',
-      'system',
-    ]),
-  },
-};
-
 const NAV_GROUPS = [
   {
     label: 'Overview',
@@ -172,17 +123,6 @@ function sectionFromRoute() {
 
   const match = hash.match(/^#\/content\/([^/]+)$/);
   return match?.[1] || 'dashboard';
-}
-
-function canAccessSection(user, section) {
-  return Boolean(
-    user &&
-    ROLE_META[user.role]?.sections.has(section)
-  );
-}
-
-function roleLabel(role) {
-  return ROLE_META[role]?.label || role || 'Unknown role';
 }
 
 function validateContent(value) {
@@ -387,164 +327,13 @@ function newWriteup() {
 }
 
 function App() {
-  const [authState, setAuthState] = useState('loading');
-  const [adminUser, setAdminUser] = useState(null);
-  const [loginError, setLoginError] = useState('');
-
-  useEffect(() => {
-    checkSession();
-  }, []);
-
-  async function checkSession() {
-    try {
-      const response = await fetch(API + '/api/admin/me', {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        setAuthState('logged-out');
-        return;
-      }
-
-      const data = await response.json();
-
-      if (!data?.user?.role || !ROLE_META[data.user.role]) {
-        setAuthState('logged-out');
-        return;
-      }
-
-      setAdminUser(data.user);
-      setAuthState('authenticated');
-    } catch {
-      setAuthState('logged-out');
-    }
-  }
-
-  async function login(credentials) {
-    setLoginError('');
-
-    try {
-      const response = await fetch(API + '/api/admin/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.error === 'invalid_credentials'
-          ? 'Invalid username or password.'
-          : (data?.error || 'Login failed.'));
-      }
-
-      setAdminUser(data.user);
-      setAuthState('authenticated');
-      setLoginError('');
-
-      const requestedSection = sectionFromRoute();
-      const safeSection = canAccessSection(data.user, requestedSection)
-        ? requestedSection
-        : 'dashboard';
-
-      if (window.location.hash !== sectionRoute(safeSection)) {
-        window.location.hash = sectionRoute(safeSection);
-      }
-    } catch (error) {
-      setLoginError(error.message);
-    }
-  }
-
-  async function logout() {
-    try {
-      await fetch(API + '/api/admin/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch {}
-
-    setAdminUser(null);
-    setAuthState('logged-out');
-    window.location.hash = '#/dashboard';
-  }
-
-  if (authState === 'loading') {
-    return <div className="admin-loading">ฅ^•ﻌ•^ฅ <span>Checking admin session...</span></div>;
-  }
-
-  if (authState !== 'authenticated') {
-    return <LoginScreen onLogin={login} error={loginError} />;
-  }
-
-  return <AdminShell user={adminUser} onLogout={logout} />;
+  return <AdminShell />;
 }
 
-function LoginScreen({ onLogin, error }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  async function submit(event) {
-    event.preventDefault();
-    setLoading(true);
-
-    try {
-      await onLogin({ username, password });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="admin-login-shell">
-      <form className="admin-login-card" onSubmit={submit}>
-        <div className="admin-login-mark">ฅ^•ﻌ•^ฅ</div>
-        <small>LOCAL ADMIN</small>
-        <h1>Sign in to ZUL / ADMIN</h1>
-        <p>Content editing, comment moderation and API diagnostics are separated by role.</p>
-
-        <label className="login-field">
-          <span>Username</span>
-          <input
-            autoFocus
-            autoComplete="username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-          />
-        </label>
-
-        <label className="login-field">
-          <span>Password</span>
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-
-        {error && <div className="login-error">{error}</div>}
-
-        <button className="save login-submit" disabled={loading || !username || !password}>
-          {loading ? 'Signing in...' : 'Sign in'}
-        </button>
-
-        <small className="login-note">
-          Local admin session is held by the server in an HttpOnly cookie.
-        </small>
-      </form>
-    </div>
-  );
-}
-
-function AdminShell({ user, onLogout }) {
+function AdminShell() {
   const [content, setContent] = useState(null);
   const [section, setSectionState] = useState(() => {
-    const requested = sectionFromRoute();
-    return canAccessSection(user, requested) ? requested : 'dashboard';
+    return sectionFromRoute();
   });
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
@@ -578,51 +367,33 @@ function AdminShell({ user, onLogout }) {
 
   useEffect(() => {
     loadContent();
-
-    if (canAccessSection(user, 'system')) {
-      refreshSystem();
-    }
+    refreshSystem();
 
     const handleHashChange = () => {
       const requested = sectionFromRoute();
-
-      if (canAccessSection(user, requested)) {
-        setSectionState(requested);
-        setSearch('');
-        setExpanded(null);
-      } else {
-        setSectionState('dashboard');
-        window.location.hash = '#/dashboard';
-        setNotice('This route is not available for your role.');
-      }
+      setSectionState(requested);
+      setSearch('');
+      setExpanded(null);
     };
 
     window.addEventListener('hashchange', handleHashChange);
     handleHashChange();
 
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [user.role]);
+  }, []);
 
   useEffect(() => {
     if (content) setRaw(JSON.stringify(content, null, 2));
   }, [content]);
 
   useEffect(() => {
-    if (
-      section === 'ctf-writeups' &&
-      canAccessSection(user, 'ctf-writeups')
-    ) {
+    if (section === 'ctf-writeups') {
       loadWriteups();
     }
   }, [section]);
 
 
   function setSection(nextSection) {
-    if (!canAccessSection(user, nextSection)) {
-      setNotice('Access denied for the ' + roleLabel(user.role) + ' role.');
-      return;
-    }
-
     setSectionState(nextSection);
     setSearch('');
     setExpanded(null);
@@ -635,16 +406,7 @@ function AdminShell({ user, onLogout }) {
   }
 
   async function authFetch(url, options = {}) {
-    const response = await fetch(url, {
-      ...options,
-      credentials: 'include',
-    });
-
-    if (response.status === 401) {
-      onLogout();
-    }
-
-    return response;
+    return fetch(url, options);
   }
 
   function buildWriteupFrom(value) {
@@ -1231,14 +993,12 @@ function AdminShell({ user, onLogout }) {
       probe('Online API', ONLINE_API + '/api/health'),
     ];
 
-    if (canAccessSection(user, 'system')) {
-      checks.push(probe('Local AI', API + '/api/ai-status'));
-    }
+    checks.push(probe('Local AI', API + '/api/ai-status'));
 
     const results = await Promise.all(checks);
     const local = results[0];
     const online = results[1];
-    const ai = canAccessSection(user, 'system') ? results[2] : null;
+    const ai = results[2];
 
     setServiceStatus({
       local,
@@ -1418,26 +1178,19 @@ function AdminShell({ user, onLogout }) {
 
         <div className="top-actions">
           <span className="admin-user-chip">
-            <strong>{user.username}</strong>
-            <small>{roleLabel(user.role)}</small>
+            <strong>LOCAL</strong>
+            <small>NO AUTH</small>
           </span>
           <button className="ghost" onClick={loadContent} disabled={saving}>Reload</button>
-          {canAccessSection(user, 'profile') && (
-            <>
-              <button className="ghost" onClick={syncRaw} disabled={saving}>Sync JSON</button>
-              <span className={isDirty ? 'dirty-badge' : 'saved-badge'}>{isDirty ? 'Unsaved changes' : 'Saved'}</span>
-            </>
-          )}
+          <>
+            <button className="ghost" onClick={syncRaw} disabled={saving}>Sync JSON</button>
+            <span className={isDirty ? 'dirty-badge' : 'saved-badge'}>{isDirty ? 'Unsaved changes' : 'Saved'}</span>
+          </>
           <button className="ghost" onClick={() => window.open(PUBLIC_SITE, '_blank')} disabled={saving}>Public site</button>
-          {canAccessSection(user, 'profile') && (
-            <button className="ghost" onClick={() => window.open(HIRING_ROUTE, '_blank')} disabled={saving}>Hiring view</button>
-          )}
-          {canAccessSection(user, 'profile') && (
-            <button className="save" onClick={saveContent} disabled={saving || !apiOnline || !isDirty}>
-              {saving ? 'Saving...' : 'Save changes'}
-            </button>
-          )}
-          <button className="ghost logout-button" onClick={onLogout} disabled={saving}>Sign out</button>
+          <button className="ghost" onClick={() => window.open(HIRING_ROUTE, '_blank')} disabled={saving}>Hiring view</button>
+          <button className="save" onClick={saveContent} disabled={saving || !apiOnline || !isDirty}>
+            {saving ? 'Saving...' : 'Save changes'}
+          </button>
         </div>
       </header>
 
@@ -1451,13 +1204,10 @@ function AdminShell({ user, onLogout }) {
 
           <nav className="section-nav">
             {NAV_GROUPS.map((group) => {
-              const available = group.sections.filter((key) => canAccessSection(user, key));
-              if (!available.length) return null;
-
               return (
                 <div className="nav-group" key={group.label}>
                   <small>{group.label}</small>
-                  {available.map((key) => (
+                  {group.sections.map((key) => (
                     <button
                       key={key}
                       className={section === key ? 'active' : ''}
@@ -3243,7 +2993,7 @@ function DashboardEditor({
         <div className="service-list">
           {[
             ['local', 'Local API'],
-            ...(canAccessSection(user, 'system') ? [['ai', 'Local AI']] : []),
+            ['ai', 'Local AI'],
             ['online', 'Online Vercel API'],
           ].map(([key, label]) => (
             <ServiceRow key={key} label={label} item={serviceStatus[key]} />
@@ -3266,7 +3016,6 @@ function DashboardEditor({
             'comments',
             'system',
           ]
-            .filter((key) => canAccessSection(user, key))
             .filter((key, index, array) => array.indexOf(key) === index)
             .map((key) => (
               <button key={key} className="ghost" onClick={() => setSection(key)}>
