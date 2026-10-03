@@ -135,6 +135,9 @@ async function writeContent(data) {
 const REDIS_URL =
   process.env.REDIS_URL || '';
 
+const REDIS_COMMENT_HASH =
+  'portfolio:comments:data';
+
 let redisClientPromise = null;
 
 function redisConfigured() {
@@ -1485,6 +1488,204 @@ function isWriteAuthorized(request) {
     request.get('X-Admin-Secret') === secret
   );
 }
+
+/* =========================================================
+   ADMIN COMMENT MODERATION
+========================================================= */
+
+function adminPublicComment(item) {
+  return {
+    id: item.id,
+    term: item.term,
+    name: item.name,
+    comment: item.comment,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt || null,
+    parentId: item.parentId || null,
+    deleted: Boolean(item.deleted),
+  };
+}
+
+app.get(
+  '/api/admin/comments',
+  async (request, response) => {
+    if (!isWriteAuthorized(request)) {
+      return response.status(401).json({
+        error: 'admin_unauthorized',
+      });
+    }
+
+    try {
+      let items = [];
+
+      if (redisConfigured()) {
+        try {
+          const values = await redisCommand([
+            'HGETALL',
+            REDIS_COMMENT_HASH,
+          ]);
+
+          if (Array.isArray(values)) {
+            for (let i = 0; i < values.length; i += 2) {
+              try {
+                const value = values[i + 1];
+                if (typeof value === 'string') {
+                  const parsed = JSON.parse(value);
+                  if (parsed?.id) items.push(parsed);
+                }
+              } catch {}
+            }
+          }
+        } catch (error) {
+          console.warn(
+            'Admin Redis comment read failed; using local JSON:',
+            error?.message || error
+          );
+        }
+      }
+
+      if (!items.length) {
+        const local = await readComments();
+        items = flattenComments(local);
+      }
+
+      items.sort(
+        (a, b) =>
+          (Date.parse(b.createdAt) || 0) -
+          (Date.parse(a.createdAt) || 0)
+      );
+
+      return response.json({
+        comments: items.map(adminPublicComment),
+        totals: {
+          all: items.length,
+          active: items.filter((item) => !item.deleted).length,
+          deleted: items.filter((item) => item.deleted).length,
+          replies: items.filter((item) => item.parentId).length,
+        },
+      });
+    } catch (error) {
+      console.error(
+        'Admin comment read error:',
+        error?.message || error
+      );
+
+      return response.status(500).json({
+        error: 'admin_comments_unavailable',
+      });
+    }
+  }
+);
+
+app.delete(
+  '/api/admin/comments/:id',
+  async (request, response) => {
+    if (!isWriteAuthorized(request)) {
+      return response.status(401).json({
+        error: 'admin_unauthorized',
+      });
+    }
+
+    const id = String(
+      request.params.id || ''
+    ).trim();
+
+    if (
+      !id ||
+      !/^[a-zA-Z0-9-]{10,100}$/.test(id)
+    ) {
+      return response.status(400).json({
+        error: 'invalid_comment_id',
+      });
+    }
+
+    try {
+      if (redisConfigured()) {
+        try {
+          const raw = await redisCommand([
+            'HGET',
+            REDIS_COMMENT_HASH,
+            id,
+          ]);
+
+          if (raw) {
+            const item = JSON.parse(raw);
+
+            if (!item.deleted) {
+              item.deleted = true;
+              item.comment = '';
+              item.updatedAt =
+                new Date().toISOString();
+
+              await saveRedisComment(item);
+            }
+
+            return response.json({
+              ok: true,
+              deleted: true,
+              id,
+            });
+          }
+        } catch (error) {
+          console.warn(
+            'Admin Redis comment moderation failed; using local JSON:',
+            error?.message || error
+          );
+        }
+      }
+
+      const result = await withCommentsLock(
+        async () => {
+          const allComments =
+            await readComments();
+
+          const item =
+            flattenComments(allComments).find(
+              (entry) => entry.id === id
+            );
+
+          if (!item) {
+            return {
+              status: 404,
+              body: {
+                error: 'comment_not_found',
+              },
+            };
+          }
+
+          item.deleted = true;
+          item.comment = '';
+          item.updatedAt =
+            new Date().toISOString();
+
+          await writeComments(allComments);
+
+          return {
+            status: 200,
+            body: {
+              ok: true,
+              deleted: true,
+              id,
+            },
+          };
+        }
+      );
+
+      return response
+        .status(result.status)
+        .json(result.body);
+    } catch (error) {
+      console.error(
+        'Admin comment delete error:',
+        error?.message || error
+      );
+
+      return response.status(500).json({
+        error: 'admin_comment_delete_failed',
+      });
+    }
+  }
+);
 
 /* =========================================================
    GOOGLE DRIVE
