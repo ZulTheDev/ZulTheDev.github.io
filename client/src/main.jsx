@@ -1657,7 +1657,7 @@ function safeWriteupHtml(value) {
   const html = String(value || '');
 
   if (typeof DOMParser === 'undefined') {
-    return html.replace(/<script[\\s\\S]*?<\\/script>/gi, '');
+    return html.replace(/<script[\s\S]*?<\/script>/gi, '');
   }
 
   const documentNode =
