@@ -1,3 +1,10 @@
+import {
+  consumeJudge0RateLimit,
+  fingerprintJudgeRequest,
+  getClientIp,
+  rateLimitKeyPreview,
+} from '../lib/rate-limit.js';
+
 const ALLOWED_ORIGINS = [
   'https://zulthedev.github.io',
 ];
@@ -36,22 +43,112 @@ export default async function handler(request, response) {
     });
   }
 
+  const contentLength = Number(
+    request.headers['content-length'] || 0
+  );
+
+  if (
+    Number.isFinite(contentLength) &&
+    contentLength > 64 * 1024
+  ) {
+    return response.status(413).json({
+      error: 'request_too_large',
+    });
+  }
+
   const sourceCode = String(request.body?.source_code || '');
   const stdin = String(request.body?.stdin || '');
   const languageId = Number(request.body?.language_id);
+
+  const allowedLanguageIds = new Set([
+    46, // Bash
+    50, // C
+    54, // C++
+    60, // Go
+    62, // Java
+    63, // JavaScript
+    71, // Python 3
+    72, // Ruby
+    73, // Rust
+    74, // TypeScript
+  ]);
 
   if (
     !sourceCode ||
     sourceCode.length > 12000 ||
     !Number.isInteger(languageId) ||
-    languageId < 1 ||
-    languageId > 1000 ||
+    !allowedLanguageIds.has(languageId) ||
     stdin.length > 4000
   ) {
     return response.status(400).json({
       error: 'invalid_code_request',
     });
   }
+
+  const clientIp = getClientIp(request);
+  const fingerprint =
+    fingerprintJudgeRequest({
+      sourceCode,
+      stdin,
+      languageId,
+    });
+
+  let rateLimit;
+
+  try {
+    rateLimit = await consumeJudge0RateLimit({
+      ip: clientIp,
+      fingerprint,
+    });
+  } catch (error) {
+    console.error(
+      'Judge0 rate limiter unavailable:',
+      error?.message || error
+    );
+
+    return response.status(503).json({
+      error: 'rate_limit_unavailable',
+    });
+  }
+
+  if (!rateLimit.allowed) {
+    const retryAfter =
+      rateLimit.retryAfterSeconds;
+
+    response.setHeader(
+      'Retry-After',
+      String(retryAfter)
+    );
+    response.setHeader(
+      'X-RateLimit-Limit',
+      String(rateLimit.limit)
+    );
+    response.setHeader(
+      'X-RateLimit-Remaining',
+      '0'
+    );
+
+    console.warn(
+      'Judge0 rate limited request:',
+      rateLimitKeyPreview(clientIp)
+    );
+
+    return response.status(429).json({
+      error: 'rate_limited',
+      message:
+        'Code execution rate limit reached. Try again later.',
+      retryAfter,
+    });
+  }
+
+  response.setHeader(
+    'X-RateLimit-Limit',
+    String(rateLimit.limit)
+  );
+  response.setHeader(
+    'X-RateLimit-Remaining',
+    String(rateLimit.remaining)
+  );
 
   const judgeUrl = String(
     process.env.JUDGE0_URL || 'https://ce.judge0.com'
