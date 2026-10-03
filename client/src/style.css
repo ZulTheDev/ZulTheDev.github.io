@@ -2724,3 +2724,371 @@ footer{
     gap:7px;
   }
 }
+
+
+/* =========================================================
+   TRANS-PASTEL FRAME
+   Cyan → pink → white → pink → cyan
+========================================================= */
+
+:root{
+  --trans-pastel-cyan:#9edff0;
+  --trans-pastel-pink:#f2b7c8;
+  --trans-pastel-white:#ffffff;
+}
+
+html::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:99998;
+  pointer-events:none;
+  padding:3px;
+  background:linear-gradient(
+    90deg,
+    var(--trans-pastel-cyan) 0%,
+    var(--trans-pastel-pink) 25%,
+    var(--trans-pastel-white) 50%,
+    var(--trans-pastel-pink) 75%,
+    var(--trans-pastel-cyan) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite:exclude;
+}
+
+/* =========================================================
+   PROFESSIONAL / HIRING RESUME VIEW
+========================================================= */
+
+.hiring-resume-page{
+  min-height:100vh;
+  background:#f5f6f8;
+  color:#17202a;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  padding:28px 24px 60px;
+}
+
+.hiring-resume-toolbar{
+  width:min(1020px,100%);
+  margin:0 auto 18px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+
+.hiring-resume-toolbar a,
+.hiring-resume-toolbar button{
+  border:1px solid #d7dbe1;
+  background:#ffffff;
+  color:#34404d;
+  border-radius:8px;
+  padding:9px 13px;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.hiring-resume-toolbar button:hover,
+.hiring-resume-toolbar a:hover{
+  border-color:#aeb7c2;
+}
+
+.hiring-resume{
+  width:min(1020px,100%);
+  margin:0 auto;
+  background:#ffffff;
+  border:1px solid #e1e5ea;
+  box-shadow:0 18px 45px rgba(23,32,42,.08);
+  padding:48px 54px 40px;
+}
+
+.hiring-resume-header{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 280px;
+  gap:36px;
+  padding-bottom:28px;
+  border-bottom:2px solid #17202a;
+}
+
+.hiring-resume-eyebrow{
+  color:#637080;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  margin-bottom:12px;
+}
+
+.hiring-resume-header h1{
+  margin:0;
+  font-size:42px;
+  line-height:1.05;
+  letter-spacing:-.035em;
+}
+
+.hiring-resume-title{
+  margin:9px 0 5px;
+  color:#33475b;
+  font-size:17px;
+  font-weight:700;
+}
+
+.hiring-resume-location{
+  margin:0;
+  color:#657384;
+  font-size:12px;
+}
+
+.hiring-resume-contact{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:flex-start;
+  gap:8px;
+  padding-top:3px;
+}
+
+.hiring-resume-contact a{
+  color:#315d7d;
+  font-size:11px;
+  font-weight:600;
+  text-align:right;
+  overflow-wrap:anywhere;
+}
+
+.hiring-resume-section{
+  padding:24px 0;
+  border-bottom:1px solid #e6e9ed;
+}
+
+.hiring-resume-section:last-of-type{
+  border-bottom:0;
+}
+
+.hiring-resume-section h2{
+  margin:0 0 14px;
+  color:#18232f;
+  font-size:15px;
+  line-height:1.2;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+.hiring-resume-summary p{
+  margin:0;
+  max-width:900px;
+  color:#45515e;
+  font-size:13px;
+  line-height:1.75;
+}
+
+.hiring-skill-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+
+.hiring-skill-grid span{
+  border:1px solid #d7dfe7;
+  background:#f8fafc;
+  border-radius:999px;
+  padding:6px 9px;
+  color:#344657;
+  font-size:10px;
+  font-weight:700;
+}
+
+.hiring-entry-list{
+  display:flex;
+  flex-direction:column;
+  gap:21px;
+}
+
+.hiring-entry-list-tight{
+  gap:16px;
+}
+
+.hiring-entry{
+  padding-bottom:18px;
+  border-bottom:1px solid #edf0f3;
+}
+
+.hiring-entry:last-child{
+  padding-bottom:0;
+  border-bottom:0;
+}
+
+.hiring-entry-meta{
+  display:flex;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:5px;
+  color:#718092;
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+
+.hiring-entry h3{
+  margin:0;
+  color:#17202a;
+  font-size:16px;
+  line-height:1.35;
+}
+
+.hiring-entry h4{
+  margin:3px 0 8px;
+  color:#45647c;
+  font-size:12px;
+  font-weight:700;
+}
+
+.hiring-entry p{
+  margin:0;
+  color:#4b5865;
+  font-size:12px;
+  line-height:1.65;
+}
+
+.hiring-resume-columns{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:38px;
+}
+
+.hiring-resume-columns .hiring-resume-section{
+  border-bottom:0;
+}
+
+.hiring-list-item{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  padding:10px 0;
+  border-bottom:1px solid #edf0f3;
+}
+
+.hiring-list-item:last-child{
+  border-bottom:0;
+}
+
+.hiring-list-item strong{
+  color:#1e2b37;
+  font-size:12px;
+  line-height:1.45;
+}
+
+.hiring-list-item span{
+  color:#697786;
+  font-size:11px;
+  line-height:1.55;
+}
+
+.hiring-award-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:20px;
+}
+
+.hiring-awards .hiring-list-item{
+  border:1px solid #e2e7ec;
+  border-radius:9px;
+  padding:12px;
+}
+
+.hiring-resume-footer{
+  margin-top:24px;
+  padding-top:18px;
+  border-top:1px solid #dde2e8;
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  color:#778494;
+  font-size:10px;
+  font-weight:700;
+}
+
+.hiring-resume-footer a{
+  color:#315d7d;
+  text-decoration:none;
+}
+
+.professional-resume-link{
+  font-weight:800;
+}
+
+@media(max-width:760px){
+  .hiring-resume-page{
+    padding:16px 10px 36px;
+  }
+
+  .hiring-resume-toolbar{
+    margin-bottom:12px;
+  }
+
+  .hiring-resume{
+    padding:28px 24px 30px;
+  }
+
+  .hiring-resume-header{
+    grid-template-columns:1fr;
+    gap:18px;
+  }
+
+  .hiring-resume-contact{
+    align-items:flex-start;
+  }
+
+  .hiring-resume-contact a{
+    text-align:left;
+  }
+
+  .hiring-resume-columns{
+    grid-template-columns:1fr;
+    gap:0;
+  }
+
+  .hiring-award-grid{
+    grid-template-columns:1fr;
+  }
+
+  .hiring-resume-footer{
+    flex-direction:column;
+  }
+}
+
+@media print{
+  html::before,
+  .hiring-resume-toolbar{
+    display:none;
+  }
+
+  .hiring-resume-page{
+    padding:0;
+    background:#fff;
+  }
+
+  .hiring-resume{
+    width:100%;
+    border:0;
+    box-shadow:none;
+    padding:0;
+  }
+
+  .hiring-resume-section{
+    break-inside:avoid;
+  }
+
+  .hiring-entry{
+    break-inside:avoid;
+  }
+}
