@@ -179,7 +179,12 @@ export async function publishWriteup(writeup) {
     'utf8'
   );
 
-  return next;
+  const deploy = await deployPublishedWriteup(next.title);
+
+  return {
+    ...next,
+    deploy,
+  };
 }
 
 export function r2Configured() {
