@@ -312,3 +312,5 @@ button{color:inherit}
   .writeup-editor-paper{padding:14px}
   .media-upload-row{grid-template-columns:1fr}
 }
+
+.writeup-format-select{padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:#17121e;color:var(--muted);font-size:9px;outline:0}
