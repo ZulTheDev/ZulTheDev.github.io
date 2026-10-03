@@ -147,6 +147,11 @@ export async function publishWriteup(writeup) {
   await ensureWriteupDirs();
 
   const slug = safeSlug(writeup.slug || writeup.title);
+  const publicBase =
+    String(process.env.R2_PUBLIC_BASE_URL || '')
+      .trim()
+      .replace(/\/+$/, '');
+
   const next = {
     ...writeup,
     slug,
@@ -154,6 +159,33 @@ export async function publishWriteup(writeup) {
     publishedAt: writeup.publishedAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+
+  if (Array.isArray(next.blocks)) {
+    next.blocks = next.blocks.map((block) => {
+      if (
+        block?.type !== 'media' ||
+        !block.media ||
+        !block.media.key ||
+        block.media.url
+      ) {
+        return block;
+      }
+
+      if (!publicBase) {
+        throw new Error(
+          'r2_public_base_url_required'
+        );
+      }
+
+      return {
+        ...block,
+        media: {
+          ...block.media,
+          url: publicBase + '/' + block.media.key,
+        },
+      };
+    });
+  }
 
   await fs.writeFile(
     path.join(writeupPublishDir, slug + '.json'),
