@@ -2090,7 +2090,14 @@ app.post(
         .replace(/\\/g, '/')
         .split('/')
         .pop()
-        .replace(/[^a-zA-Z0-9._-]+/g, '-');
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/^\.+$/, '');
+
+      if (!safeName) {
+        return response.status(400).json({
+          error: 'invalid_filename',
+        });
+      }
 
       const key =
         'ctf-blog/' +
@@ -2105,17 +2112,10 @@ app.post(
         contentType,
       });
 
-      const publicBase =
-        String(
-          process.env.R2_PUBLIC_BASE_URL || ''
-        ).replace(/\/+$/, '');
-
       return response.json({
         key,
         uploadUrl,
-        publicUrl: publicBase
-          ? publicBase + '/' + key
-          : '',
+        publicUrl: r2PublicUrl(key),
         expiresIn: 3600,
       });
     } catch (error) {
