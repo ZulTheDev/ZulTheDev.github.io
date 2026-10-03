@@ -1264,7 +1264,6 @@ function AdminShell() {
               restoreDraft={restoreDraft}
               discardDraft={discardDraft}
               setSection={setSection}
-              user={user}
             />
           )}
 
@@ -2930,7 +2929,6 @@ function DashboardEditor({
   content,
   validation,
   isDirty,
-  user,
   hasDraft,
   serviceStatus,
   serviceLoading,
