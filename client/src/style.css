@@ -3484,3 +3484,189 @@ html::before{
     grid-template-columns:1fr;
   }
 }
+
+
+/* Hiring view: compact professional navigation and media-first header. */
+.hiring-portfolio-page{
+  scroll-behavior:smooth;
+}
+
+.hiring-portfolio-page [id]{
+  scroll-margin-top:82px;
+}
+
+.hiring-portfolio-nav{
+  position:sticky;
+  top:0;
+  z-index:20;
+  width:min(1120px,100%);
+  margin:0 auto 14px;
+  min-height:46px;
+  padding:8px 12px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  border:1px solid #dce1e6;
+  border-radius:9px;
+  background:rgba(255,255,255,.94);
+  box-shadow:0 8px 24px rgba(34,45,56,.05);
+  backdrop-filter:blur(12px);
+}
+
+.hiring-nav-brand{
+  flex:0 0 auto;
+  color:#1c2833;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.1em;
+  text-decoration:none;
+}
+
+.hiring-nav-links{
+  display:flex;
+  align-items:center;
+  gap:13px;
+  min-width:0;
+  overflow:auto;
+  scrollbar-width:none;
+}
+
+.hiring-nav-links::-webkit-scrollbar{
+  display:none;
+}
+
+.hiring-nav-links a{
+  flex:0 0 auto;
+  color:#6a7784;
+  font-size:10px;
+  font-weight:700;
+  text-decoration:none;
+  white-space:nowrap;
+}
+
+.hiring-nav-links a:hover{
+  color:#315f7a;
+}
+
+.hiring-nav-return{
+  margin-left:auto;
+  flex:0 0 auto;
+  color:#315f7a;
+  font-size:10px;
+  font-weight:800;
+  text-decoration:none;
+  white-space:nowrap;
+}
+
+.hiring-identity{
+  display:flex;
+  align-items:center;
+  gap:20px;
+}
+
+.hiring-profile-photo{
+  width:82px;
+  height:82px;
+  flex:0 0 82px;
+  object-fit:cover;
+  border-radius:50%;
+  border:1px solid #ccd5dd;
+  background:#edf1f4;
+  box-shadow:0 8px 22px rgba(34,45,56,.09);
+}
+
+.hiring-media-section{
+  padding-bottom:10px;
+}
+
+.hiring-media-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin-top:12px;
+}
+
+.hiring-media-card{
+  margin:0;
+  overflow:hidden;
+  border:1px solid #d9dfe5;
+  border-radius:10px;
+  background:#fff;
+}
+
+.hiring-media-card img{
+  display:block;
+  width:100%;
+  aspect-ratio:16/10;
+  object-fit:cover;
+  background:#eef1f4;
+}
+
+.hiring-media-card figcaption{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  padding:10px 12px 11px;
+}
+
+.hiring-media-card figcaption strong{
+  color:#25333f;
+  font-size:11px;
+  line-height:1.35;
+}
+
+.hiring-media-card figcaption span{
+  color:#7a8692;
+  font-size:9px;
+  line-height:1.4;
+}
+
+@media(max-width:850px){
+  .hiring-portfolio-nav{
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+
+  .hiring-nav-return{
+    margin-left:0;
+  }
+
+  .hiring-identity{
+    align-items:flex-start;
+  }
+
+  .hiring-profile-photo{
+    width:70px;
+    height:70px;
+    flex-basis:70px;
+  }
+
+  .hiring-media-grid{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media(max-width:540px){
+  .hiring-portfolio-nav{
+    gap:9px;
+  }
+
+  .hiring-nav-links{
+    order:3;
+    width:100%;
+  }
+
+  .hiring-identity{
+    gap:13px;
+  }
+
+  .hiring-profile-photo{
+    width:58px;
+    height:58px;
+    flex-basis:58px;
+  }
+
+  .hiring-media-grid{
+    grid-template-columns:1fr;
+  }
+}
