@@ -63,6 +63,8 @@ When `GITHUB_APP_AUTO_PUSH=true`, publishing a CTF writeup:
 
 The local admin therefore does not need a personal GitHub PAT for publishing. If the branch moved while a publish was in progress, the server reports a retryable branch-moved error instead of force-pushing over the newer commit.
 
+The same App is used for portfolio media uploads from the admin. Certification images/PDFs are written to `client/public/certs/`; other collection media uses `client/public/portfolio-media/<section>/`. The browser sends the file to the local server, and only the local server talks to GitHub with the App installation token.
+
 ## Security notes
 
 The React admin never receives the App private key or installation token. The credentials remain server-side in the local API process.
