@@ -235,6 +235,160 @@ export async function checkGitHubAppConnection() {
   };
 }
 
+
+function safePublicMediaPath(value) {
+  const filePath = String(value || '').trim();
+
+  if (
+    !filePath.startsWith(
+      'client/public/certs/'
+    ) &&
+    !filePath.startsWith(
+      'client/public/portfolio-media/'
+    )
+  ) {
+    throw new Error(
+      'github_app_media_path_invalid'
+    );
+  }
+
+  if (
+    filePath.includes('..') ||
+    filePath.startsWith('/') ||
+    filePath.length > 500
+  ) {
+    throw new Error(
+      'github_app_media_path_invalid'
+    );
+  }
+
+  return filePath;
+}
+
+export async function uploadGitHubAppMedia({
+  path,
+  contentBase64,
+  message,
+}) {
+  if (!githubAppConfigured()) {
+    throw new Error(
+      'github_app_not_configured'
+    );
+  }
+
+  const safePath =
+    safePublicMediaPath(path);
+
+  const encoded = String(
+    contentBase64 || ''
+  )
+    .replace(/\s+/g, '');
+
+  if (
+    !encoded ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)
+  ) {
+    throw new Error(
+      'github_app_media_base64_invalid'
+    );
+  }
+
+  const { owner, repo } =
+    githubRepository();
+
+  const branch = githubBranch();
+  const token =
+    await getInstallationToken();
+
+  const apiPrefix =
+    '/repos/' +
+    encodeURIComponent(owner) +
+    '/' +
+    encodeURIComponent(repo);
+
+  let existingSha = null;
+
+  try {
+    const existing =
+      await githubRequest(
+        apiPrefix +
+          '/contents/' +
+          safePath
+            .split('/')
+            .map((part) =>
+              encodeURIComponent(part)
+            )
+            .join('/') +
+          '?ref=' +
+          encodeURIComponent(branch),
+        { token }
+      );
+
+    existingSha =
+      existing?.sha || null;
+  } catch (error) {
+    if (error?.status !== 404) {
+      throw error;
+    }
+  }
+
+  const body = {
+    message:
+      String(
+        message ||
+          'Add portfolio media'
+      )
+        .replace(
+          /[^a-zA-Z0-9 _./-]/g,
+          ''
+        )
+        .trim()
+        .slice(0, 120) ||
+      'Add portfolio media',
+    content: encoded,
+    branch,
+  };
+
+  if (existingSha) {
+    body.sha = existingSha;
+  }
+
+  const result =
+    await githubRequest(
+      apiPrefix +
+        '/contents/' +
+        safePath
+          .split('/')
+          .map((part) =>
+            encodeURIComponent(part)
+          )
+          .join('/'),
+      {
+        method: 'PUT',
+        token,
+        body,
+      }
+    );
+
+  return {
+    pushed: true,
+    provider: 'github-app',
+    repository:
+      owner + '/' + repo,
+    branch,
+    path: safePath,
+    publicPath:
+      safePath.replace(
+        /^client\/public/,
+        ''
+      ),
+    commitSha:
+      result?.commit?.sha || '',
+    message:
+      'Media uploaded to the portfolio repository.',
+  };
+}
+
 export async function publishFilesWithGitHubApp({
   title,
   files,
