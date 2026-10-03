@@ -6,29 +6,22 @@ A small personal React/Vite portfolio and blog-style site.
 
 Please use the public interface as intended.
 
-Do not attack, hack, scan, fuzz, overload, bypass, exploit, or attempt unauthorized access to the static portfolio, comments, local API, deployment services, or stored data. Do not use the site as a test target or attempt to access another visitor's information.
+Do not attack, hack, scan, fuzz, overload, bypass, exploit, or attempt unauthorized access to the static portfolio, comments, local API, deployment services, or stored data. Do not attempt to access another visitor's information.
 
-### Local AI API
+## Services
 
-The AI/chatbot API is tied to the local server and follows Singapore Time (SGT, UTC+8):
-
-- Monday–Friday: 05:00–00:00
-- Saturday: 24 hours
-- Sunday: offline
-
-Anonymous comments can remain available online through the separate comment service.
+- Anonymous comments are stored online through the comments service.
+- The AI portfolio assistant is available online through the hosted AI API.
+- AI chat history is kept only in the browser session. Refreshing keeps the current session; ending the browser session clears it. The AI service does not save the conversation.
+- The local chatbot follows Singapore Time (SGT, UTC+8): Monday–Friday 05:00–00:00, Saturday 24 hours, Sunday offline.
 
 ## Hiring view
 
-For a cleaner recruiter-facing presentation:
-
-`/port_resume?type_of_work_hiring`
-
-A specific target can also be supplied, for example:
+Use:
 
 `/port_resume?type_of_work_hiring=technical_officer`
 
-The page is designed as a professional resume-style view while the main site remains the interactive portfolio.
+The hiring view is a professional, minimal version of the interactive portfolio. The requested work type is used to select relevant skills, experience, projects, certifications and achievements instead of generating a separate static resume.
 
 ## Development
 
