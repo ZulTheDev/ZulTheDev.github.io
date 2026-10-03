@@ -130,6 +130,7 @@ const allowedOrigins = (
 
 app.use(
   cors({
+    credentials: true,
     origin(origin, callback) {
       if (!origin) {
         return callback(null, true);
@@ -1576,12 +1577,24 @@ app.post(
       !account &&
       accounts.length === 0 &&
       process.env.ADMIN_WRITE_SECRET &&
-      username === 'admin' &&
-      timingSafeEqual(
-        Buffer.from(password),
-        Buffer.from(process.env.ADMIN_WRITE_SECRET)
-      )
+      username === 'admin'
     ) {
+      const provided = Buffer.from(password);
+      const expected = Buffer.from(process.env.ADMIN_WRITE_SECRET);
+
+      if (
+        provided.length === expected.length &&
+        timingSafeEqual(provided, expected)
+      ) {
+        account = {
+          username: 'admin',
+          role: 'admin',
+          passwordHash: '',
+        };
+      }
+    }
+
+    if (
       account = {
         username: 'admin',
         role: 'admin',
