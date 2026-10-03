@@ -3145,6 +3145,7 @@ function MediaListEditor({
         url: result.publicPath || next[index]?.url || '',
         alt: next[index]?.alt || file.name,
         repoPath: result.path || '',
+        previewUrl: result.rawUrl || '',
         mimeType: result.mimeType || file.type || '',
       };
 
@@ -3294,10 +3295,10 @@ function MediaListEditor({
                 />
               </label>
 
-              {item.src && (
+              {(item.previewUrl || item.src) && (
                 <a
                   className="ghost small"
-                  href={normalizeAdminAssetPath(item.src)}
+                  href={normalizeAdminAssetPath(item.previewUrl || item.src)}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -3314,10 +3315,10 @@ function MediaListEditor({
               </button>
             </div>
 
-            {item.src && String(item.type).toLowerCase() === 'image' && (
+            {(item.previewUrl || item.src) && String(item.type).toLowerCase() === 'image' && (
               <div className="media-inline-preview">
                 <img
-                  src={normalizeAdminAssetPath(item.src)}
+                  src={normalizeAdminAssetPath(item.previewUrl || item.src)}
                   alt={item.alt || item.title || 'Uploaded media'}
                   onError={(event) => {
                     event.currentTarget.style.display = 'none';
