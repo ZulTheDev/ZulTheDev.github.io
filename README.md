@@ -27,6 +27,8 @@ The hiring view is a professional, minimal version of the interactive portfolio.
 
 The local admin panel includes a dashboard with content-health validation, unsaved-change protection, browser-local draft recovery, JSON backup/import, public and hiring-view preview links, Google Drive media browsing, anonymous comment moderation, local/online service diagnostics, an online AI smoke test, and a hiring-filter relevance test. Collection editors support create, edit, duplicate, delete, reorder and structured media editing.
 
+The admin panel and its local API are intentionally unauthenticated and have no user roles. They are designed to run only on the local machine.
+
 ## Development
 
 ### Client
@@ -37,26 +39,12 @@ npm install
 npm run dev
 ```
 
-### Role-based local admin
+### Local admin
 
-Create a password hash:
-
-```powershell
-cd server
-npm run hash-admin-password -- "your-password"
-```
-
-Add the resulting hash to the local `server/.env`:
-
-```env
-ADMIN_SESSION_TTL_MINUTES=480
-ADMIN_ACCOUNTS_JSON=[{"username":"admin","passwordHash":"PASTE_HASH_HERE","role":"admin"},{"username":"editor","passwordHash":"PASTE_HASH_HERE","role":"editor"},{"username":"moderator","passwordHash":"PASTE_HASH_HERE","role":"moderator"},{"username":"diagnostics","passwordHash":"PASTE_HASH_HERE","role":"diagnostics"}]
-```
-
-Roles are separated as follows: `admin` can access everything, `editor` can edit portfolio content and media, `moderator` can moderate public comments, and `diagnostics` can use API/AI diagnostics. The browser does not store the session token; the server keeps the session and sends an HttpOnly cookie.
-Sessions are held in server memory and expire after the configured TTL; restarting the local API requires signing in again. `ADMIN_WRITE_SECRET` remains only as a legacy single-admin fallback when no `ADMIN_ACCOUNTS_JSON` is configured.
+The local admin does not require a username, password, session cookie, or role selection. Start the server and open the admin app directly.
 
 ### Local API
+
 
 ```powershell
 cd server
