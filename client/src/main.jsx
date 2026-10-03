@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import GiscusComments from './GiscusComments';
 import {
@@ -415,105 +415,154 @@ function ExpModal({ x, close }) {
   );
 }
 
+
 /* =========================================================
    AI CHAT
+   Browser session only: refresh keeps the conversation;
+   closing the browser session clears it. The server does not
+   persist chat history.
 ========================================================= */
+
+const CHAT_SESSION_KEY = 'portfolio-ai-chat-session';
+
+function readChatSession() {
+  try {
+    const saved = sessionStorage.getItem(CHAT_SESSION_KEY);
+
+    if (!saved) {
+      return [
+        {
+          a: 1,
+          t: "Ask me about Zul's work, skills, projects or certifications.",
+        },
+      ];
+    }
+
+    const parsed = JSON.parse(saved);
+
+    return Array.isArray(parsed) && parsed.length
+      ? parsed.slice(-20)
+      : [];
+  } catch {
+    return [
+      {
+        a: 1,
+        t: "Ask me about Zul's work, skills, projects or certifications.",
+      },
+    ];
+  }
+}
+
+function writeChatSession(messages) {
+  try {
+    sessionStorage.setItem(
+      CHAT_SESSION_KEY,
+      JSON.stringify(messages.slice(-20))
+    );
+  } catch {
+    // Session storage may be disabled.
+  }
+}
+
+const ONLINE_API =
+  import.meta.env.VITE_ONLINE_API_URL ||
+  import.meta.env.VITE_COMMENTS_BACKUP_URL ||
+  '';
 
 function Chat({ content }) {
   const [open, setOpen] = useState(false);
-
-  const [question, setQuestion] =
-    useState('');
-
+  const [question, setQuestion] = useState('');
   const [messages, setMessages] =
-    useState([
-      {
-        a: 1,
-        t: "Mrrp! Ask me about Zul's work, skills, projects or certifications.",
-      },
-    ]);
+    useState(() => readChatSession());
+
+  useEffect(() => {
+    writeChatSession(messages);
+  }, [messages]);
 
   async function send() {
-    if (!question.trim()) {
+    const message = question.trim();
+
+    if (!message) {
       return;
     }
 
-    const message = question;
-
     setQuestion('');
+
+    const nextMessages = [
+      ...messages,
+      {
+        t: message,
+      },
+    ];
+
+    setMessages(nextMessages);
+
+    const history = nextMessages
+      .slice(-12)
+      .map((item) => ({
+        role: item.a ? 'assistant' : 'user',
+        content: item.t,
+      }));
+
+    const endpoints = [
+      ONLINE_API,
+      API,
+    ].filter(
+      (value, index, list) =>
+        value &&
+        list.indexOf(value) === index
+    );
+
+    for (const base of endpoints) {
+      try {
+        const response = await fetch(
+          base + '/api/chat',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message,
+              history,
+              context: content,
+            }),
+          }
+        );
+
+        const data =
+          await response.json()
+            .catch(() => ({}));
+
+        if (response.ok) {
+          setMessages((current) => [
+            ...current,
+            {
+              a: 1,
+              t:
+                data.reply ||
+                'No reply available.',
+            },
+          ]);
+
+          return;
+        }
+      } catch {
+        // Try the next backend.
+      }
+    }
 
     setMessages((current) => [
       ...current,
       {
-        t: message,
+        a: 1,
+        t: 'AI service is temporarily unavailable.',
       },
     ]);
-
-    /* ---------------------------------------------
-       NO API CONFIGURED
-    --------------------------------------------- */
-
-    if (!API) {
-      setMessages((current) => [
-        ...current,
-        {
-          a: 1,
-          t: 'AI server is not configured yet.',
-        },
-      ]);
-
-      return;
-    }
-
-    /* ---------------------------------------------
-       SEND TO AI API
-    --------------------------------------------- */
-
-    try {
-      const response = await fetch(
-        `${API}/api/chat`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-          body: JSON.stringify({
-            message,
-            context: content,
-          }),
-        }
-      );
-
-      const data =
-        await response.json();
-
-      setMessages((current) => [
-        ...current,
-        {
-          a: 1,
-          t:
-            data.reply ||
-            'No reply',
-        },
-      ]);
-    } catch {
-      setMessages((current) => [
-        ...current,
-        {
-          a: 1,
-          t: 'Backup AI is unavailable.',
-        },
-      ]);
-    }
   }
 
   return (
     <div className="chat">
-      {/* ---------------------------------------------
-          CHAT WINDOW
-      --------------------------------------------- */}
-
       {open && (
         <div className="cw">
           <header>
@@ -561,7 +610,7 @@ function Chat({ content }) {
                   send();
                 }
               }}
-              placeholder="Ask the cat..."
+              placeholder="Ask the portfolio..."
             />
 
             <button
@@ -573,10 +622,6 @@ function Chat({ content }) {
           </footer>
         </div>
       )}
-
-      {/* ---------------------------------------------
-          CHAT BUTTON
-      --------------------------------------------- */}
 
       <button
         className="cat"
@@ -773,124 +818,309 @@ function LoadingScreen({ progress = 0 }) {
     </div>
   );
 }
+
 /* =========================================================
-   PROFESSIONAL HIRING RESUME VIEW
+   PROFESSIONAL HIRING FILTER VIEW
    Route: /port_resume?type_of_work_hiring=...
+   
+   The query selects relevant portfolio evidence rather than
+   generating a replacement resume. The same interactive cards,
+   timelines and detail modals remain available.
 ========================================================= */
 
 function formatHiringTarget(value) {
   if (!value) {
-    return 'Professional Resume';
+    return 'General hiring';
   }
 
   return decodeURIComponent(value)
     .replace(/[+_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase()
+    );
 }
 
-function HiringResume({ content, target }) {
-  const experience = Array.isArray(content.experience)
-    ? content.experience
-    : [];
+function uniqueValues(values) {
+  return Array.from(
+    new Set(values.filter(Boolean))
+  );
+}
 
-  const education = Array.isArray(content.education)
-    ? content.education
-    : [];
+function fallbackHiringFilter(content, target) {
+  const terms = target
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
 
-  const certifications = Array.isArray(content.certifications)
-    ? content.certifications
-    : [];
+  const score = (item) => {
+    const haystack =
+      JSON.stringify(item).toLowerCase();
 
-  const projects = Array.isArray(content.projects)
-    ? content.projects
-    : [];
-
-  const awards = Array.isArray(content.awards)
-    ? content.awards
-    : [];
-
-  const skills = Array.from(
-    new Set(
-      experience.flatMap((item) =>
-        Array.isArray(item.skills) ? item.skills : []
-      )
-    )
-  ).slice(0, 14);
-
-  const formatLink = (value) => {
-    if (value.startsWith('mailto:')) {
-      return value.replace('mailto:', '');
-    }
-
-    return value
-      .replace(/^https?:\/\//, '')
-      .replace(/\/$/, '');
+    return terms.reduce(
+      (total, term) =>
+        total +
+        (haystack.includes(term) ? 1 : 0),
+      0
+    );
   };
 
+  const pick = (items, limit) =>
+    items
+      .map((item) => ({
+        item,
+        score: score(item),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .filter(({ score }) => score > 0)
+      .slice(0, Math.min(limit, items.length))
+      .map(({ item }) => item.id)
+      .filter(Boolean);
+
+  return {
+    experience: terms.length
+      ? pick(content.experience, 6)
+      : content.experience.map((item) => item.id),
+    projects: terms.length
+      ? pick(content.projects, 5)
+      : content.projects.map((item) => item.id),
+    certifications: terms.length
+      ? pick(content.certifications, 8)
+      : content.certifications.map((item) => item.id),
+    achievements: terms.length
+      ? pick(content.achievements, 8)
+      : content.achievements.map((item) => item.id),
+    awards: terms.length
+      ? pick(content.awards, 5)
+      : content.awards.map((item) => item.id),
+    education: content.education.map(
+      (item) => item.id
+    ),
+  };
+}
+
+function filterContentByHiring(content, selection) {
+  const selectedIds = (key, items) => {
+    const ids = new Set(
+      Array.isArray(selection && selection[key])
+        ? selection[key]
+        : []
+    );
+
+    return items.filter(
+      (item) => ids.has(item.id)
+    );
+  };
+
+  return {
+    ...content,
+    experience: selectedIds(
+      'experience',
+      content.experience
+    ),
+    projects: selectedIds(
+      'projects',
+      content.projects
+    ),
+    certifications: selectedIds(
+      'certifications',
+      content.certifications
+    ),
+    achievements: selectedIds(
+      'achievements',
+      content.achievements
+    ),
+    awards: selectedIds(
+      'awards',
+      content.awards
+    ),
+    education: selectedIds(
+      'education',
+      content.education
+    ),
+    research: [],
+    recent: [],
+    explore: [],
+  };
+}
+
+function HiringPortfolioView({
+  content,
+  target,
+}) {
+  const [filtered, setFiltered] = useState(null);
+  const [status, setStatus] =
+    useState('Selecting relevant evidence…');
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function runFilter() {
+      if (!ONLINE_API) {
+        if (active) {
+          setFiltered(
+            filterContentByHiring(
+              content,
+              fallbackHiringFilter(
+                content,
+                target
+              )
+            )
+          );
+          setStatus(
+            'Focused using local portfolio data.'
+          );
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          ONLINE_API + '/api/hiring',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              target,
+              content,
+            }),
+          }
+        );
+
+        const data =
+          await response.json()
+            .catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            data && data.error
+              ? data.error
+              : 'hiring_filter_failed'
+          );
+        }
+
+        if (active) {
+          setFiltered(
+            filterContentByHiring(
+              content,
+              data
+            )
+          );
+          setStatus(
+            'Focused by the portfolio AI.'
+          );
+        }
+      } catch {
+        if (active) {
+          setFiltered(
+            filterContentByHiring(
+              content,
+              fallbackHiringFilter(
+                content,
+                target
+              )
+            )
+          );
+          setStatus(
+            'Focused using local portfolio data.'
+          );
+        }
+      }
+    }
+
+    runFilter();
+
+    return () => {
+      active = false;
+    };
+  }, [content, target]);
+
+  if (!filtered) {
+    return (
+      <div className="hiring-portfolio-page hiring-loading">
+        <div>
+          <span>PROFESSIONAL / HIRING VIEW</span>
+          <h1>{target}</h1>
+          <p>{status}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const skillItems = [
+    ...filtered.experience,
+    ...filtered.projects,
+    ...filtered.certifications,
+  ];
+
+  const skills = uniqueValues(
+    skillItems.flatMap(
+      (item) =>
+        Array.isArray(item.skills)
+          ? item.skills
+          : []
+    )
+  ).slice(0, 16);
+
+  const durations =
+    filtered.experience.map(
+      (item) =>
+        months(item.start, item.end)
+    );
+
+  const maxDuration = Math.max(
+    1,
+    ...(durations.length
+      ? durations
+      : [1])
+  );
+
+  const open = (type, item) =>
+    setSelected([type, item]);
+
   return (
-    <div className="hiring-resume-page">
-      <div className="hiring-resume-toolbar">
-        <a href="/">Interactive portfolio</a>
-        <button
-          type="button"
-          onClick={() => window.print()}
-        >
-          Print / Save PDF
-        </button>
+    <div className="hiring-portfolio-page">
+      <header className="hiring-portfolio-header">
+        <div>
+          <span>
+            PROFESSIONAL / HIRING VIEW
+          </span>
+          <h1>{content.profile.name}</h1>
+          <p>{target}</p>
+          <small>
+            {content.profile.location}
+          </small>
+        </div>
+
+        <div className="hiring-portfolio-actions">
+          <a href="/">Portfolio</a>
+          <a
+            href={'mailto:' + content.profile.email}
+          >
+            Contact
+          </a>
+        </div>
+      </header>
+
+      <div className="hiring-focus-note">
+        <strong>Role focus</strong>
+        <span>{status}</span>
       </div>
 
-      <main className="hiring-resume">
-        <header className="hiring-resume-header">
-          <div>
-            <div className="hiring-resume-eyebrow">
-              PROFESSIONAL PORTFOLIO / HIRING VIEW
-            </div>
-
-            <h1>{content.profile.name}</h1>
-
-            <p className="hiring-resume-title">
-              {target || content.profile.title}
-            </p>
-
-            <p className="hiring-resume-location">
-              {content.profile.location}
-            </p>
-          </div>
-
-          <div className="hiring-resume-contact">
-            {[
-              content.profile.email
-                ? 'mailto:' + content.profile.email
-                : '',
-              content.profile.linkedin,
-              content.profile.website,
-              content.profile.orcid,
-            ]
-              .filter(Boolean)
-              .map((link) => (
-                <a
-                  key={link}
-                  href={link}
-                  target={link.startsWith('mailto:') ? undefined : '_blank'}
-                  rel={link.startsWith('mailto:') ? undefined : 'noreferrer'}
-                >
-                  {formatLink(link)}
-                </a>
-              ))}
-          </div>
-        </header>
-
-        <section className="hiring-resume-section hiring-resume-summary">
-          <h2>Professional summary</h2>
+      <main>
+        <section className="hiring-profile-section">
+          <small>PROFILE</small>
           <p>{content.profile.summary}</p>
         </section>
 
         {skills.length > 0 && (
-          <section className="hiring-resume-section">
-            <h2>Core skills</h2>
-            <div className="hiring-skill-grid">
+          <section className="hiring-profile-section">
+            <small>RELEVANT SKILLS</small>
+            <div className="hiring-skill-list">
               {skills.map((skill) => (
                 <span key={skill}>{skill}</span>
               ))}
@@ -898,97 +1128,199 @@ function HiringResume({ content, target }) {
           </section>
         )}
 
-        {experience.length > 0 && (
-          <section className="hiring-resume-section">
-            <h2>Experience</h2>
-
-            <div className="hiring-entry-list">
-              {experience.map((item) => (
-                <article className="hiring-entry" key={item.id}>
-                  <div className="hiring-entry-meta">
-                    <span>{date(item.start)} — {date(item.end)}</span>
-                    <span>{item.location}</span>
+        {filtered.experience.length > 0 && (
+          <section className="hiring-profile-section">
+            <small>RELEVANT EXPERIENCE</small>
+            <div className="hiring-interactive-list">
+              {filtered.experience.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    open('exp', item)
+                  }
+                >
+                  <div>
+                    <strong>{item.role}</strong>
+                    <span>{item.company}</span>
                   </div>
 
-                  <h3>{item.role}</h3>
-                  <h4>{item.company}</h4>
-                  <p>{item.summary}</p>
-                </article>
+                  <div className="hiring-entry-bar">
+                    <i
+                      style={{
+                        width:
+                          Math.max(
+                            8,
+                            (
+                              months(
+                                item.start,
+                                item.end
+                              ) /
+                              maxDuration
+                            ) * 100
+                          ) + '%',
+                      }}
+                    />
+                  </div>
+
+                  <small>
+                    {date(item.start)} —{' '}
+                    {date(item.end)}
+                  </small>
+                </button>
               ))}
             </div>
           </section>
         )}
 
-        {education.length > 0 && (
-          <section className="hiring-resume-section">
-            <h2>Education</h2>
-
-            <div className="hiring-entry-list hiring-entry-list-tight">
-              {education.map((item) => (
-                <article className="hiring-entry" key={item.id}>
-                  <div className="hiring-entry-meta">
-                    <span>{item.period}</span>
-                  </div>
-
-                  <h3>{item.qualification}</h3>
-                  <h4>{item.school}</h4>
-                  {item.description && <p>{item.description}</p>}
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <div className="hiring-resume-columns">
-          {certifications.length > 0 && (
-            <section className="hiring-resume-section">
-              <h2>Certifications</h2>
-              {certifications.map((item) => (
-                <div className="hiring-list-item" key={item.id}>
-                  <strong>{item.title}</strong>
-                  <span>{item.issuer}</span>
-                </div>
-              ))}
-            </section>
-          )}
-
-          {projects.length > 0 && (
-            <section className="hiring-resume-section">
-              <h2>Selected projects</h2>
-              {projects.map((item) => (
-                <div className="hiring-list-item" key={item.id}>
-                  <strong>{item.title}</strong>
-                  <span>{item.description}</span>
-                </div>
-              ))}
-            </section>
-          )}
-        </div>
-
-        {awards.length > 0 && (
-          <section className="hiring-resume-section hiring-awards">
-            <h2>Recognition</h2>
-            <div className="hiring-award-grid">
-              {awards.map((item) => (
-                <div className="hiring-list-item" key={item.id}>
-                  <strong>{item.title}</strong>
+        {filtered.projects.length > 0 && (
+          <section className="hiring-profile-section">
+            <small>RELEVANT PROJECTS</small>
+            <div className="hiring-card-grid">
+              {filtered.projects.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    open('Project', item)
+                  }
+                >
                   <span>
-                    {item.issuer}
-                    {item.date ? ' · ' + item.date : ''}
+                    {item.category || 'PROJECT'}
                   </span>
-                </div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <b>Open details →</b>
+                </button>
               ))}
             </div>
           </section>
         )}
 
-        <footer className="hiring-resume-footer">
-          <span>
-            Target: {target || 'General hiring review'}
-          </span>
-          <a href="/">zulthedev.github.io</a>
-        </footer>
+        {filtered.certifications.length > 0 && (
+          <section className="hiring-profile-section">
+            <small>RELEVANT CERTIFICATIONS</small>
+            <div className="hiring-card-grid">
+              {filtered.certifications.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    open('Certification', item)
+                  }
+                >
+                  <span>
+                    {item.issuer || 'CERTIFICATION'}
+                  </span>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <b>Open details →</b>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {filtered.achievements.length > 0 && (
+          <section className="hiring-profile-section">
+            <small>RELEVANT ACHIEVEMENTS</small>
+            <div className="hiring-card-grid">
+              {filtered.achievements.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    open('Achievement', item)
+                  }
+                >
+                  <span>
+                    {item.issuer || 'ACHIEVEMENT'}
+                  </span>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <b>Open details →</b>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {filtered.awards.length > 0 && (
+          <section className="hiring-profile-section">
+            <small>RELEVANT RECOGNITION</small>
+            <div className="hiring-card-grid">
+              {filtered.awards.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    open('Award', item)
+                  }
+                >
+                  <span>
+                    {item.issuer || 'RECOGNITION'}
+                  </span>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <b>Open details →</b>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {filtered.education.length > 0 && (
+          <section className="hiring-profile-section">
+            <small>EDUCATION</small>
+            <div className="hiring-education-grid">
+              {filtered.education.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    open(
+                      'Education',
+                      {
+                        ...item,
+                        title: item.school,
+                        description:
+                          item.description ||
+                          item.qualification,
+                      }
+                    )
+                  }
+                >
+                  <strong>{item.school}</strong>
+                  <span>{item.qualification}</span>
+                  <small>{item.period}</small>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
+
+      <footer className="hiring-portfolio-footer">
+        <span>
+          {content.profile.name} · {target}
+        </span>
+        <a href="/">
+          Return to interactive portfolio
+        </a>
+      </footer>
+
+      {selected && selected[0] === 'exp' ? (
+        <ExpModal
+          x={selected[1]}
+          close={() =>
+            setSelected(null)
+          }
+        />
+      ) : (
+        selected && (
+          <Modal
+            type={selected[0]}
+            item={selected[1]}
+            close={() =>
+              setSelected(null)
+            }
+          />
+        )
+      )}
     </div>
   );
 }
@@ -1143,7 +1475,7 @@ function App() {
       params.get('type_of_work_hiring') || '';
 
     return (
-      <HiringResume
+      <HiringPortfolioView
         content={content}
         target={formatHiringTarget(rawTarget)}
       />
@@ -1290,13 +1622,6 @@ function App() {
         <a href="#explore">
           Explore{' '}
           <Sparkles size={13} />
-        </a>
-
-        <a
-          href="/port_resume?type_of_work_hiring"
-          className="professional-resume-link"
-        >
-          Resume
         </a>
 
         <a href="#games">
