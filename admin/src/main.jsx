@@ -587,9 +587,18 @@ function AdminShell() {
 
       await loadWriteups();
 
+      const deploy = data.deploy || data.writeup?.deploy;
+      const deployMessage =
+        deploy?.pushed
+          ? ' GitHub App commit ' + (deploy.commitSha || '').slice(0, 7) + '.'
+          : deploy?.message
+            ? ' ' + deploy.message
+            : '';
+
       setNotice(
         'Published: ' +
-          (data.url || '/ctf-blog/' + slug)
+          (data.url || '/ctf-blog/' + slug) +
+          deployMessage
       );
     } catch (error) {
       setNotice('Writeup publish failed: ' + error.message);
@@ -1393,6 +1402,7 @@ function AdminShell() {
               loadR2Objects={loadR2Objects}
               openR2Object={openR2Object}
               deleteR2Object={deleteR2Object}
+              githubStatus={serviceStatus.github}
             />
           )}
 
@@ -1908,6 +1918,14 @@ function WriteupsEditor({
               <small>WRITEUP / {activeWriteup.status || 'DRAFT'}</small>
               <h2>{activeWriteup.title || 'Untitled CTF writeup'}</h2>
               <span>/ctf-blog/{activeWriteup.slug || 'writeup-slug'}</span>
+              <small className="writeup-publish-status">
+                GitHub App:{' '}
+                {githubStatus?.ok
+                  ? 'connected'
+                  : githubStatus?.status
+                    ? 'not ready'
+                    : 'run diagnostics'}
+              </small>
             </div>
             <div className="writeup-editor-actions">
               <button className="ghost" onClick={() => setActiveWriteup(null)} disabled={saving || publishing}>Back</button>
@@ -1915,7 +1933,11 @@ function WriteupsEditor({
                 {saving ? 'Saving...' : 'Save draft'}
               </button>
               <button className="save" onClick={publish} disabled={saving || publishing || !activeWriteup.title?.trim()}>
-                {publishing ? 'Publishing...' : 'Publish'}
+                {publishing
+                  ? 'Publishing...'
+                  : githubStatus?.ok
+                    ? 'Publish & push'
+                    : 'Publish'}
               </button>
             </div>
           </div>
@@ -2821,6 +2843,7 @@ function WriteupR2MediaTab({
   loadR2Objects,
   openR2Object,
   deleteR2Object,
+  githubStatus,
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(null);
@@ -3207,7 +3230,7 @@ function SystemEditor({
     <div className="system-grid">
       <section className="panel">
         <PanelHeader eyebrow="RUNTIME" title="Service diagnostics" />
-        <div className="service-list">{[['local', 'Local API'], ['r2', 'Cloudflare R2'], ['ai', 'Local AI'], ['online', 'Online API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
+        <div className="service-list">{[['local', 'Local API'], ['r2', 'Cloudflare R2'], ['github', 'GitHub App'], ['ai', 'Local AI'], ['online', 'Online API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
         <button className="accent-button" onClick={refreshSystem} disabled={serviceLoading}>{serviceLoading ? 'Checking...' : 'Run diagnostic'}</button>
         {serviceStatus.checkedAt && <small className="system-note">Checked {new Date(serviceStatus.checkedAt).toLocaleString()}</small>}
       </section>
