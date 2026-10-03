@@ -27,7 +27,7 @@ The hiring view is a professional, minimal version of the interactive portfolio.
 
 The local admin panel includes a dashboard with content-health validation, unsaved-change protection, browser-local draft recovery, JSON backup/import, public and hiring-view preview links, Google Drive media browsing, anonymous comment moderation, local/online service diagnostics, an online AI smoke test, and a hiring-filter relevance test. Collection editors support create, edit, duplicate, delete, reorder and structured media editing.
 
-The admin panel and its local API are intentionally unauthenticated and have no user roles. They are designed to run only on the local machine.
+The admin panel and its local API are intentionally unauthenticated and have no user roles. They are designed to run only on the local machine. GitHub access for publishing is handled separately by the local server's GitHub App service account.
 
 ## Development
 
@@ -95,16 +95,23 @@ The hosted public proxy uses the same Judge0 variables in the Vercel project. Ke
 
 #### Publishing
 
-Save a draft first. **Publish** writes the static JSON/index files into `client/public/ctf-blog/`. With `GIT_AUTO_PUSH=true`, the local server also commits that directory and pushes the configured branch; otherwise run your normal `git push` workflow yourself.
+Save a draft first. **Publish** writes the static JSON/index files into `client/public/ctf-blog/`. The preferred publishing path is a GitHub App installation used as the local admin's service account. The server requests a short-lived installation token when publishing, then creates the CTF files and updates the configured branch through GitHub's Git database API. Your personal GitHub password or long-lived personal access token is not stored by the admin.
+
+Create the GitHub App, install it only on this repository, grant the minimum repository permissions needed for the workflow, and keep the App private key in the local server's `.env` file. The expected variables are:
 
 ```env
-GIT_AUTO_PUSH=false
-GIT_REPO_ROOT=
-GIT_BRANCH=main
+GITHUB_APP_ID=
+GITHUB_INSTALLATION_ID=
+GITHUB_APP_PRIVATE_KEY=
+GITHUB_OWNER=ZulTheDev
+GITHUB_REPO=ZulTheDev.github.io
+GITHUB_BRANCH=main
+GITHUB_APP_AUTO_PUSH=false
 ```
 
-The generated CTF files are intentionally kept small and static so GitHub Pages can serve the writeups without requiring the local admin server to be online.
+Set `GITHUB_APP_AUTO_PUSH=true` after the App is installed and tested. The local admin's **Service diagnostics** panel checks the GitHub App connection. GitHub App authentication and installation-token behavior are documented by GitHub. urlGitHub Apps documentationhttps://docs.github.com/en/apps
 
+The generated CTF files are intentionally kept small and static so GitHub Pages can serve the writeups without requiring the local admin server to be online.
 ### Admin
 
 ```powershell
