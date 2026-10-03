@@ -1,111 +1,36 @@
 # Zulfaqar Jamal Portfolio
 
-A small, personal React/Vite portfolio with a deliberately simple architecture.
+A small personal React/Vite portfolio and blog-style site.
 
-This project is **a portfolio, not a scalable enterprise platform, public security-testing target, or production-grade infrastructure benchmark**. The application is intentionally limited in scope and should be treated as a small personal project.
+## Ground rules
 
-## Architecture
+Please use the public interface as intended.
 
-```
-GitHub Pages
-  |
-  +-- React/Vite portfolio
-  |     |
-  |     +-- Anonymous comments
-  |             |
-  |             +-- Online Vercel API -> Redis Cloud (24/7 comment persistence)
-  |             |
-  |             +-- Local Express API -> same Redis Cloud database when local server is online
-  |                                      -> local JSON fallback if Redis is unavailable
-  |
-  +-- Local Express API
-        +-- content API
-        +-- Google Drive media
-        +-- DeepSeek chatbot
-        +-- local visitor/session tracker
-```
+Do not attack, hack, scan, fuzz, overload, bypass, exploit, or attempt unauthorized access to the static portfolio, comments, local API, deployment services, or stored data. Do not use the site as a test target or attempt to access another visitor's information.
 
-The online backup service is intentionally **comment-only**. It does not provide the admin API, portfolio content API, Google Drive integration, DeepSeek chatbot, or local visitor tracker.
+### Local AI API
 
-Redis Cloud is the managed Redis database used by the comment service. The browser never receives its database credentials; both the online API and local Express API connect server-side using the Redis client. citeturn859439search0turn796663search3
+The AI/chatbot API is tied to the local server and follows Singapore Time (SGT, UTC+8):
 
-## Comment storage
+- Monday–Friday: 05:00–00:00
+- Saturday: 24 hours
+- Sunday: offline
 
-Anonymous comments are the only application data intentionally replicated to the online Redis store.
+Anonymous comments can remain available online through the separate comment service.
 
-Stored comment fields are limited to what the feature needs:
+## Hiring view
 
-- display name / nickname
-- comment text
-- thread term
-- parent comment id
-- creation/update timestamps
-- random browser ownership token
-- random browser-session token used for the 10-reply session limit
+For a cleaner recruiter-facing presentation:
 
-The comment service does **not intentionally collect IP addresses, precise location, PID, PHI, passwords, API keys, payment information, Google Drive credentials, chatbot conversations, or the portfolio content JSON**.
+`/port_resume?type_of_work_hiring`
 
-### Browser identity
+A specific target can also be supplied, for example:
 
-The browser creates an opaque random ownership token in local storage and a separate random session token in session storage.
+`/port_resume?type_of_work_hiring=technical_officer`
 
-This allows the same browser profile to return and manage its own anonymous comments while keeping reply limits tied to a browser session.
+The page is designed as a professional resume-style view while the main site remains the interactive portfolio.
 
-This is not an authentication system or a cryptographic identity system. Clearing site storage, changing browser profiles, or using another browser/device creates a new anonymous identity.
-
-## Online Redis backup setup
-
-The online comment backup lives in:
-
-`online-comments/`
-
-It is a small Vercel serverless API backed by Redis Cloud. Redis Cloud provides the managed database; Vercel only hosts the small HTTP API that safely keeps the Redis credentials server-side.
-
-### 1. Create the Redis database
-
-Create a Redis Cloud database and copy its database connection string from the Redis Cloud database details/connection wizard.
-
-Redis Cloud provides managed Redis databases and documents application connections through Redis clients such as node-redis. citeturn677241search8turn677241search10
-
-### 2. Configure the online API
-
-Deploy the `online-comments/` directory as a small Vercel project.
-
-In the Vercel project settings, add:
-
-`REDIS_URL`
-
-Use the Redis Cloud database connection string supplied by Redis Cloud.
-
-Redis Cloud documents the public database endpoint and connection details in the database configuration/connection wizard. citeturn677241search8turn906360search8
-
-### 3. Connect GitHub Pages to the backup
-
-Add a GitHub repository secret named:
-
-`COMMENTS_BACKUP_URL`
-
-Set it to the deployed Vercel project URL.
-
-The Pages workflow injects this value into `VITE_COMMENTS_BACKUP_URL`.
-
-When configured, the portfolio prefers the online comment API so comments remain available when the local server is offline. The local API remains a fallback, and both APIs use the same Redis Cloud database.
-
-### 4. Connect the local server to the same Redis Cloud database
-
-Copy the Redis Cloud connection string into your **local** `server/.env`:
-
-```env
-REDIS_URL=redis[s]://username:password@host:port
-```
-
-Do not commit this value.
-
-The local Express API and the online Vercel API use the same Redis Cloud database. This keeps comments persistent while the local machine is offline.
-
-The local JSON comment file remains a fallback for development when Redis is unavailable.
-
-## Local development
+## Development
 
 ### Client
 
@@ -120,11 +45,8 @@ npm run dev
 ```powershell
 cd server
 npm install
-cp .env.example .env
 npm run dev
 ```
-
-On Windows PowerShell, use the actual Node/npm commands above rather than pasting shell commands into JavaScript files.
 
 ### Admin
 
@@ -133,89 +55,3 @@ cd admin
 npm install
 npm run dev
 ```
-
-## Local server operating schedule
-
-The local server is intended to follow this schedule in **Singapore Time (SGT, UTC+8)**:
-
-| Day | Local server |
-|---|---|
-| Monday | 05:00 – 00:00 |
-| Tuesday | 05:00 – 00:00 |
-| Wednesday | 05:00 – 00:00 |
-| Thursday | 05:00 – 00:00 |
-| Friday | 05:00 – 00:00 |
-| Saturday | 24 hours |
-| Sunday | **OFF** |
-
-The schedule is an operational plan, not an automatic enforcement mechanism.
-
-When the local server is offline, the portfolio's **comment service can continue through the online Redis-backed API** once the backup is configured.
-
-The chatbot is tied to the local server and is therefore **not a 24/7 service**. It is unavailable whenever the local server is offline, including the scheduled Sunday shutdown.
-
-The online comment API has **no chatbot feature**.
-
-## Visitor rules and acceptable use
-
-This portfolio is a small personal project. It is **not authorized as a target for infrastructure stress testing, offensive security testing, exploitation, or automated abuse**.
-
-By interacting with the site, visitors are expected to:
-
-1. Use the normal public portfolio interface only.
-2. Do not attempt denial-of-service, request flooding, load testing, or resource exhaustion.
-3. Do not brute-force, credential-stuff, or attempt to bypass authentication or authorization.
-4. Do not probe for secrets, environment variables, private files, server-side source, Redis credentials, Google Drive credentials, admin credentials, or local-machine resources.
-5. Do not attempt exploitation of the local Express server, Tailscale endpoint, online API, Redis database, GitHub repository, or deployment infrastructure.
-6. Do not perform automated vulnerability scanning, fuzzing, mass endpoint enumeration, or exploit-chain testing against this portfolio without explicit written authorization.
-7. Do not attempt to access, modify, delete, or exfiltrate another visitor's comments or data.
-8. Do not impersonate another visitor or intentionally abuse anonymous ownership controls.
-9. Do not submit passwords, API keys, government identification numbers, payment information, health information, or other sensitive personal information into comments.
-10. Do not use the portfolio as a general-purpose hosting service, relay, proxy, malware delivery point, or command-and-control endpoint.
-11. Do not interfere with the local server's availability or the scheduled operating hours.
-12. Respect the fact that this project is intentionally small and may contain weaknesses, rough edges, outages, limited capacity, and incomplete security hardening.
-
-### Important security expectation
-
-The infrastructure is **not a hardened enterprise environment**.
-
-That does not mean visitors are invited to attack it.
-
-Treat the site as a normal personal portfolio and use the features for their intended purpose. The local server, online API, Redis database, deployment pipeline, and related infrastructure are operational components of the portfolio, not a challenge environment.
-
-## Responsible disclosure
-
-If you discover a genuine security problem during normal use, do not exploit it further, access unrelated data, persist access, or publish a working exploit against the infrastructure.
-
-Instead, preserve only the minimum information needed to describe the issue and report it privately to the portfolio owner.
-
-## Scope
-
-For the time being, this repository should be treated as:
-
-**a simple personal portfolio with a small commenting system and a limited local backend.**
-
-It is not intended to be:
-
-- a scalable SaaS application
-- a multi-tenant platform
-- a production enterprise API
-- a security research lab
-- a benchmark target
-- a public penetration-testing environment
-
-## Games
-
-Set `VITE_GAMES_URL` to the other GitHub Pages games repository. The Games tab embeds it with an iframe.
-
-## Git automation
-
-`scripts\\commit-push.bat "message"`
-
-`scripts\\build-all.bat`
-
-`scripts\\secure-repo-wipe.bat` is destructive. It rewrites history and force-pushes. It does not revoke credentials; rotate leaked secrets separately.
-
-## Resume source
-
-Initial factual profile data is grounded in the supplied Zulfaqar Jamal profile PDF. Project entries that require evidence not present in that source are explicitly marked as placeholders.
