@@ -326,6 +326,59 @@ function normalizeContent(value) {
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const makeId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+const WRITEUP_BLOCK_TYPES = [
+  ['paragraph', 'Paragraph'],
+  ['heading', 'Heading'],
+  ['quote', 'Quote'],
+  ['list', 'List'],
+  ['table', 'Table'],
+  ['code', 'Code'],
+  ['media', 'Media'],
+  ['workflow', 'Interactive workflow'],
+];
+
+const JUDGE0_LANGUAGES = [
+  { id: 71, label: 'Python 3' },
+  { id: 63, label: 'JavaScript' },
+  { id: 54, label: 'C++' },
+  { id: 50, label: 'C' },
+  { id: 62, label: 'Java' },
+  { id: 60, label: 'Go' },
+  { id: 73, label: 'Rust' },
+  { id: 74, label: 'TypeScript' },
+  { id: 72, label: 'Ruby' },
+  { id: 46, label: 'Bash' },
+];
+
+function newWriteup() {
+  const sessionId = makeId('session');
+
+  return {
+    version: 1,
+    title: 'Untitled CTF Writeup',
+    slug: 'untitled-ctf-writeup',
+    excerpt: '',
+    author: 'Zulfaqar Jamal',
+    tags: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    publishedAt: null,
+    status: 'draft',
+    sessions: [
+      { id: sessionId, title: 'Introduction' },
+    ],
+    blocks: [
+      { id: makeId('block'), sessionId, type: 'paragraph', html: '' },
+    ],
+    workspace: {
+      id: makeId('workspace'),
+      title: 'Interactive workflow',
+      nodes: [],
+      edges: [],
+    },
+  };
+}
+
 function App() {
   const [authState, setAuthState] = useState('loading');
   const [adminUser, setAdminUser] = useState(null);
