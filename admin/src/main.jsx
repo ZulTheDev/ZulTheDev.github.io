@@ -836,6 +836,60 @@ function AdminShell({ user, onLogout }) {
     }
   }
 
+  async function deleteWriteupDraft(slug) {
+    if (!slug) return;
+
+    if (!window.confirm('Delete this CTF writeup draft?')) {
+      return;
+    }
+
+    try {
+      const response = await authFetch(
+        API + '/api/writeups/' + encodeURIComponent(slug),
+        { method: 'DELETE' }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Writeup delete failed');
+      }
+
+      if (activeWriteup?.slug === slug) {
+        setActiveWriteup(null);
+      }
+
+      await loadWriteups();
+      setNotice('Writeup draft deleted.');
+    } catch (error) {
+      setNotice('Writeup delete failed: ' + error.message);
+    }
+  }
+
+  async function openR2Object(key) {
+    const cleanKey = String(key || '').trim();
+
+    if (!cleanKey) return;
+
+    try {
+      const response = await authFetch(
+        API +
+          '/api/r2/read-url?key=' +
+          encodeURIComponent(cleanKey)
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data?.url) {
+        throw new Error(data?.error || 'R2 read URL unavailable');
+      }
+
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      setNotice('R2 read failed: ' + error.message);
+    }
+  }
+
   async function uploadWriteupFile(file, slug) {
     if (!file) return null;
 
@@ -1506,11 +1560,13 @@ function AdminShell({ user, onLogout }) {
               openWriteup={openWriteup}
               saveDraft={saveWriteupDraft}
               publish={publishActiveWriteup}
+              deleteDraft={deleteWriteupDraft}
               updateWriteup={updateActiveWriteup}
               uploadFile={uploadWriteupFile}
               r2Objects={r2Objects}
               r2Loading={r2Loading}
               loadR2Objects={loadR2Objects}
+              openR2Object={openR2Object}
             />
           )}
 
@@ -1960,6 +2016,7 @@ function WriteupsEditor({
   openWriteup,
   saveDraft,
   publish,
+  deleteDraft,
   updateWriteup,
   uploadFile,
   r2Objects,
@@ -1990,18 +2047,30 @@ function WriteupsEditor({
           ) : (
             <div className="writeup-draft-list">
               {writeups.map((item) => (
-                <button
+                <div
                   className="writeup-draft-card"
                   key={item.slug}
-                  onClick={() => openWriteup(item.slug)}
                 >
-                  <div>
-                    <small>{item.status || 'draft'} · {item.slug}</small>
-                    <strong>{item.title || 'Untitled writeup'}</strong>
-                    <span>{item.excerpt || 'No excerpt yet.'}</span>
-                  </div>
-                  <b>Open →</b>
-                </button>
+                  <button
+                    className="writeup-draft-open"
+                    type="button"
+                    onClick={() => openWriteup(item.slug)}
+                  >
+                    <div>
+                      <small>{item.status || 'draft'} · {item.slug}</small>
+                      <strong>{item.title || 'Untitled writeup'}</strong>
+                      <span>{item.excerpt || 'No excerpt yet.'}</span>
+                    </div>
+                    <b>Open →</b>
+                  </button>
+                  <button
+                    className="delete-button compact"
+                    type="button"
+                    onClick={() => deleteDraft(item.slug)}
+                  >
+                    Delete
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -2924,9 +2993,16 @@ function WriteupR2MediaTab({
   r2Objects,
   r2Loading,
   loadR2Objects,
+  openR2Object,
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(null);
+
+  useEffect(() => {
+    if (writeup?.slug) {
+      loadR2Objects(writeup.slug);
+    }
+  }, [writeup?.slug]);
 
   async function upload(event) {
     const file = event.target.files?.[0];
@@ -2979,7 +3055,11 @@ function WriteupR2MediaTab({
               disabled={uploading}
             />
           </label>
-          <button className="ghost" onClick={loadR2Objects} disabled={r2Loading}>
+          <button
+            className="ghost"
+            onClick={() => loadR2Objects(writeup.slug || writeup.title)}
+            disabled={r2Loading}
+          >
             {r2Loading ? 'Loading...' : 'Refresh R2'}
           </button>
         </div>
@@ -3001,7 +3081,16 @@ function WriteupR2MediaTab({
                 <strong>{item.key}</strong>
                 <small>{item.size ? Math.round(item.size / 1024) + ' KB' : ''}</small>
               </div>
-              <code>{item.lastModified ? new Date(item.lastModified).toLocaleString() : ''}</code>
+              <div className="r2-object-actions">
+                <code>{item.lastModified ? new Date(item.lastModified).toLocaleString() : ''}</code>
+                <button
+                  className="ghost small"
+                  type="button"
+                  onClick={() => openR2Object(item.key)}
+                >
+                  Open
+                </button>
+              </div>
             </div>
           ))
         )}
