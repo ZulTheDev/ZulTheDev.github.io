@@ -104,6 +104,13 @@ jobs:
             exit 1
           fi
 
+          if [ -f "client/dist/ctf-blog/index.json" ]; then
+            echo "FOUND: client/dist/ctf-blog/index.json"
+          else
+            echo "ERROR: client/dist/ctf-blog/index.json is missing"
+            exit 1
+          fi
+
           echo "Build output:"
           find client/dist -maxdepth 3 -type f | sort
 
