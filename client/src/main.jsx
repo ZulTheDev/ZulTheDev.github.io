@@ -2789,7 +2789,7 @@ function App() {
   ======================================================= */
 
   const ctfPath =
-    location.pathname.replace(/\\+$/, '');
+    location.pathname.replace(/\/+$/, '');
 
   if (ctfPath === '/ctf-blog' || ctfPath === '/ctf-blog/') {
     return <CTFBlogIndexView />;
