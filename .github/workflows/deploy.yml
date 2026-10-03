@@ -70,6 +70,7 @@ jobs:
         env:
           VITE_API_BASE_URL: https://system32.tail39684d.ts.net
           VITE_COMMENTS_BACKUP_URL: ${{ secrets.COMMENTS_BACKUP_URL }}
+          VITE_ONLINE_API_URL: ${{ secrets.COMMENTS_BACKUP_URL }}
         run: npm run build
 
       - name: Verify build output
