@@ -2034,6 +2034,7 @@ function WriteupsEditor({
               writeup={activeWriteup}
               updateWriteup={updateWriteup}
               uploadFile={uploadFile}
+              writeupSlug={activeWriteup.slug || activeWriteup.title}
             />
           )}
 
@@ -2248,6 +2249,7 @@ function WriteupDocumentEditor({
               moveDown={() => moveBlock(index, 1)}
               uploadFile={uploadFile}
               addBlock={addBlock}
+              writeupSlug={writeup.slug || writeup.title}
             />
           ))}
 
@@ -2277,6 +2279,7 @@ function WriteupBlockEditor({
   moveUp,
   moveDown,
   uploadFile,
+  writeupSlug,
 }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
@@ -2335,7 +2338,7 @@ function WriteupBlockEditor({
     if (!file) return;
 
     try {
-      const media = await uploadFile(file, 'writeup-media');
+      const media = await uploadFile(file, writeupSlug || 'writeup-media');
       update({
         ...block,
         media,
