@@ -719,8 +719,8 @@ app.get(
           validAnonymousId(
             deviceId
           )
-            ? countUserReplies(
-                allComments,
+            ? countRawUserReplies(
+                rawComments,
                 deviceId
               )
             : 0,
@@ -992,8 +992,8 @@ app.post(
               }
 
               const replies =
-                countUserReplies(
-                  allComments,
+                countRawUserReplies(
+                  allComments[term] || [],
                   deviceId
                 );
 
