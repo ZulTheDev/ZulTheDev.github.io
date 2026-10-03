@@ -41,7 +41,7 @@ function githubBranch() {
     branch.includes('..') ||
     branch.startsWith('/') ||
     branch.endsWith('/') ||
-    branch.includes('\\\\') ||
+    branch.includes('\\') ||
     branch.length > 250
   ) {
     throw new Error('github_app_branch_invalid');
