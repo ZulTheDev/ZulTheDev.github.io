@@ -23,10 +23,6 @@ function githubRepository() {
   const owner = required('GITHUB_OWNER');
   const repo = required('GITHUB_REPO');
 
-  if (!owner || !repo) {
-    throw new Error('github_app_repository_not_configured');
-  }
-
   if (
     !/^[A-Za-z0-9_.-]{1,100}$/.test(owner) ||
     !/^[A-Za-z0-9_.-]{1,100}$/.test(repo)
@@ -41,11 +37,11 @@ function githubBranch() {
   const branch = required('GITHUB_BRANCH') || 'main';
 
   if (
-    !branch ||
+    branch === '' ||
     branch.includes('..') ||
     branch.startsWith('/') ||
     branch.endsWith('/') ||
-    branch.includes('\\') ||
+    branch.includes('\\\\') ||
     branch.length > 250
   ) {
     throw new Error('github_app_branch_invalid');
@@ -57,9 +53,9 @@ function githubBranch() {
 function base64Url(value) {
   return Buffer.from(value)
     .toString('base64')
-    .replace(/=/g, '')
-    .replace(/\\+/g, '-')
-    .replace(/\\//g, '_');
+    .replaceAll('=', '')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_');
 }
 
 function githubAppJwt() {
@@ -87,7 +83,7 @@ function githubAppJwt() {
   const unsigned = header + '.' + payload;
 
   const privateKey = createPrivateKey({
-    key: privateKeyValue.replace(/\\\\n/g, '\n'),
+    key: privateKeyValue.replaceAll('\\\\n', '\n'),
     format: 'pem',
   });
 
@@ -95,9 +91,7 @@ function githubAppJwt() {
   signer.update(unsigned);
   signer.end();
 
-  const signature = signer.sign(privateKey);
-
-  return unsigned + '.' + base64Url(signature);
+  return unsigned + '.' + base64Url(signer.sign(privateKey));
 }
 
 async function githubRequest(apiPath, { method = 'GET', token, body } = {}) {
@@ -130,12 +124,11 @@ async function githubRequest(apiPath, { method = 'GET', token, body } = {}) {
   }
 
   if (!response.ok) {
-    const message =
+    const error = new Error(
       data?.message ||
       data?.error ||
-      ('GitHub API HTTP ' + response.status);
-
-    const error = new Error(message);
+      ('GitHub API HTTP ' + response.status)
+    );
     error.status = response.status;
     error.github = data;
     throw error;
@@ -197,9 +190,7 @@ function safePublishedPath(value) {
   const filePath = String(value || '').trim();
 
   if (
-    !filePath.startsWith(
-      'client/public/ctf-blog/'
-    ) ||
+    !filePath.startsWith('client/public/ctf-blog/') ||
     filePath.includes('..') ||
     filePath.startsWith('/') ||
     filePath.length > 500
@@ -218,6 +209,7 @@ export async function checkGitHubAppConnection() {
       configured: false,
       reachable: false,
       repository: null,
+      branch: githubBranch(),
     };
   }
 
