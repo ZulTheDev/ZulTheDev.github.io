@@ -2604,6 +2604,27 @@ function CTFWriteupView({ slug }) {
                   )}
                 </span>
               )}
+
+              {writeup.ctf?.event && (
+                <span>{writeup.ctf.event}</span>
+              )}
+
+              {writeup.ctf?.category && (
+                <span>{writeup.ctf.category}</span>
+              )}
+
+              {writeup.ctf?.difficulty && (
+                <span>
+                  Difficulty: {writeup.ctf.difficulty}
+                </span>
+              )}
+
+              {writeup.ctf?.points && (
+                <span>
+                  {writeup.ctf.points} pts
+                </span>
+              )}
+
               {writeup.tags
                 ?.length > 0 && (
                 <div>
