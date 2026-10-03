@@ -27,6 +27,10 @@ import {
   safeR2Prefix,
 } from './writeups.js';
 
+import {
+  checkGitHubAppConnection,
+} from './github-app.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -2026,6 +2030,41 @@ app.get(
     }
   }
 );
+
+app.get(
+  '/api/github-app/status',
+  async (request, response) => {
+    try {
+      return response.json(
+        await checkGitHubAppConnection()
+      );
+    } catch (error) {
+      console.error(
+        'GitHub App status check failed:',
+        error?.message || error
+      );
+
+      return response.status(503).json({
+        configured: true,
+        reachable: false,
+        repository:
+          process.env.GITHUB_OWNER &&
+          process.env.GITHUB_REPO
+            ? process.env.GITHUB_OWNER +
+              '/' +
+              process.env.GITHUB_REPO
+            : null,
+        branch:
+          process.env.GITHUB_BRANCH ||
+          'main',
+        error:
+          error?.message ||
+          'github_app_unreachable',
+      });
+    }
+  }
+);
+
 
 app.get(
   '/api/r2/objects',
