@@ -1653,6 +1653,27 @@ function HiringPortfolioView({
 }
 
 
+function safeWriteupUrl(value, options = {}) {
+  const raw = String(value || '').trim();
+  const allowMailto = Boolean(options.allowMailto);
+
+  if (!raw) return '';
+
+  if (
+    /^https?:\/\//i.test(raw) ||
+    /^\/(?!\/)/.test(raw) ||
+    /^#/.test(raw)
+  ) {
+    return raw;
+  }
+
+  if (allowMailto && /^mailto:/i.test(raw)) {
+    return raw;
+  }
+
+  return '';
+}
+
 function safeWriteupHtml(value) {
   const html = String(value || '');
 
@@ -1676,10 +1697,41 @@ function safeWriteupHtml(value) {
     .querySelectorAll('*')
     .forEach((node) => {
       [...node.attributes].forEach((attribute) => {
-        if (
-          attribute.name.toLowerCase().startsWith('on')
-        ) {
+        const name =
+          attribute.name.toLowerCase();
+
+        if (name.startsWith('on')) {
           node.removeAttribute(attribute.name);
+          return;
+        }
+
+        if (name === 'srcset') {
+          node.removeAttribute(attribute.name);
+          return;
+        }
+
+        if (
+          name === 'href' ||
+          name === 'src' ||
+          name === 'poster' ||
+          name === 'xlink:href'
+        ) {
+          const safe = safeWriteupUrl(
+            attribute.value,
+            {
+              allowMailto:
+                name === 'href',
+            }
+          );
+
+          if (!safe) {
+            node.removeAttribute(attribute.name);
+          } else {
+            node.setAttribute(
+              attribute.name,
+              safe
+            );
+          }
         }
       });
     });
@@ -1861,7 +1913,8 @@ function WriteupCodeRunner({ block }) {
 }
 
 function WriteupMedia({ media }) {
-  const url = media?.url || '';
+  const url =
+    safeWriteupUrl(media?.url || '');
 
   if (!url) {
     return (
@@ -2669,11 +2722,19 @@ function App() {
   const [loadProgress, setLoadProgress] = useState(8);
   const [selected, setSelected] = useState(null);
 
+  const ctfPath =
+    location.pathname.replace(/\/+$/, '');
+
+  const isCtfRoute =
+    ctfPath === '/ctf-blog' ||
+    ctfPath === '/ctf-blog/' ||
+    ctfPath.startsWith('/ctf-blog/');
+
   useEffect(() => {
     const { deviceId, sessionId } =
       getAnonymousIdentity();
 
-    if (!API) {
+    if (!API || isCtfRoute) {
       return;
     }
 
@@ -2689,7 +2750,7 @@ function App() {
     }).catch(() => {
       // Anonymous access tracking is best-effort.
     });
-  }, []);
+  }, [isCtfRoute]);
 
   const [page, setPage] = useState(
     location.hash.slice(1) || 'home'
@@ -2700,6 +2761,10 @@ function App() {
   --------------------------------------------- */
 
   useEffect(() => {
+    if (isCtfRoute) {
+      return;
+    }
+
     let mounted = true;
 
     const loadContent = async () => {
@@ -2783,26 +2848,11 @@ function App() {
         handleHashChange
       );
     };
-  }, []);
-
-  /* ---------------------------------------------
-     LOADING STATE
-  --------------------------------------------- */
-
-  if (!content) {
-    return (
-      <LoadingScreen
-        progress={loadProgress}
-      />
-    );
-  }
+  }, [isCtfRoute]);
 
   /* =======================================================
      CTF BLOG ROUTES
   ======================================================= */
-
-  const ctfPath =
-    location.pathname.replace(/\/+$/, '');
 
   if (ctfPath === '/ctf-blog' || ctfPath === '/ctf-blog/') {
     return <CTFBlogIndexView />;
@@ -2817,6 +2867,19 @@ function App() {
     if (slug) {
       return <CTFWriteupView slug={slug} />;
     }
+  }
+
+  /* ---------------------------------------------
+     LOADING STATE  /* ---------------------------------------------
+     LOADING STATE
+  --------------------------------------------- */
+
+  if (!content) {
+    return (
+      <LoadingScreen
+        progress={loadProgress}
+      />
+    );
   }
 
   /* =======================================================
