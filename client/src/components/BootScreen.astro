@@ -1,0 +1,106 @@
+---
+---
+
+<div
+  id="portfolio-boot"
+  class="loading-screen"
+  role="status"
+  aria-live="polite"
+  aria-label="Loading Zulfaqar Jamal portfolio"
+>
+  <div class="loader-shell">
+    <div class="loader-ring">
+      <div class="loader-ring-inner"></div>
+      <span class="tick tick-1"></span>
+      <span class="tick tick-2"></span>
+      <span class="tick tick-3"></span>
+      <span class="tick tick-4"></span>
+      <span class="tick tick-5"></span>
+      <span class="tick tick-6"></span>
+      <span class="tick tick-7"></span>
+      <span class="tick tick-8"></span>
+      <div class="loader-scanner"></div>
+
+      <div class="coder-cat">
+        <div class="cat-ear cat-ear-left"></div>
+        <div class="cat-ear cat-ear-right"></div>
+        <div class="cat-head">
+          <span class="cat-eye cat-eye-left"></span>
+          <span class="cat-eye cat-eye-right"></span>
+          <span class="cat-nose">⌁</span>
+          <span class="cat-mouth">ω</span>
+        </div>
+        <div class="cat-laptop">
+          <div class="cat-screen"><span>&gt;_</span></div>
+          <div class="cat-base"></div>
+        </div>
+        <div class="cat-paw cat-paw-left"></div>
+        <div class="cat-paw cat-paw-right"></div>
+      </div>
+    </div>
+
+    <div class="loader-status">
+      <div class="loader-label">
+        <span>ฅ^•ﻌ•^ฅ</span>
+        <strong> booting zul.exe </strong>
+        <span>ฅ^•ﻌ•^ฅ</span>
+      </div>
+
+      <div class="loader-progress">
+        <span style="width: 76%"></span>
+      </div>
+
+      <div class="loader-meta">
+        <span>WAITING FOR IDLE</span>
+        <span>76%</span>
+      </div>
+
+      <div class="loader-subtext">
+        Astro rendered the portfolio. Waiting for the browser to hydrate it...
+      </div>
+    </div>
+  </div>
+</div>
+
+<style is:global>
+  #portfolio-boot {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      opacity 180ms ease,
+      visibility 180ms ease;
+  }
+
+  #portfolio-boot.is-ready {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+</style>
+
+<script is:inline>
+  (() => {
+    const boot = document.getElementById('portfolio-boot');
+    if (!boot) return;
+
+    let fallbackTimer;
+
+    const hideBootScreen = () => {
+      boot.classList.add('is-ready');
+
+      if (fallbackTimer) {
+        window.clearTimeout(fallbackTimer);
+      }
+    };
+
+    window.addEventListener(
+      'portfolio:hydrated',
+      hideBootScreen,
+      { once: true }
+    );
+
+    // Do not trap visitors behind a loader if client JavaScript fails.
+    fallbackTimer = window.setTimeout(hideBootScreen, 6000);
+  })();
+</script>
