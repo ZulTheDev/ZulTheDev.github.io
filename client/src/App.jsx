@@ -3537,3 +3537,5 @@ function App({ initialContent = null }) {
     </>
   );
 }
+
+export default App;
