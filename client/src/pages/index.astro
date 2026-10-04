@@ -1,17 +1,10 @@
 ---
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import PortfolioApp from '../App.jsx';
+import { loadInitialContent } from '../data/content-loader.js';
 import '../style.css';
 import '../responsive.css';
 
-const contentPath = fileURLToPath(
-  new URL('../../public/content.json', import.meta.url)
-);
-
-const initialContent = JSON.parse(
-  fs.readFileSync(contentPath, 'utf8')
-);
+const initialContent = loadInitialContent();
 ---
 
 <html lang="en">
