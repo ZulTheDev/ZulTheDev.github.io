@@ -82,6 +82,7 @@ jobs:
       - name: Verify server JavaScript syntax
         run: |
           node --check server/src/index.js
+          node --check server/src/monetization.js
           node --check server/src/writeups.js
 
       - name: Verify build output
