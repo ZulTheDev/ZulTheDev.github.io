@@ -387,6 +387,7 @@ async function migrateTermToRedis(
 
   const redis = await getRedis();
   const multi = redis.multi();
+  let commandCount = 0;
 
   for (const item of localComments) {
     if (!item?.id || !item?.ownerId) continue;
@@ -410,13 +411,15 @@ async function migrateTermToRedis(
         REDIS_COMMENT_USER_PREFIX + item.ownerId,
         item.id
       );
+
+    commandCount += 1;
   }
 
-  if (multi.commands?.length) {
+  if (commandCount > 0) {
     await multi.exec();
   }
 
-  return localComments.length;
+  return commandCount;
 }
 
 async function migrateAllLocalCommentsToRedis() {
