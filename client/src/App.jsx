@@ -8,6 +8,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 const API = import.meta.env.VITE_API_BASE_URL || '';
+const CONTENT_API_ENABLED =
+  import.meta.env.VITE_ENABLE_CONTENT_API === 'true';
 
 const GAMES =
   import.meta.env.VITE_GAMES_URL ||
@@ -491,31 +493,28 @@ function BotAvatar({ size = 28 }) {
 
 const CHAT_SESSION_KEY = 'portfolio-ai-chat-session';
 
+const DEFAULT_CHAT_MESSAGES = [
+  {
+    a: 1,
+    t: "Ask me about Zul's work, skills, projects or certifications.",
+  },
+];
+
 function readChatSession() {
   try {
     const saved = sessionStorage.getItem(CHAT_SESSION_KEY);
 
     if (!saved) {
-      return [
-        {
-          a: 1,
-          t: "Ask me about Zul's work, skills, projects or certifications.",
-        },
-      ];
+      return DEFAULT_CHAT_MESSAGES;
     }
 
     const parsed = JSON.parse(saved);
 
     return Array.isArray(parsed) && parsed.length
       ? parsed.slice(-20)
-      : [];
+      : DEFAULT_CHAT_MESSAGES;
   } catch {
-    return [
-      {
-        a: 1,
-        t: "Ask me about Zul's work, skills, projects or certifications.",
-      },
-    ];
+    return DEFAULT_CHAT_MESSAGES;
   }
 }
 
@@ -539,11 +538,20 @@ function Chat({ content }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
   const [messages, setMessages] =
-    useState(() => readChatSession());
+    useState(DEFAULT_CHAT_MESSAGES);
+  const [chatSessionReady, setChatSessionReady] =
+    useState(false);
 
   useEffect(() => {
-    writeChatSession(messages);
-  }, [messages]);
+    setMessages(readChatSession());
+    setChatSessionReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (chatSessionReady) {
+      writeChatSession(messages);
+    }
+  }, [messages, chatSessionReady]);
 
   async function send() {
     const message = question.trim();
@@ -2725,6 +2733,10 @@ export default function App({ initialContent = null }) {
   const [selected, setSelected] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  useEffect(() => {
+    window.dispatchEvent(new Event('portfolio:hydrated'));
+  }, []);
+
   const currentLocation =
     typeof window !== 'undefined'
       ? window.location
@@ -2782,22 +2794,22 @@ export default function App({ initialContent = null }) {
         /*
          * API is optional. Static content remains the fallback.
          */
-        if (API) {
+        if (CONTENT_API_ENABLED && API) {
           try {
             const apiResponse = await fetch(
-              `${API}/api/content`
+              `${API}/api/content`,
+              { cache: 'no-store' }
             );
 
             if (apiResponse.ok) {
               const apiData = await apiResponse.json();
 
-              setLoadProgress(88);
+              if (mounted) {
+                setLoadProgress(88);
 
-              if (
-                mounted &&
-                apiData?.profile
-              ) {
-                setContent(normalizeContent(apiData));
+                if (apiData?.profile) {
+                  setContent(normalizeContent(apiData));
+                }
               }
             }
           } catch {
