@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   ChevronRight,
   X,
+  Menu,
   Sparkles,
 } from 'lucide-react';
 const API = import.meta.env.VITE_API_BASE_URL || '';
@@ -3035,14 +3036,32 @@ function App({ initialContent = null }) {
           NAVIGATION
       =================================================== */}
 
-      <nav>
-        <a href="#home">
+      <nav className={mobileNavOpen ? 'mobile-nav-open' : ''}>
+        <a
+          href="#home"
+          className="site-nav-brand"
+          onClick={() => setMobileNavOpen(false)}
+        >
           <b>
             ZUL<span>/</span>JAMAL
           </b>
         </a>
 
-        <div>
+        <button
+          type="button"
+          className="mobile-nav-toggle"
+          aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={mobileNavOpen}
+          aria-controls="mobile-site-navigation"
+          onClick={() => setMobileNavOpen((open) => !open)}
+        >
+          {mobileNavOpen ? <X size={25} /> : <Menu size={25} />}
+        </button>
+
+        <div
+          id="mobile-site-navigation"
+          className="site-nav-links"
+        >
           {[
             'home',
             'recent',
@@ -3055,24 +3074,27 @@ function App({ initialContent = null }) {
             <a
               key={item}
               href={`#${item}`}
+              onClick={() => setMobileNavOpen(false)}
             >
               {item}
             </a>
           ))}
         </div>
 
-        <a href="#explore">
-          Explore{' '}
-          <Sparkles size={13} />
-        </a>
+        <div className="site-nav-extra-links">
+          <a href="#explore" onClick={() => setMobileNavOpen(false)}>
+            Explore{' '}
+            <Sparkles size={13} />
+          </a>
 
-        <a href="#games">
-          Games
-        </a>
+          <a href="#games" onClick={() => setMobileNavOpen(false)}>
+            Games
+          </a>
 
-        <a href="/ctf-blog/">
-          CTF Blog
-        </a>
+          <a href="/ctf-blog/" onClick={() => setMobileNavOpen(false)}>
+            CTF Blog
+          </a>
+        </div>
       </nav>
 
       <main>
