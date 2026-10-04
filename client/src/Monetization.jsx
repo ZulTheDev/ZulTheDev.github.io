@@ -182,7 +182,7 @@ export default function MonetizationSection({
     <section id="buy-first" className="support-section">
       <div className="support-header">
         <div>
-          <small>06 / SUPPORT</small>
+          <small>07 / SUPPORT</small>
           <h2>Support & buy-first content</h2>
           <p>
             Tip the project if it helped you, or unlock selected deep-dive content after a Ko-fi purchase.
@@ -250,7 +250,7 @@ export default function MonetizationSection({
                         <KeyRound size={14} /> Unlocked
                       </div>
                       <div className="buy-first-content-text">
-                        {content.split('\\n').map((line, index) => (
+                        {content.split('\n').map((line, index) => (
                           <p key={index}>{line || '\u00a0'}</p>
                         ))}
                       </div>
