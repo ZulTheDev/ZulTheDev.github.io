@@ -206,6 +206,7 @@ const DEFAULT_CONTENT = {
     links: [],
   },
   settings: {
+    kofiUrl: '',
     theme: {
       bg: '#0e0b13',
       primary: '#f2a8d4',
