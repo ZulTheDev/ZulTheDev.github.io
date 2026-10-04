@@ -491,3 +491,30 @@ code {
     display: contents;
   }
 }
+
+/* Keep portfolio modal comments compact on small phones. */
+@media (max-width: 600px) {
+  .modal section {
+    grid-template-rows: minmax(170px, 1fr) auto minmax(92px, 24dvh);
+    min-height: 0;
+  }
+
+  .comments {
+    min-height: 92px;
+    max-height: 24dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  .modal section {
+    grid-template-rows: minmax(150px, 1fr) auto minmax(78px, 20dvh);
+  }
+
+  .comments {
+    min-height: 78px;
+    max-height: 20dvh;
+  }
+}
