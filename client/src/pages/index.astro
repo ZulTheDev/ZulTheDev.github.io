@@ -1,11 +1,9 @@
 ---
-import fs from 'node:fs/promises';
 import PortfolioApp from '../App.jsx';
 import '../style.css';
 import '../responsive.css';
 
-const contentPath = new URL('../../public/content.json', import.meta.url);
-const initialContent = JSON.parse(await fs.readFile(contentPath, 'utf8'));
+const initialContent = null;
 ---
 
 <html lang="en">
