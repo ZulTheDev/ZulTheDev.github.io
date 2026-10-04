@@ -1022,6 +1022,7 @@ function HiringPortfolioView({
   const [status, setStatus] =
     useState('Selecting relevant evidence…');
   const [selected, setSelected] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
