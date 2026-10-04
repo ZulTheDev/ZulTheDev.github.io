@@ -89,10 +89,14 @@ jobs:
         run: |
           set -e
 
-          # GitHub Pages serves 404.html for extensionless deep links.
-          # Copying the SPA entrypoint preserves /port_resume URLs so
-          # the React router can inspect location.pathname.
-          cp "client/dist/index.html" "client/dist/404.html"
+          # Astro generates a dedicated 404 page for deep links.
+          # Keep that route-specific page instead of replacing it with index.html.
+          if [ -f "client/dist/404.html" ]; then
+            echo "FOUND: client/dist/404.html"
+          else
+            echo "WARNING: Astro did not generate client/dist/404.html; using index.html fallback"
+            cp "client/dist/index.html" "client/dist/404.html"
+          fi
 
           if [ -f "client/dist/index.html" ]; then
             echo "FOUND: client/dist/index.html"
