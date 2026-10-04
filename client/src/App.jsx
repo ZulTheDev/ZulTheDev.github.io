@@ -15,8 +15,6 @@ import {
   X,
   Sparkles,
 } from 'lucide-react';
-import './style.css';
-import './responsive.css';
 
 const API = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -786,6 +784,9 @@ function ProfilePhoto({ profile }) {
           className="hero-photo"
           src={src}
           alt={`${profile?.name || 'Zulfaqar Jamal'} profile`}
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
           onError={() => {
             setSourceIndex((current) => {
               const next = current + 1;
@@ -2753,7 +2754,8 @@ function App({ initialContent = null }) {
       return;
     }
 
-    fetch(`${API}/api/access/track`, {
+    const send = () => {
+      fetch(`${API}/api/access/track`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2762,9 +2764,19 @@ function App({ initialContent = null }) {
         deviceId,
         sessionId,
       }),
-    }).catch(() => {
-      // Anonymous access tracking is best-effort.
-    });
+      keepalive: true,
+      }).catch(() => {
+        // Anonymous access tracking is best-effort.
+      });
+    };
+
+    if ('requestIdleCallback' in globalThis) {
+      const id = globalThis.requestIdleCallback(send, { timeout: 2500 });
+      return () => globalThis.cancelIdleCallback(id);
+    }
+
+    const id = globalThis.setTimeout(send, 1200);
+    return () => globalThis.clearTimeout(id);
   }, [isCtfRoute]);
 
   const [page, setPage] = useState(
@@ -2831,25 +2843,30 @@ function App({ initialContent = null }) {
          * API is optional. Static content remains the fallback.
          */
         if (API) {
-          try {
-            const apiResponse = await fetch(
-              `${API}/api/content`
-            );
+          const refresh = async () => {
+            try {
+              const apiResponse = await fetch(
+                `${API}/api/content`,
+                { cache: 'no-store' }
+              );
 
-            if (apiResponse.ok) {
-              const apiData = await apiResponse.json();
+              if (apiResponse.ok) {
+                const apiData = await apiResponse.json();
 
-              setLoadProgress(88);
-
-              if (
-                mounted &&
-                apiData?.profile
-              ) {
-                setContent(normalizeContent(apiData));
+                if (mounted && apiData?.profile) {
+                  setLoadProgress(88);
+                  setContent(normalizeContent(apiData));
+                }
               }
+            } catch {
+              // Keep using the static content.
             }
-          } catch {
-            // Keep using the static content.
+          };
+
+          if ('requestIdleCallback' in globalThis) {
+            globalThis.requestIdleCallback(refresh, { timeout: 3000 });
+          } else {
+            globalThis.setTimeout(refresh, 1500);
           }
         }
 
