@@ -33,6 +33,7 @@ import {
   publishFilesWithGitHubApp,
   uploadGitHubAppMedia,
 } from './github-app.js';
+import monetizationRouter from './monetization.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -142,6 +143,8 @@ app.use(
   })
 );
 
+app.use(monetizationRouter);
+
 /* =========================================================
    CONTENT
 ========================================================= */
@@ -178,6 +181,14 @@ const REDIS_URL =
 
 const REDIS_COMMENT_HASH =
   'portfolio:comments:data';
+
+const REDIS_COMMENT_USER_PREFIX =
+  'portfolio:comments:user:';
+
+const LOCAL_COMMENT_FALLBACK_ENABLED =
+  String(
+    process.env.ALLOW_LOCAL_COMMENT_FALLBACK || ''
+  ).toLowerCase() === 'true';
 
 let redisClientPromise = null;
 
@@ -337,21 +348,29 @@ async function readRedisTermComments(term) {
 async function saveRedisComment(
   item
 ) {
-  await redisPipeline([
-    [
-      'HSET',
+  const redis = await getRedis();
+
+  await redis
+    .multi()
+    .hSet(
       REDIS_COMMENT_HASH,
       item.id,
-      JSON.stringify(item),
-    ],
-    [
-      'ZADD',
+      JSON.stringify(item)
+    )
+    .zAdd(
       `portfolio:comments:index:${item.term}`,
-      Date.parse(item.createdAt) ||
-        Date.now(),
-      item.id,
-    ],
-  ]);
+      {
+        score:
+          Date.parse(item.createdAt) ||
+          Date.now(),
+        value: item.id,
+      }
+    )
+    .sAdd(
+      REDIS_COMMENT_USER_PREFIX + item.ownerId,
+      item.id
+    )
+    .exec();
 }
 
 async function migrateTermToRedis(
@@ -363,26 +382,73 @@ async function migrateTermToRedis(
     !Array.isArray(localComments) ||
     localComments.length === 0
   ) {
-    return;
+    return 0;
   }
 
-  await redisPipeline(
-    localComments.flatMap((item) => [
-      [
-        'HSET',
+  const redis = await getRedis();
+  const multi = redis.multi();
+
+  for (const item of localComments) {
+    if (!item?.id || !item?.ownerId) continue;
+
+    multi
+      .hSet(
         REDIS_COMMENT_HASH,
         item.id,
-        JSON.stringify(item),
-      ],
-      [
-        'ZADD',
+        JSON.stringify({ ...item, term })
+      )
+      .zAdd(
         `portfolio:comments:index:${term}`,
-        Date.parse(item.createdAt) ||
-          Date.now(),
-        item.id,
-      ],
-    ])
+        {
+          score:
+            Date.parse(item.createdAt) ||
+            Date.now(),
+          value: item.id,
+        }
+      )
+      .sAdd(
+        REDIS_COMMENT_USER_PREFIX + item.ownerId,
+        item.id
+      );
+  }
+
+  if (multi.commands?.length) {
+    await multi.exec();
+  }
+
+  return localComments.length;
+}
+
+async function migrateAllLocalCommentsToRedis() {
+  if (!redisConfigured()) return 0;
+
+  const allComments = await readComments();
+  let migrated = 0;
+
+  for (const [term, items] of Object.entries(allComments)) {
+    if (!validCommentTerm(term) || !Array.isArray(items)) {
+      continue;
+    }
+
+    migrated += await migrateTermToRedis(term, items);
+  }
+
+  return migrated;
+}
+
+function commentsPersistenceReady() {
+  return (
+    redisConfigured() ||
+    LOCAL_COMMENT_FALLBACK_ENABLED
   );
+}
+
+function sendCommentsPersistenceUnavailable(response) {
+  return response.status(503).json({
+    error: 'comments_not_configured',
+    message:
+      'Shared comment persistence is not configured. Set REDIS_URL on the comment API.',
+  });
 }
 
 async function readVisitors() {
@@ -600,6 +666,10 @@ app.get(
     }
 
     try {
+      if (!commentsPersistenceReady()) {
+        return sendCommentsPersistenceUnavailable(response);
+      }
+
       if (redisConfigured()) {
         try {
           let rawComments =
@@ -675,11 +745,17 @@ app.get(
                 : 0,
           });
         } catch (redisError) {
-          console.warn(
-            'Redis comment read failed; using local JSON:',
+          console.error(
+            'Redis comment read failed:',
             redisError?.message ||
               redisError
           );
+
+          return response.status(503).json({
+            error: 'comments_unavailable',
+            message:
+              'The shared comment database is temporarily unavailable.',
+          });
         }
       }
 
@@ -828,6 +904,10 @@ app.post(
     }
 
     try {
+      if (!commentsPersistenceReady()) {
+        return sendCommentsPersistenceUnavailable(response);
+      }
+
       if (redisConfigured()) {
         try {
           const existing =
@@ -925,11 +1005,19 @@ app.post(
                 ),
             });
         } catch (redisError) {
-          console.warn(
-            'Redis comment write failed; using local JSON:',
+          console.error(
+            'Redis comment write failed:',
             redisError?.message ||
               redisError
           );
+
+          if (!LOCAL_COMMENT_FALLBACK_ENABLED) {
+            return response.status(503).json({
+              error: 'comments_unavailable',
+              message:
+                'The shared comment database is temporarily unavailable.',
+            });
+          }
         }
       }
 
@@ -1119,6 +1207,10 @@ app.put(
     }
 
     try {
+      if (!commentsPersistenceReady()) {
+        return sendCommentsPersistenceUnavailable(response);
+      }
+
       if (redisConfigured()) {
         try {
           const raw =
@@ -1179,11 +1271,19 @@ app.put(
               ),
           });
         } catch (redisError) {
-          console.warn(
-            'Redis comment edit failed; using local JSON:',
+          console.error(
+            'Redis comment edit failed:',
             redisError?.message ||
               redisError
           );
+
+          if (!LOCAL_COMMENT_FALLBACK_ENABLED) {
+            return response.status(503).json({
+              error: 'comments_unavailable',
+              message:
+                'The shared comment database is temporarily unavailable.',
+            });
+          }
         }
       }
 
@@ -1317,6 +1417,10 @@ app.delete(
     }
 
     try {
+      if (!commentsPersistenceReady()) {
+        return sendCommentsPersistenceUnavailable(response);
+      }
+
       if (redisConfigured()) {
         try {
           const raw =
@@ -1374,11 +1478,19 @@ app.delete(
             id,
           });
         } catch (redisError) {
-          console.warn(
-            'Redis comment delete failed; using local JSON:',
+          console.error(
+            'Redis comment delete failed:',
             redisError?.message ||
               redisError
           );
+
+          if (!LOCAL_COMMENT_FALLBACK_ENABLED) {
+            return response.status(503).json({
+              error: 'comments_unavailable',
+              message:
+                'The shared comment database is temporarily unavailable.',
+            });
+          }
         }
       }
 
@@ -1490,6 +1602,10 @@ app.get(
   async (request, response) => {
 
     try {
+      if (!commentsPersistenceReady()) {
+        return sendCommentsPersistenceUnavailable(response);
+      }
+
       let items = [];
 
       if (redisConfigured()) {
@@ -1511,14 +1627,22 @@ app.get(
             }
           }
         } catch (error) {
-          console.warn(
-            'Admin Redis comment read failed; using local JSON:',
+          console.error(
+            'Admin Redis comment read failed:',
             error?.message || error
           );
+
+          if (!LOCAL_COMMENT_FALLBACK_ENABLED) {
+            return response.status(503).json({
+              error: 'comments_unavailable',
+              message:
+                'The shared comment database is temporarily unavailable.',
+            });
+          }
         }
       }
 
-      if (!items.length) {
+      if (!items.length && LOCAL_COMMENT_FALLBACK_ENABLED) {
         const local = await readComments();
         items = flattenComments(local);
       }
@@ -1569,6 +1693,10 @@ app.delete(
     }
 
     try {
+      if (!commentsPersistenceReady()) {
+        return sendCommentsPersistenceUnavailable(response);
+      }
+
       if (redisConfigured()) {
         try {
           const raw = await redisCommand([
@@ -1596,10 +1724,18 @@ app.delete(
             });
           }
         } catch (error) {
-          console.warn(
-            'Admin Redis comment moderation failed; using local JSON:',
+          console.error(
+            'Admin Redis comment moderation failed:',
             error?.message || error
           );
+
+          if (!LOCAL_COMMENT_FALLBACK_ENABLED) {
+            return response.status(503).json({
+              error: 'comments_unavailable',
+              message:
+                'The shared comment database is temporarily unavailable.',
+            });
+          }
         }
       }
 
@@ -2342,6 +2478,10 @@ app.get('/api/health', (request, response) => {
     contentFile: content,
     commentsFile: commentsFile,
     allowedOrigins,
+    redisConfigured: redisConfigured(),
+    sharedCommentsPersistent: redisConfigured(),
+    localCommentFallbackEnabled: LOCAL_COMMENT_FALLBACK_ENABLED,
+    kofiConfigured: Boolean(process.env.KO_FI_VERIFICATION_TOKEN),
   });
 });
 
@@ -2809,5 +2949,32 @@ app.listen(
         process.env.TAILSCALE_AI_SHARED_SECRET
       )}`
     );
+
+    console.log(
+      `Redis configured: ${redisConfigured()}`
+    );
+
+    console.log(
+      `Ko-fi webhook configured: ${Boolean(
+        process.env.KO_FI_VERIFICATION_TOKEN
+      )}`
+    );
+
+    if (redisConfigured()) {
+      void migrateAllLocalCommentsToRedis()
+        .then((count) => {
+          if (count > 0) {
+            console.log(
+              `Migrated ${count} local comment(s) into Redis.`
+            );
+          }
+        })
+        .catch((error) => {
+          console.error(
+            'Local comment migration failed:',
+            error?.message || error
+          );
+        });
+    }
   }
 );
