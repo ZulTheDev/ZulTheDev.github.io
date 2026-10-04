@@ -587,9 +587,18 @@ function AdminShell() {
 
       await loadWriteups();
 
+      const deploy = data.deploy || data.writeup?.deploy;
+      const deployMessage =
+        deploy?.pushed
+          ? ' GitHub App commit ' + (deploy.commitSha || '').slice(0, 7) + '.'
+          : deploy?.message
+            ? ' ' + deploy.message
+            : '';
+
       setNotice(
         'Published: ' +
-          (data.url || '/ctf-blog/' + slug)
+          (data.url || '/ctf-blog/' + slug) +
+          deployMessage
       );
     } catch (error) {
       setNotice('Writeup publish failed: ' + error.message);
@@ -652,6 +661,70 @@ function AdminShell() {
     }
   }
 
+  async function deleteR2Object(key) {
+    const cleanKey = String(key || '').trim();
+
+    if (!cleanKey) return;
+
+    if (!window.confirm('Delete this R2 object? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await authFetch(
+        API + '/api/r2/objects',
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            key: cleanKey,
+          }),
+        }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'R2 delete failed');
+      }
+
+      updateWriteup((current) => ({
+        ...current,
+        mediaLibrary: Array.isArray(current.mediaLibrary)
+          ? current.mediaLibrary.filter(
+              (item) => item?.key !== cleanKey
+            )
+          : [],
+        blocks: Array.isArray(current.blocks)
+          ? current.blocks.map((block) => {
+              if (
+                block?.type !== 'media' ||
+                block.media?.key !== cleanKey
+              ) {
+                return block;
+              }
+
+              return {
+                ...block,
+                media: {
+                  ...(block.media || {}),
+                  key: '',
+                  url: '',
+                },
+              };
+            })
+          : [],
+      }));
+
+      setNotice('Deleted R2 object: ' + cleanKey);
+      await loadR2Objects(activeWriteup?.slug || activeWriteup?.title || '');
+    } catch (error) {
+      setNotice('R2 delete failed: ' + error.message);
+    }
+  }
+
   async function uploadWriteupFile(file, slug) {
     if (!file) return null;
 
@@ -703,6 +776,92 @@ function AdminShell() {
       url: data.publicUrl || '',
       type: file.type || 'application/octet-stream',
       name: file.name,
+      size: file.size,
+    };
+  }
+
+  async function uploadRepositoryMedia(file, folder = 'portfolio-media') {
+    if (!file) return null;
+
+    if (
+      !file.type.startsWith('image/') &&
+      file.type !== 'application/pdf'
+    ) {
+      throw new Error(
+        'Only image files and PDF files can be uploaded to the portfolio repository.'
+      );
+    }
+
+    if (file.size > 18_000_000) {
+      throw new Error(
+        'Repository media must be smaller than 18 MB.'
+      );
+    }
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () =>
+        resolve(String(reader.result || ''));
+      reader.onerror = () =>
+        reject(
+          new Error(
+            'Could not read the selected file.'
+          )
+        );
+      reader.readAsDataURL(file);
+    });
+
+    const commaIndex = dataUrl.indexOf(',');
+    const contentBase64 =
+      commaIndex >= 0
+        ? dataUrl.slice(commaIndex + 1)
+        : '';
+
+    if (!contentBase64) {
+      throw new Error(
+        'Selected file did not contain readable data.'
+      );
+    }
+
+    const response = await authFetch(
+      API + '/api/repo/media/upload',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          contentBase64,
+          folder,
+        }),
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          'Repository media upload failed (' +
+          response.status +
+          ')'
+      );
+    }
+
+    return {
+      ...data,
+      type:
+        file.type === 'application/pdf'
+          ? 'pdf'
+          : file.type.startsWith('image/')
+            ? 'image'
+            : 'link',
+      name: file.name,
+      mimeType: file.type,
       size: file.size,
     };
   }
@@ -816,7 +975,26 @@ function AdminShell() {
       setSavedSnapshot(JSON.stringify(normalized));
       try { localStorage.removeItem(LOCAL_DRAFT_KEY); } catch {}
       setHasDraft(false);
-      setNotice(`Saved successfully at ${new Date().toLocaleTimeString()}.`);
+
+      const deploy = data.deploy;
+      if (deploy?.pushed) {
+        setNotice(
+          'Saved and pushed to GitHub App (' +
+          (deploy.commitSha || '').slice(0, 7) +
+          ').'
+        );
+      } else if (deploy?.message) {
+        setNotice(
+          'Saved locally. ' +
+          deploy.message
+        );
+      } else {
+        setNotice(
+          'Saved successfully at ' +
+          new Date().toLocaleTimeString() +
+          '.'
+        );
+      }
     } catch (error) {
       setNotice(`Save failed: ${error.message}`);
     } finally {
@@ -991,19 +1169,24 @@ function AdminShell() {
     const checks = [
       probe('Local API', API + '/api/health'),
       probe('Online API', ONLINE_API + '/api/health'),
+      probe('R2', API + '/api/r2/status'),
+      probe('GitHub App', API + '/api/github-app/status'),
+      probe('Local AI', API + '/api/ai-status'),
     ];
-
-    checks.push(probe('Local AI', API + '/api/ai-status'));
 
     const results = await Promise.all(checks);
     const local = results[0];
     const online = results[1];
-    const ai = results[2];
+    const r2 = results[2];
+    const github = results[3];
+    const ai = results[4];
 
     setServiceStatus({
       local,
       ai,
       online,
+      r2,
+      github,
       checkedAt: new Date().toISOString(),
     });
     setServiceLoading(false);
@@ -1323,6 +1506,8 @@ function AdminShell() {
               r2Loading={r2Loading}
               loadR2Objects={loadR2Objects}
               openR2Object={openR2Object}
+              deleteR2Object={deleteR2Object}
+              githubStatus={serviceStatus.github}
             />
           )}
 
@@ -1383,6 +1568,8 @@ function AdminShell() {
               removeItem={removeItem}
               moveItem={moveItem}
               duplicateItem={duplicateItem}
+              uploadRepositoryMedia={uploadRepositoryMedia}
+              setNotice={setNotice}
             />
           )}
 
@@ -1397,6 +1584,8 @@ function AdminShell() {
               removeItem={removeItem}
               moveItem={moveItem}
               duplicateItem={duplicateItem}
+              uploadRepositoryMedia={uploadRepositoryMedia}
+              setNotice={setNotice}
             />
           )}
 
@@ -1490,6 +1679,8 @@ function CardEditor({
   removeItem,
   moveItem,
   duplicateItem,
+  uploadRepositoryMedia,
+  setNotice,
 }) {
   return (
     <section className="collection">
@@ -1507,7 +1698,7 @@ function CardEditor({
             const open = expanded === `${section}-${index}`;
             return (
               <ItemEditorCard
-                key={`${item.id || item.title || 'item'}-${index}`}
+                key={`${section}-${index}`}
                 item={item}
                 open={open}
                 onToggle={() => setExpanded(open ? null : `${section}-${index}`)}
@@ -1517,6 +1708,13 @@ function CardEditor({
                 onMoveDown={() => moveItem(section, index, 1)}
                 onDuplicate={() => duplicateItem(section, index)}
                 section={section}
+                repositoryFolder={
+                  section === 'certifications'
+                    ? 'certs'
+                    : 'portfolio-media/' + section
+                }
+                uploadRepositoryMedia={uploadRepositoryMedia}
+                setNotice={setNotice}
               />
             );
           })}
@@ -1536,6 +1734,9 @@ function ItemEditorCard({
   onMoveDown,
   onDuplicate,
   section,
+  repositoryFolder,
+  uploadRepositoryMedia,
+  setNotice,
 }) {
   return (
     <article className={open ? 'editor-card open' : 'editor-card'}>
@@ -1563,6 +1764,9 @@ function ItemEditorCard({
           <MediaListEditor
             media={Array.isArray(item.media) ? item.media : []}
             onChange={(value) => onChange('media', value)}
+            repositoryFolder={repositoryFolder}
+            uploadRepositoryMedia={uploadRepositoryMedia}
+            setNotice={setNotice}
           />
           <div className="editor-card-actions">
             <button className="ghost small" onClick={onMoveUp}>↑ Move up</button>
@@ -1586,6 +1790,8 @@ function ExperienceEditor({
   removeItem,
   moveItem,
   duplicateItem,
+  uploadRepositoryMedia,
+  setNotice,
 }) {
   return (
     <section className="collection">
@@ -1600,7 +1806,7 @@ function ExperienceEditor({
             const index = allItems.indexOf(item);
             const open = expanded === `experience-${index}`;
             return (
-              <article key={`${item.id || 'experience'}-${index}`} className={open ? 'editor-card open' : 'editor-card'}>
+              <article key={`experience-${index}`} className={open ? 'editor-card open' : 'editor-card'}>
                 <button className="editor-card-head" onClick={() => setExpanded(open ? null : `experience-${index}`)}>
                   <div>
                     <small>{item.company || 'Company'}</small>
@@ -1626,6 +1832,9 @@ function ExperienceEditor({
                   <MediaListEditor
                     media={Array.isArray(item.media) ? item.media : []}
                     onChange={(value) => updateItem('experience', index, 'media', value)}
+                    repositoryFolder="portfolio-media/experience"
+                    uploadRepositoryMedia={uploadRepositoryMedia}
+                    setNotice={setNotice}
                   />
                   <div className="editor-card-actions">
                     <button className="ghost small" onClick={() => moveItem('experience', index, -1)}>↑ Move up</button>
@@ -1667,7 +1876,7 @@ function EducationEditor({
             const index = allItems.indexOf(item);
             const open = expanded === `education-${index}`;
             return (
-              <article key={`${item.id || 'education'}-${index}`} className={open ? 'editor-card open' : 'editor-card'}>
+              <article key={`education-${index}`} className={open ? 'editor-card open' : 'editor-card'}>
                 <button className="editor-card-head" onClick={() => setExpanded(open ? null : `education-${index}`)}>
                   <div>
                     <small>{item.school || 'School'}</small>
@@ -1710,7 +1919,7 @@ function ExploreEditor({ items, addItem, update, remove }) {
 
       <div className="explore-editor-list">
         {items.map((item, index) => (
-          <div className="explore-row" key={`${item}-${index}`}>
+          <div className="explore-row" key={`explore-${index}`}>
             <span>{String(index + 1).padStart(2, '0')}</span>
             <input value={item} onChange={(e) => update(index, e.target.value)} />
             <button className="delete-button compact" onClick={() => remove(index)}>×</button>
@@ -1728,7 +1937,7 @@ function StringListEditor({ items, onChange, placeholder, addLabel }) {
   return (
     <div className="string-list-editor">
       {values.map((value, index) => (
-        <div className="string-list-row" key={String(value) + '-' + index}>
+        <div className="string-list-row" key={`string-item-${index}`}>
           <input
             value={value || ''}
             placeholder={placeholder}
@@ -1838,6 +2047,14 @@ function WriteupsEditor({
               <small>WRITEUP / {activeWriteup.status || 'DRAFT'}</small>
               <h2>{activeWriteup.title || 'Untitled CTF writeup'}</h2>
               <span>/ctf-blog/{activeWriteup.slug || 'writeup-slug'}</span>
+              <small className="writeup-publish-status">
+                GitHub App:{' '}
+                {githubStatus?.ok
+                  ? 'connected'
+                  : githubStatus?.status
+                    ? 'not ready'
+                    : 'run diagnostics'}
+              </small>
             </div>
             <div className="writeup-editor-actions">
               <button className="ghost" onClick={() => setActiveWriteup(null)} disabled={saving || publishing}>Back</button>
@@ -1845,7 +2062,11 @@ function WriteupsEditor({
                 {saving ? 'Saving...' : 'Save draft'}
               </button>
               <button className="save" onClick={publish} disabled={saving || publishing || !activeWriteup.title?.trim()}>
-                {publishing ? 'Publishing...' : 'Publish'}
+                {publishing
+                  ? 'Publishing...'
+                  : githubStatus?.ok
+                    ? 'Publish & push'
+                    : 'Publish'}
               </button>
             </div>
           </div>
@@ -2750,6 +2971,8 @@ function WriteupR2MediaTab({
   r2Loading,
   loadR2Objects,
   openR2Object,
+  deleteR2Object,
+  githubStatus,
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(null);
@@ -2846,6 +3069,13 @@ function WriteupR2MediaTab({
                 >
                   Open
                 </button>
+                <button
+                  className="delete-button compact"
+                  type="button"
+                  onClick={() => deleteR2Object(item.key)}
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))
@@ -2873,12 +3103,22 @@ function WriteupPreviewData({ writeup }) {
   );
 }
 
-function MediaListEditor({ media, onChange }) {
+function MediaListEditor({
+  media,
+  onChange,
+  repositoryFolder = 'portfolio-media',
+  uploadRepositoryMedia,
+  setNotice,
+}) {
   const items = Array.isArray(media) ? media : [];
+  const [uploadingIndex, setUploadingIndex] = useState(null);
 
   function update(index, field, value) {
     const next = clone(items);
-    next[index] = { ...(next[index] || {}), [field]: value };
+    next[index] = {
+      ...(next[index] || {}),
+      [field]: value,
+    };
     onChange(next);
   }
 
@@ -2886,38 +3126,207 @@ function MediaListEditor({ media, onChange }) {
     onChange(items.filter((_, i) => i !== index));
   }
 
+  async function upload(index, file) {
+    if (!file || !uploadRepositoryMedia) return;
+
+    setUploadingIndex(index);
+
+    try {
+      const result = await uploadRepositoryMedia(
+        file,
+        repositoryFolder
+      );
+
+      const next = clone(items);
+      next[index] = {
+        ...(next[index] || {}),
+        type: result.type || next[index]?.type || 'image',
+        title: next[index]?.title || file.name,
+        src: result.publicPath || next[index]?.src || '',
+        url: result.publicPath || next[index]?.url || '',
+        alt: next[index]?.alt || file.name,
+        repoPath: result.path || '',
+        previewUrl: result.rawUrl || '',
+        mimeType: result.mimeType || file.type || '',
+      };
+
+      onChange(next);
+
+      setNotice?.(
+        'Uploaded ' +
+        file.name +
+        ' to ' +
+        (result.publicPath || repositoryFolder)
+      );
+    } catch (error) {
+      setNotice?.(
+        'Repository media upload failed: ' +
+        error.message
+      );
+    } finally {
+      setUploadingIndex(null);
+    }
+  }
+
   return (
     <div className="media-editor">
       <div className="panel-head compact">
-        <div><small>ATTACHMENTS</small><h2>Media items</h2></div>
-        <button className="accent-button" type="button" onClick={() => onChange([
-          ...items,
-          { type: 'link', title: '', body: '', url: '', driveId: '', alt: '' },
-        ])}>+ Add media</button>
+        <div>
+          <small>ATTACHMENTS</small>
+          <h2>Media items</h2>
+        </div>
+        <button
+          className="accent-button"
+          type="button"
+          onClick={() => onChange([
+            ...items,
+            {
+              type: 'link',
+              title: '',
+              body: '',
+              url: '',
+              src: '',
+              driveId: '',
+              alt: '',
+            },
+          ])}
+        >
+          + Add media
+        </button>
       </div>
 
-      {!items.length && <div className="media-empty">No media attached. Add a link or use the Drive library.</div>}
+      <p className="helper media-repo-helper">
+        Upload an image or PDF directly into
+        <code>/public/{repositoryFolder}</code>
+        through the GitHub App.
+      </p>
+
+      {!items.length && (
+        <div className="media-empty">
+          No media attached. Add a link or upload a repository asset.
+        </div>
+      )}
 
       <div className="media-edit-list">
         {items.map((item, index) => (
-          <div className="media-edit-card" key={(item.title || 'media') + '-' + index}>
+          <div
+            className="media-edit-card"
+            key={'media-item-' + index}
+          >
             <div className="media-edit-grid">
               <label className="field">
                 <span>Type</span>
-                <select value={item.type || 'link'} onChange={(e) => update(index, 'type', e.target.value)}>
+                <select
+                  value={item.type || 'link'}
+                  onChange={(e) => update(index, 'type', e.target.value)}
+                >
                   <option value="link">Link</option>
                   <option value="image">Image</option>
                   <option value="video">Video</option>
                   <option value="pdf">PDF</option>
                 </select>
               </label>
-              <Field label="Title" value={item.title || ''} onChange={(v) => update(index, 'title', v)} />
-              <Field wide label="URL" value={item.url || ''} onChange={(v) => update(index, 'url', v)} />
-              <Field wide label="Drive file ID" value={item.driveId || ''} onChange={(v) => update(index, 'driveId', v)} />
-              <Field wide multiline label="Body / description" value={item.body || ''} onChange={(v) => update(index, 'body', v)} />
-              <Field wide label="Alt text" value={item.alt || ''} onChange={(v) => update(index, 'alt', v)} />
+
+              <Field
+                label="Title"
+                value={item.title || ''}
+                onChange={(v) => update(index, 'title', v)}
+              />
+
+              <Field
+                wide
+                label="Public / external URL"
+                value={item.url || item.src || ''}
+                onChange={(v) => {
+                  const next = clone(items);
+                  next[index] = {
+                    ...(next[index] || {}),
+                    url: v,
+                    src: v,
+                  };
+                  onChange(next);
+                }}
+              />
+
+              <Field
+                wide
+                label="Drive file ID"
+                value={item.driveId || ''}
+                onChange={(v) => update(index, 'driveId', v)}
+              />
+
+              <Field
+                wide
+                label="Repository path"
+                value={item.repoPath || ''}
+                onChange={() => {}}
+                readOnly
+              />
+
+              <Field
+                wide
+                multiline
+                label="Body / description"
+                value={item.body || ''}
+                onChange={(v) => update(index, 'body', v)}
+              />
+
+              <Field
+                wide
+                label="Alt text"
+                value={item.alt || ''}
+                onChange={(v) => update(index, 'alt', v)}
+              />
             </div>
-            <button className="delete-button compact" type="button" onClick={() => remove(index)}>Remove media</button>
+
+            <div className="media-repo-actions">
+              <label className="ghost file-button">
+                {uploadingIndex === index
+                  ? 'Uploading...'
+                  : 'Upload image / PDF to repo'}
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  disabled={uploadingIndex !== null}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    await upload(index, file);
+                  }}
+                />
+              </label>
+
+              {(item.previewUrl || item.src) && (
+                <a
+                  className="ghost small"
+                  href={normalizeAdminAssetPath(item.previewUrl || item.src)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open / view
+                </a>
+              )}
+
+              <button
+                className="delete-button compact"
+                type="button"
+                onClick={() => remove(index)}
+              >
+                Remove media
+              </button>
+            </div>
+
+            {(item.previewUrl || item.src) && String(item.type).toLowerCase() === 'image' && (
+              <div className="media-inline-preview">
+                <img
+                  src={normalizeAdminAssetPath(item.previewUrl || item.src)}
+                  alt={item.alt || item.title || 'Uploaded media'}
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -2925,6 +3334,19 @@ function MediaListEditor({ media, onChange }) {
   );
 }
 
+function normalizeAdminAssetPath(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (
+    raw.startsWith('http://') ||
+    raw.startsWith('https://') ||
+    raw.startsWith('data:') ||
+    raw.startsWith('blob:')
+  ) return raw;
+  return raw.startsWith('/')
+    ? raw
+    : '/' + raw.replace(/^\.?\//, '');
+}
 function DashboardEditor({
   content,
   validation,
@@ -2991,6 +3413,7 @@ function DashboardEditor({
         <div className="service-list">
           {[
             ['local', 'Local API'],
+            ['r2', 'Cloudflare R2'],
             ['ai', 'Local AI'],
             ['online', 'Online Vercel API'],
           ].map(([key, label]) => (
@@ -3049,6 +3472,7 @@ function ServiceRow({ label, item }) {
         {item.status > 0 && <small>{item.status} · {item.latency} ms</small>}
         {item.error && <small>{item.error}</small>}
         {item.data?.chatbot !== undefined && <small>Chatbot: {item.data.chatbot ? 'configured' : 'missing'}</small>}
+        {item.data?.repository && <small>{item.data.repository}{item.data.branch ? ' · ' + item.data.branch : ''}</small>}
       </div>
     </div>
   );
@@ -3128,7 +3552,7 @@ function SystemEditor({
     <div className="system-grid">
       <section className="panel">
         <PanelHeader eyebrow="RUNTIME" title="Service diagnostics" />
-        <div className="service-list">{[['local', 'Local API'], ['ai', 'Local AI'], ['online', 'Online API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
+        <div className="service-list">{[['local', 'Local API'], ['r2', 'Cloudflare R2'], ['github', 'GitHub App'], ['ai', 'Local AI'], ['online', 'Online API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
         <button className="accent-button" onClick={refreshSystem} disabled={serviceLoading}>{serviceLoading ? 'Checking...' : 'Run diagnostic'}</button>
         {serviceStatus.checkedAt && <small className="system-note">Checked {new Date(serviceStatus.checkedAt).toLocaleString()}</small>}
       </section>
@@ -3168,14 +3592,30 @@ function PanelHeader({ eyebrow, title, compact = false }) {
   );
 }
 
-function Field({ label, value, onChange, multiline = false, wide = false }) {
+function Field({
+  label,
+  value,
+  onChange,
+  multiline = false,
+  wide = false,
+  readOnly = false,
+}) {
   return (
     <label className={wide ? 'field wide' : 'field'}>
       <span>{label}</span>
       {multiline ? (
-        <textarea rows={5} value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+        <textarea
+          rows={5}
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          readOnly={readOnly}
+        />
       ) : (
-        <input value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+        <input
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          readOnly={readOnly}
+        />
       )}
     </label>
   );

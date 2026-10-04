@@ -12,62 +12,6 @@ import './responsive.css';
 
 const API = import.meta.env.VITE_API_BASE_URL || '';
 
-const ANONYMOUS_DEVICE_KEY = 'portfolio-anonymous-device-id';
-const ANONYMOUS_SESSION_KEY = 'portfolio-comment-session-id';
-
-function getAnonymousIdentity() {
-  let deviceId = '';
-  let sessionId = '';
-
-  try {
-    deviceId =
-      localStorage.getItem(ANONYMOUS_DEVICE_KEY) || '';
-
-    if (!deviceId) {
-      deviceId =
-        globalThis.crypto?.randomUUID?.() ||
-        `anon-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
-
-      localStorage.setItem(
-        ANONYMOUS_DEVICE_KEY,
-        deviceId
-      );
-    }
-
-    sessionId =
-      sessionStorage.getItem(ANONYMOUS_SESSION_KEY) ||
-      '';
-
-    if (!sessionId) {
-      sessionId =
-        globalThis.crypto?.randomUUID?.() ||
-        `session-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
-
-      sessionStorage.setItem(
-        ANONYMOUS_SESSION_KEY,
-        sessionId
-      );
-    }
-  } catch {
-    deviceId =
-      globalThis.crypto?.randomUUID?.() ||
-      `anon-${Date.now()}`;
-
-    sessionId =
-      globalThis.crypto?.randomUUID?.() ||
-      `session-${Date.now()}`;
-  }
-
-  return {
-    deviceId,
-    sessionId,
-  };
-}
-
 const GAMES =
   import.meta.env.VITE_GAMES_URL ||
   'https://YOUR-GAMES-REPO.github.io/';
@@ -136,6 +80,40 @@ function normalizeAssetPath(value) {
   }
 
   return normalized;
+}
+
+function resolvePortfolioMediaSrc(media) {
+  if (!media || typeof media !== 'object') {
+    return '';
+  }
+
+  const direct =
+    media.src ||
+    media.url ||
+    media.local ||
+    '';
+
+  const normalized =
+    normalizeAssetPath(direct);
+
+  if (normalized) {
+    return normalized;
+  }
+
+  const driveId =
+    media.driveId ||
+    media.googleDriveId ||
+    '';
+
+  if (driveId && API) {
+    return (
+      API +
+      '/api/drive/image/' +
+      encodeURIComponent(driveId)
+    );
+  }
+
+  return '';
 }
 
 function normalizeContent(data) {
@@ -273,14 +251,40 @@ function Modal({ item, type, close }) {
 
         <section>
           <div className="preview">
-            {media[0].type === 'image' ? (
-              <img
-                src={normalizeAssetPath(media[0].src)}
-                alt={
-                  media[0].title ||
-                  item.title
-                }
-              />
+            {media[0].type === 'image' &&
+            resolvePortfolioMediaSrc(media[0]) ? (
+              <a
+                className="modal-image-link"
+                href={resolvePortfolioMediaSrc(media[0])}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <img
+                  src={resolvePortfolioMediaSrc(media[0])}
+                  alt={
+                    media[0].title ||
+                    item.title
+                  }
+                  loading="lazy"
+                />
+              </a>
+            ) : String(media[0].type || '').toLowerCase() === 'pdf' &&
+              resolvePortfolioMediaSrc(media[0]) ? (
+              <div className="modal-file-preview">
+                <Sparkles />
+                <h2>
+                  {media[0].title ||
+                    item.title}
+                </h2>
+                <a
+                  className="modal-file-link"
+                  href={resolvePortfolioMediaSrc(media[0])}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open certificate PDF
+                </a>
+              </div>
             ) : (
               <div>
                 <Sparkles />
@@ -1148,7 +1152,7 @@ function HiringPortfolioView({
             (media) =>
               media &&
               media.type === 'image' &&
-              media.src
+              (media.src || media.url || media.local)
           )
           .map((media) => ({
             ...media,
@@ -1592,9 +1596,7 @@ function HiringPortfolioView({
                     className="hiring-media-card"
                   >
                     <img
-                      src={normalizeAssetPath(
-                        media.src
-                      )}
+                      src={resolvePortfolioMediaSrc(media)}
                       alt={
                         media.title ||
                         media.itemTitle
