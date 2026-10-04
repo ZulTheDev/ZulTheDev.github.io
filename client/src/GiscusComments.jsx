@@ -4,6 +4,8 @@ import Giscus from '@giscus/react';
 const API = import.meta.env.VITE_API_BASE_URL || '';
 const COMMENTS_BACKUP_API =
   import.meta.env.VITE_COMMENTS_BACKUP_URL || '';
+const LOCAL_COMMENT_FALLBACK_ENABLED =
+  import.meta.env.VITE_ALLOW_LOCAL_COMMENT_FALLBACK === 'true';
 
 function commentApiCandidates() {
   return [
@@ -243,6 +245,14 @@ export default function GiscusComments({ discussionTerm }) {
       }
     }
 
+    if (!LOCAL_COMMENT_FALLBACK_ENABLED) {
+      setComments([]);
+      setReplyCount(0);
+      setNotice('Shared comment service is unavailable. Your comment was not saved.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const saved = JSON.parse(
         localStorage.getItem(
@@ -361,6 +371,11 @@ export default function GiscusComments({ discussionTerm }) {
       } catch {
         // Try the backup backend.
       }
+    }
+
+    if (!LOCAL_COMMENT_FALLBACK_ENABLED) {
+      setNotice('Shared comment service is unavailable. Your comment was not deleted.');
+      return;
     }
 
     try {
@@ -485,7 +500,7 @@ export default function GiscusComments({ discussionTerm }) {
       throw new Error('edit_failed');
     } catch {
       setNotice(
-        'Unable to edit the comment right now.'
+        'Shared comment service is unavailable. Your edit was not saved.'
       );
     } finally {
       setPosting(false);
@@ -644,6 +659,11 @@ export default function GiscusComments({ discussionTerm }) {
         'comment_api_unavailable'
       );
     } catch {
+      if (!LOCAL_COMMENT_FALLBACK_ENABLED) {
+        setNotice('Shared comment service is unavailable. Your comment was not saved.');
+        return;
+      }
+
       try {
         const nextComment = {
           id: createId(),
