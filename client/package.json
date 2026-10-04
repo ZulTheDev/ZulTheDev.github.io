@@ -1,9 +1,9 @@
 {
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@giscus/react": "^3.1.0",
@@ -11,8 +11,6 @@
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "vite": "latest",
-    "astro": "^7.3.5",
-    "@astrojs/react": "^7.0.0"
+    "vite": "latest"
   }
 }
