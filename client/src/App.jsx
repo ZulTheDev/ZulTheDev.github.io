@@ -2750,9 +2750,9 @@ export default function App({ initialContent = null }) {
     ctfPath === '/ctf-blog/' ||
     ctfPath.startsWith('/ctf-blog/');
 
-  const [page, setPage] = useState(
-    currentLocation.hash.slice(1) || 'home'
-  );
+  // Keep the first render deterministic for Astro SSR.
+  // The real hash is applied immediately after hydration.
+  const [page, setPage] = useState('home');
 
   /* ---------------------------------------------
      LOAD CONTENT
@@ -2854,6 +2854,8 @@ export default function App({ initialContent = null }) {
       'hashchange',
       handleHashChange
     );
+
+    handleHashChange();
 
     return () => {
       mounted = false;
