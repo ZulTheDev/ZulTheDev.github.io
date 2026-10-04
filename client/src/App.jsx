@@ -1022,7 +1022,6 @@ function HiringPortfolioView({
   const [status, setStatus] =
     useState('Selecting relevant evidence…');
   const [selected, setSelected] = useState(null);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -2724,6 +2723,7 @@ export default function App({ initialContent = null }) {
   );
   const [loadProgress, setLoadProgress] = useState(initialContent ? 100 : 8);
   const [selected, setSelected] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const currentLocation =
     typeof window !== 'undefined'
