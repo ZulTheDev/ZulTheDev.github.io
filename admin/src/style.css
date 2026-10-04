@@ -326,3 +326,173 @@ button{color:inherit}
 .media-repo-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .media-inline-preview{margin-top:12px;border:1px solid var(--line);border-radius:10px;background:#100d15;padding:8px;max-width:720px}
 .media-inline-preview img{display:block;width:auto;max-width:100%;max-height:360px;margin:0 auto;border-radius:7px}
+
+/* =========================================================
+   KO-FI / BUY-FIRST ADMIN
+========================================================= */
+
+.buy-first-admin-grid{
+  display:grid;
+  gap:18px;
+}
+
+.buy-first-admin-note,
+.buy-first-webhook-help{
+  display:flex;
+  gap:11px;
+  align-items:flex-start;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:14px;
+  background:#16111b;
+  color:var(--muted);
+}
+
+.buy-first-admin-note svg,
+.buy-first-webhook-help svg{
+  color:var(--primary);
+  flex:0 0 auto;
+  margin-top:2px;
+}
+
+.buy-first-admin-note div,
+.buy-first-webhook-help div{
+  display:grid;
+  gap:5px;
+}
+
+.buy-first-admin-note strong,
+.buy-first-webhook-help strong{
+  color:var(--text);
+  font-size:12px;
+}
+
+.buy-first-admin-note span,
+.buy-first-webhook-help span{
+  line-height:1.6;
+  font-size:11px;
+}
+
+.buy-first-admin-list{
+  display:grid;
+  gap:14px;
+}
+
+.buy-first-admin-card{
+  border:1px solid var(--line);
+  border-radius:15px;
+  padding:16px;
+  background:linear-gradient(145deg,#19131f,#110e15);
+}
+
+.buy-first-admin-card-head{
+  display:flex;
+  gap:15px;
+  justify-content:space-between;
+  align-items:flex-start;
+  margin-bottom:14px;
+}
+
+.buy-first-admin-card-head>div{
+  display:grid;
+  gap:4px;
+}
+
+.buy-first-admin-card-head strong{
+  color:var(--text);
+}
+
+.buy-first-admin-card .form-grid{
+  margin-top:0;
+}
+
+.buy-first-active-toggle{
+  display:flex;
+  gap:9px;
+  align-items:center;
+  margin-top:12px;
+  color:var(--muted);
+  font-size:11px;
+}
+
+.buy-first-active-toggle input{
+  accent-color:var(--primary);
+}
+
+.kofi-payment-list{
+  display:grid;
+  gap:10px;
+  margin-top:15px;
+}
+
+.kofi-payment-card{
+  display:grid;
+  grid-template-columns:1fr auto auto;
+  gap:8px 14px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  padding:12px;
+  background:#120e17;
+}
+
+.kofi-payment-card>div{
+  display:grid;
+  gap:3px;
+}
+
+.kofi-payment-card strong{
+  color:var(--text);
+  font-size:12px;
+}
+
+.kofi-payment-card small{
+  color:var(--muted);
+  text-transform:none;
+  letter-spacing:0;
+  font-size:9px;
+  overflow-wrap:anywhere;
+}
+
+.kofi-payment-card p{
+  grid-column:1/-1;
+  margin:0;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.5;
+}
+
+.kofi-payment-card>small{
+  align-self:center;
+}
+
+.buy-first-webhook-help{
+  margin-top:15px;
+}
+
+.buy-first-webhook-help a{
+  display:inline-flex;
+  gap:5px;
+  align-items:center;
+  color:var(--primary);
+  font-size:11px;
+  text-decoration:none;
+  margin-top:2px;
+}
+
+.buy-first-webhook-help code{
+  color:var(--text);
+}
+
+@media(max-width:850px){
+  .kofi-payment-card{
+    grid-template-columns:1fr auto;
+  }
+
+  .kofi-payment-card>small{
+    grid-column:1/-1;
+  }
+
+  .buy-first-admin-card-head{
+    display:grid;
+  }
+}
