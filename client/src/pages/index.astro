@@ -5,7 +5,8 @@ import PortfolioApp from '../App.jsx';
 import '../style.css';
 import '../responsive.css';
 
-const contentPath = path.resolve(process.cwd(), 'public/content.json');
+const projectRoot = process.env.INIT_CWD || process.cwd();
+const contentPath = path.resolve(projectRoot, 'public/content.json');
 const initialContent = JSON.parse(fs.readFileSync(contentPath, 'utf8'));
 ---
 <!doctype html>
