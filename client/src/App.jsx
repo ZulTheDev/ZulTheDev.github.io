@@ -1,11 +1,10 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 const GiscusComments = lazy(() => import('./GiscusComments'));
 
 function DeferredComments(props) {
   return (
     <Suspense fallback={<div className="comments-loading" aria-hidden="true">Loading discussion…</div>}>
-      <GiscusComments {...props} />
+      <DeferredComments {...props} />
     </Suspense>
   );
 }
@@ -413,7 +412,7 @@ function ExpModal({ x, close }) {
               GISCUS EXPERIENCE DISCUSSION
           ----------------------------------------- */}
 
-          <GiscusComments
+          <DeferredComments
             discussionTerm={`portfolio:experience-${x.id}`}
           />
         </div>
@@ -2710,7 +2709,7 @@ function CTFWriteupView({ slug }) {
           />
 
           <section className="writeup-discussion">
-            <GiscusComments
+            <DeferredComments
               discussionTerm={
                 'ctf-blog:' +
                 slug
