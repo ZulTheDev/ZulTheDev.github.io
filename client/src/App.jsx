@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import GiscusComments from './GiscusComments';
+import MonetizationSection from './Monetization.jsx';
 import {
   ArrowUpRight,
   ChevronRight,
@@ -148,6 +149,7 @@ function normalizeContent(data) {
     research: Array.isArray(source.research) ? source.research : [],
     experience: Array.isArray(source.experience) ? source.experience : [],
     education: Array.isArray(source.education) ? source.education : [],
+    buyFirst: Array.isArray(source.buyFirst) ? source.buyFirst : [],
   };
 }
 
@@ -3062,6 +3064,7 @@ export default function App({ initialContent = null }) {
             'awards',
             'projects',
             'experience',
+            'buy-first',
             'contact',
           ].map((item) => (
             <a
@@ -3445,6 +3448,16 @@ export default function App({ initialContent = null }) {
             )}
           </div>
         </section>
+
+        {/* =================================================
+            SUPPORT / BUY-FIRST
+        ================================================= */}
+
+        <MonetizationSection
+          cards={content.buyFirst}
+          kofiUrl={content.settings?.kofiUrl || ''}
+          apiBase={API || import.meta.env.VITE_COMMENTS_BACKUP_URL || ''}
+        />
 
         {/* =================================================
             CONTACT
