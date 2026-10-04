@@ -8,9 +8,5 @@ export default defineConfig({
   build: {
     inlineStylesheets: 'auto',
   },
-  prefetch: {
-    prefetchAll: false,
-    defaultStrategy: 'tap',
-  },
   integrations: [react()],
 });

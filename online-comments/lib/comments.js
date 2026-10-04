@@ -34,16 +34,14 @@ export function publicComment(item, ownerId) {
   };
 }
 
-export function countSessionReplies(
+export function countUserReplies(
   comments,
-  ownerId,
-  sessionId
+  ownerId
 ) {
   return comments.filter(
     (item) =>
       item.parentId &&
-      item.ownerId === ownerId &&
-      item.authorSessionId === sessionId
+      item.ownerId === ownerId
   ).length;
 }
 

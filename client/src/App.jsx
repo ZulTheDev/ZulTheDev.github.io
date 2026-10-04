@@ -1,77 +1,13 @@
-import React, { lazy, Suspense, useEffect, useState } from 'react';
-const GiscusComments = lazy(() => import('./GiscusComments'));
-
-function DeferredComments(props) {
-  return (
-    <Suspense fallback={<div className="comments-loading" aria-hidden="true">Loading discussion…</div>}>
-      <DeferredComments {...props} />
-    </Suspense>
-  );
-}
+import React, { useEffect, useState } from 'react';
+import GiscusComments from './GiscusComments';
 import {
   ArrowUpRight,
   ChevronRight,
   X,
+  Menu,
   Sparkles,
 } from 'lucide-react';
-
 const API = import.meta.env.VITE_API_BASE_URL || '';
-
-const ANONYMOUS_DEVICE_KEY = 'portfolio-anonymous-device-id';
-const ANONYMOUS_SESSION_KEY = 'portfolio-comment-session-id';
-
-function getAnonymousIdentity() {
-  let deviceId = '';
-  let sessionId = '';
-
-  try {
-    deviceId =
-      localStorage.getItem(ANONYMOUS_DEVICE_KEY) || '';
-
-    if (!deviceId) {
-      deviceId =
-        globalThis.crypto?.randomUUID?.() ||
-        `anon-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
-
-      localStorage.setItem(
-        ANONYMOUS_DEVICE_KEY,
-        deviceId
-      );
-    }
-
-    sessionId =
-      sessionStorage.getItem(ANONYMOUS_SESSION_KEY) ||
-      '';
-
-    if (!sessionId) {
-      sessionId =
-        globalThis.crypto?.randomUUID?.() ||
-        `session-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
-
-      sessionStorage.setItem(
-        ANONYMOUS_SESSION_KEY,
-        sessionId
-      );
-    }
-  } catch {
-    deviceId =
-      globalThis.crypto?.randomUUID?.() ||
-      `anon-${Date.now()}`;
-
-    sessionId =
-      globalThis.crypto?.randomUUID?.() ||
-      `session-${Date.now()}`;
-  }
-
-  return {
-    deviceId,
-    sessionId,
-  };
-}
 
 const GAMES =
   import.meta.env.VITE_GAMES_URL ||
@@ -141,6 +77,40 @@ function normalizeAssetPath(value) {
   }
 
   return normalized;
+}
+
+function resolvePortfolioMediaSrc(media) {
+  if (!media || typeof media !== 'object') {
+    return '';
+  }
+
+  const direct =
+    media.src ||
+    media.url ||
+    media.local ||
+    '';
+
+  const normalized =
+    normalizeAssetPath(direct);
+
+  if (normalized) {
+    return normalized;
+  }
+
+  const driveId =
+    media.driveId ||
+    media.googleDriveId ||
+    '';
+
+  if (driveId && API) {
+    return (
+      API +
+      '/api/drive/image/' +
+      encodeURIComponent(driveId)
+    );
+  }
+
+  return '';
 }
 
 function normalizeContent(data) {
@@ -278,14 +248,40 @@ function Modal({ item, type, close }) {
 
         <section>
           <div className="preview">
-            {media[0].type === 'image' ? (
-              <img
-                src={normalizeAssetPath(media[0].src)}
-                alt={
-                  media[0].title ||
-                  item.title
-                }
-              />
+            {media[0].type === 'image' &&
+            resolvePortfolioMediaSrc(media[0]) ? (
+              <a
+                className="modal-image-link"
+                href={resolvePortfolioMediaSrc(media[0])}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <img
+                  src={resolvePortfolioMediaSrc(media[0])}
+                  alt={
+                    media[0].title ||
+                    item.title
+                  }
+                  loading="lazy"
+                />
+              </a>
+            ) : String(media[0].type || '').toLowerCase() === 'pdf' &&
+              resolvePortfolioMediaSrc(media[0]) ? (
+              <div className="modal-file-preview">
+                <Sparkles />
+                <h2>
+                  {media[0].title ||
+                    item.title}
+                </h2>
+                <a
+                  className="modal-file-link"
+                  href={resolvePortfolioMediaSrc(media[0])}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open certificate PDF
+                </a>
+              </div>
             ) : (
               <div>
                 <Sparkles />
@@ -318,7 +314,7 @@ function Modal({ item, type, close }) {
               GISCUS DISCUSSION
           ----------------------------------------- */}
 
-          <DeferredComments
+          <GiscusComments
             discussionTerm={`portfolio:${item.id}`}
           />
         </section>
@@ -412,7 +408,7 @@ function ExpModal({ x, close }) {
               GISCUS EXPERIENCE DISCUSSION
           ----------------------------------------- */}
 
-          <DeferredComments
+          <GiscusComments
             discussionTerm={`portfolio:experience-${x.id}`}
           />
         </div>
@@ -783,9 +779,6 @@ function ProfilePhoto({ profile }) {
           className="hero-photo"
           src={src}
           alt={`${profile?.name || 'Zulfaqar Jamal'} profile`}
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
           onError={() => {
             setSourceIndex((current) => {
               const next = current + 1;
@@ -1156,7 +1149,7 @@ function HiringPortfolioView({
             (media) =>
               media &&
               media.type === 'image' &&
-              media.src
+              (media.src || media.url || media.local)
           )
           .map((media) => ({
             ...media,
@@ -1600,9 +1593,7 @@ function HiringPortfolioView({
                     className="hiring-media-card"
                   >
                     <img
-                      src={normalizeAssetPath(
-                        media.src
-                      )}
+                      src={resolvePortfolioMediaSrc(media)}
                       alt={
                         media.title ||
                         media.itemTitle
@@ -2709,7 +2700,7 @@ function CTFWriteupView({ slug }) {
           />
 
           <section className="writeup-discussion">
-            <DeferredComments
+            <GiscusComments
               discussionTerm={
                 'ctf-blog:' +
                 slug
@@ -2726,19 +2717,20 @@ function CTFWriteupView({ slug }) {
    MAIN APPLICATION
 ========================================================= */
 
-function App({ initialContent = null }) {
-  const [content, setContent] = useState(() =>
+export default function App({ initialContent = null }) {
+  const [content, setContent] = useState(
     initialContent ? normalizeContent(initialContent) : null
   );
-  const [loadProgress, setLoadProgress] = useState(8);
+  const [loadProgress, setLoadProgress] = useState(initialContent ? 100 : 8);
   const [selected, setSelected] = useState(null);
 
-  const currentPath =
+  const currentLocation =
     typeof window !== 'undefined'
-      ? window.location.pathname
-      : '/';
+      ? window.location
+      : { pathname: '', hash: '', search: '' };
 
-  const ctfPath = currentPath.replace(/\/+$/, '');
+  const ctfPath =
+    currentLocation.pathname.replace(/\/+$/, '');
 
   const isCtfRoute =
     ctfPath === '/ctf-blog' ||
@@ -2753,8 +2745,7 @@ function App({ initialContent = null }) {
       return;
     }
 
-    const send = () => {
-      fetch(`${API}/api/access/track`, {
+    fetch(`${API}/api/access/track`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2763,25 +2754,13 @@ function App({ initialContent = null }) {
         deviceId,
         sessionId,
       }),
-      keepalive: true,
-      }).catch(() => {
-        // Anonymous access tracking is best-effort.
-      });
-    };
-
-    if ('requestIdleCallback' in globalThis) {
-      const id = globalThis.requestIdleCallback(send, { timeout: 2500 });
-      return () => globalThis.cancelIdleCallback(id);
-    }
-
-    const id = globalThis.setTimeout(send, 1200);
-    return () => globalThis.clearTimeout(id);
+    }).catch(() => {
+      // Anonymous access tracking is best-effort.
+    });
   }, [isCtfRoute]);
 
   const [page, setPage] = useState(
-    (typeof window !== 'undefined'
-      ? window.location.hash.slice(1)
-      : '') || 'home'
+    currentLocation.hash.slice(1) || 'home'
   );
 
   /* ---------------------------------------------
@@ -2797,9 +2776,7 @@ function App({ initialContent = null }) {
 
     const loadContent = async () => {
       try {
-        if (initialContent) {
-          setLoadProgress(100);
-        } else {
+        if (!initialContent) {
           setLoadProgress(18);
         }
 
@@ -2807,65 +2784,45 @@ function App({ initialContent = null }) {
           ? null
           : await fetch('/content.json');
 
-        if (initialContent) {
-          if (API) {
-            try {
-              const apiResponse = await fetch(`${API}/api/content`);
-              if (apiResponse.ok) {
-                const apiData = await apiResponse.json();
-                if (mounted && apiData?.profile) {
-                  setContent(normalizeContent(apiData));
-                }
-              }
-            } catch {
-              // Keep using the build-time content.
-            }
+        if (!initialContent) {
+          if (!response.ok) {
+            throw new Error('content.json unavailable');
           }
-          return;
-        }
 
-        if (!response.ok) {
-          throw new Error('content.json unavailable');
-        }
+          setLoadProgress(42);
 
-        setLoadProgress(42);
+          const data = await response.json();
 
-        const data = await response.json();
+          setLoadProgress(68);
 
-        setLoadProgress(68);
-
-        if (mounted) {
-          setContent(normalizeContent(data));
+          if (mounted) {
+            setContent(normalizeContent(data));
+          }
         }
 
         /*
          * API is optional. Static content remains the fallback.
          */
         if (API) {
-          const refresh = async () => {
-            try {
-              const apiResponse = await fetch(
-                `${API}/api/content`,
-                { cache: 'no-store' }
-              );
+          try {
+            const apiResponse = await fetch(
+              `${API}/api/content`
+            );
 
-              if (apiResponse.ok) {
-                const apiData = await apiResponse.json();
+            if (apiResponse.ok) {
+              const apiData = await apiResponse.json();
 
-                if (mounted && apiData?.profile) {
-                  setLoadProgress(88);
-                  setContent(normalizeContent(apiData));
-                }
+              setLoadProgress(88);
+
+              if (
+                mounted &&
+                apiData?.profile
+              ) {
+                setContent(normalizeContent(apiData));
               }
-            } catch {
-              // Keep using the static content.
             }
-          };
-
-          if ('requestIdleCallback' in globalThis) {
-            globalThis.requestIdleCallback(refresh, { timeout: 3000 });
-          } else {
-            globalThis.setTimeout(refresh, 1500);
+          } catch {
+            // Keep using the static content.
           }
         }
 
@@ -2878,7 +2835,18 @@ function App({ initialContent = null }) {
       }
     };
 
-    loadContent();
+    if (initialContent) {
+      // Initial HTML already contains the static portfolio data.
+      // Refresh optional API content during idle time.
+      const run = () => loadContent();
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(run, { timeout: 2500 });
+      } else {
+        window.setTimeout(run, 1200);
+      }
+    } else {
+      loadContent();
+    }
 
     /* -------------------------------------------
        HASH ROUTING
@@ -2891,7 +2859,7 @@ function App({ initialContent = null }) {
       );
     };
 
-    addEventListener(
+    window.addEventListener(
       'hashchange',
       handleHashChange
     );
@@ -2899,7 +2867,7 @@ function App({ initialContent = null }) {
     return () => {
       mounted = false;
 
-      removeEventListener(
+      window.removeEventListener(
         'hashchange',
         handleHashChange
       );
@@ -2942,12 +2910,10 @@ function App({ initialContent = null }) {
   ======================================================= */
 
   const hiringPath =
-    currentPath.replace(/\/+$/, '') === '/port_resume';
+    currentLocation.pathname.replace(/\/+$/, '') === '/port_resume';
 
   if (hiringPath) {
-    const params = new URLSearchParams(
-      typeof window !== 'undefined' ? window.location.search : ''
-    );
+    const params = new URLSearchParams(currentLocation.search);
     const rawTarget =
       params.get('type_of_work_hiring') || '';
 
@@ -3070,14 +3036,32 @@ function App({ initialContent = null }) {
           NAVIGATION
       =================================================== */}
 
-      <nav>
-        <a href="#home">
+      <nav className={mobileNavOpen ? 'mobile-nav-open' : ''}>
+        <a
+          href="#home"
+          className="site-nav-brand"
+          onClick={() => setMobileNavOpen(false)}
+        >
           <b>
             ZUL<span>/</span>JAMAL
           </b>
         </a>
 
-        <div>
+        <button
+          type="button"
+          className="mobile-nav-toggle"
+          aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={mobileNavOpen}
+          aria-controls="mobile-site-navigation"
+          onClick={() => setMobileNavOpen((open) => !open)}
+        >
+          {mobileNavOpen ? <X size={25} /> : <Menu size={25} />}
+        </button>
+
+        <div
+          id="mobile-site-navigation"
+          className="site-nav-links"
+        >
           {[
             'home',
             'recent',
@@ -3090,24 +3074,27 @@ function App({ initialContent = null }) {
             <a
               key={item}
               href={`#${item}`}
+              onClick={() => setMobileNavOpen(false)}
             >
               {item}
             </a>
           ))}
         </div>
 
-        <a href="#explore">
-          Explore{' '}
-          <Sparkles size={13} />
-        </a>
+        <div className="site-nav-extra-links">
+          <a href="#explore" onClick={() => setMobileNavOpen(false)}>
+            Explore{' '}
+            <Sparkles size={13} />
+          </a>
 
-        <a href="#games">
-          Games
-        </a>
+          <a href="#games" onClick={() => setMobileNavOpen(false)}>
+            Games
+          </a>
 
-        <a href="/ctf-blog/">
-          CTF Blog
-        </a>
+          <a href="/ctf-blog/" onClick={() => setMobileNavOpen(false)}>
+            CTF Blog
+          </a>
+        </div>
       </nav>
 
       <main>
@@ -3551,5 +3538,3 @@ function App({ initialContent = null }) {
   );
 }
 
-
-export default App;

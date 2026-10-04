@@ -10,7 +10,7 @@ Do not attack, hack, scan, fuzz, overload, bypass, exploit, or attempt unauthori
 
 ## Services
 
-- Anonymous comments are stored online through the comments service.
+- Anonymous comments are stored online through the comments service. Each browser gets a persistent anonymous ownership token stored in a first-party cookie with local-storage backup, which lets the same browser return later to edit or delete its own comments. Replies are limited to 10 per anonymous browser identity for each discussion.
 - The AI portfolio assistant is available online through the hosted AI API.
 - AI chat history is kept only in the browser session. Refreshing keeps the current session; ending the browser session clears it. The AI service does not save the conversation.
 - The local chatbot follows Singapore Time (SGT, UTC+8): Monday–Friday 05:00–00:00, Saturday 24 hours, Sunday offline.
@@ -27,7 +27,7 @@ The hiring view is a professional, minimal version of the interactive portfolio.
 
 The local admin panel includes a dashboard with content-health validation, unsaved-change protection, browser-local draft recovery, JSON backup/import, public and hiring-view preview links, Google Drive media browsing, anonymous comment moderation, local/online service diagnostics, an online AI smoke test, and a hiring-filter relevance test. Collection editors support create, edit, duplicate, delete, reorder and structured media editing.
 
-The admin panel and its local API are intentionally unauthenticated and have no user roles. They are designed to run only on the local machine.
+The admin panel and its local API are intentionally unauthenticated and have no user roles. They are designed to run only on the local machine. GitHub access for publishing is handled separately by the local server's GitHub App service account.
 
 ## Development
 
@@ -95,16 +95,25 @@ The hosted public proxy uses the same Judge0 variables in the Vercel project. Ke
 
 #### Publishing
 
-Save a draft first. **Publish** writes the static JSON/index files into `client/public/ctf-blog/`. With `GIT_AUTO_PUSH=true`, the local server also commits that directory and pushes the configured branch; otherwise run your normal `git push` workflow yourself.
+Save a draft first. **Publish** writes the static JSON/index files into `client/public/ctf-blog/`. The preferred publishing path is a GitHub App installation used as the local admin's service account. The server requests a short-lived installation token when publishing, then creates the CTF files and updates the configured branch through GitHub's Git database API. Your personal GitHub password or long-lived personal access token is not stored by the admin.
+
+Create the GitHub App, install it only on this repository, grant the minimum repository permissions needed for the workflow, and keep the App private key in the local server's `.env` file. The expected variables are:
 
 ```env
-GIT_AUTO_PUSH=false
-GIT_REPO_ROOT=
-GIT_BRANCH=main
+GITHUB_APP_ID=
+GITHUB_INSTALLATION_ID=
+GITHUB_APP_PRIVATE_KEY=
+GITHUB_OWNER=ZulTheDev
+GITHUB_REPO=ZulTheDev.github.io
+GITHUB_BRANCH=main
+GITHUB_APP_AUTO_PUSH=false
 ```
 
-The generated CTF files are intentionally kept small and static so GitHub Pages can serve the writeups without requiring the local admin server to be online.
+Set `GITHUB_APP_AUTO_PUSH=true` after the App is installed and tested. The local admin's **Service diagnostics** panel checks the GitHub App connection. GitHub App authentication and installation-token behavior are documented by GitHub. urlGitHub Apps documentationhttps://docs.github.com/en/apps
 
+When `GITHUB_APP_AUTO_PUSH=true`, saving the main portfolio content also updates `client/public/content.json` in the repository. Portfolio card media can be uploaded directly from the admin; certification uploads are stored under `client/public/certs/`, while other collection media uses `client/public/portfolio-media/<section>/`. The admin stores the public `/certs/...` path in the content data and provides a GitHub raw preview so the uploaded image can be viewed immediately.
+
+The generated CTF files are intentionally kept small and static so GitHub Pages can serve the writeups without requiring the local admin server to be online.
 ### Admin
 
 ```powershell
