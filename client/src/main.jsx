@@ -8,6 +8,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import './style.css';
+import './responsive.css';
 
 const API = import.meta.env.VITE_API_BASE_URL || '';
 

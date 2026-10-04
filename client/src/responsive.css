@@ -1,0 +1,394 @@
+/* =========================================================
+   RESPONSIVE / MOBILE LAYOUT
+   UI-only overrides. No API, environment, or deployment
+   configuration is changed by this stylesheet.
+========================================================= */
+
+img,
+video,
+iframe,
+canvas {
+  max-width: 100%;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  touch-action: manipulation;
+}
+
+@media (max-width: 900px) {
+  nav {
+    padding: 12px 20px;
+    gap: 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  nav > div {
+    gap: 12px;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  nav > a {
+    flex: 0 0 auto;
+  }
+
+  nav > a:last-child {
+    margin-left: 0;
+  }
+
+  .hero,
+  section {
+    padding: 72px 24px;
+  }
+
+  .hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 38px;
+  }
+
+  .hero h1,
+  .explore h1 {
+    font-size: clamp(44px, 12vw, 72px);
+  }
+
+  .hero p {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  .heroart {
+    height: auto;
+    min-height: 280px;
+    font-size: 70px;
+  }
+
+  .tiles {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline button {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 20px 0;
+  }
+
+  .timeline button > small {
+    order: 3;
+  }
+
+  .bar {
+    width: 100%;
+  }
+
+  .contact {
+    grid-template-columns: 1fr;
+    gap: 45px;
+  }
+
+  .explore {
+    padding: 72px 24px;
+  }
+
+  .exploregrid {
+    grid-template-columns: 1fr;
+    margin-top: 30px;
+  }
+
+  .modal,
+  .expmodal {
+    width: min(94vw, 720px);
+    height: 92vh;
+    max-height: 92vh;
+    grid-template-columns: 1fr;
+  }
+
+  .modal aside {
+    max-height: 145px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--l);
+    padding: 15px;
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .modal aside h3,
+  .modal aside > small {
+    display: none;
+  }
+
+  .mi {
+    min-width: 145px;
+    margin-top: 0;
+  }
+
+  .modal section {
+    min-height: 0;
+    grid-template-rows: minmax(180px, 1fr) auto 110px;
+  }
+
+  .preview {
+    padding: 20px;
+    min-height: 180px;
+  }
+
+  .preview img,
+  .preview video {
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .desc {
+    padding: 0 20px 14px;
+    max-height: 180px;
+    overflow: auto;
+  }
+
+  .comments {
+    padding: 12px 20px;
+    overflow: auto;
+  }
+
+  .expmodal {
+    grid-template-columns: 1fr;
+  }
+
+  .expmedia {
+    min-height: 190px;
+    font-size: 60px;
+  }
+
+  .expbody {
+    padding: 30px 24px;
+  }
+
+  .back {
+    padding: 12px;
+  }
+
+  .chat {
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .cw {
+    position: fixed;
+    right: 14px;
+    bottom: 84px;
+    width: min(390px, calc(100vw - 28px));
+    height: min(560px, calc(100dvh - 110px));
+    max-height: calc(100dvh - 110px);
+  }
+
+  .games {
+    height: calc(100dvh - 58px);
+  }
+
+  .games iframe {
+    min-height: 100%;
+  }
+
+  .section-subhead {
+    margin-top: 45px;
+  }
+}
+
+@media (max-width: 600px) {
+  body {
+    font-size: 14px;
+    overflow-x: hidden;
+  }
+
+  nav {
+    padding: 11px 16px;
+    gap: 10px;
+  }
+
+  nav b {
+    font-size: 12px;
+  }
+
+  nav a {
+    font-size: 11px;
+  }
+
+  .hero,
+  section {
+    padding: 58px 18px;
+  }
+
+  .hero h1,
+  .explore h1 {
+    font-size: clamp(40px, 14vw, 58px);
+  }
+
+  .hero p {
+    font-size: 15px;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 46px;
+  }
+
+  .heroart {
+    min-height: 220px;
+  }
+
+  h2 {
+    font-size: clamp(34px, 11vw, 48px);
+    margin-bottom: 26px;
+  }
+
+  .tiles article,
+  .tile-button {
+    padding: 20px;
+  }
+
+  .card {
+    min-width: min(300px, 82vw);
+    min-height: 210px;
+    padding: 20px;
+  }
+
+  .rail {
+    margin-right: -18px;
+    padding-right: 18px;
+  }
+
+  .timeline button {
+    padding: 18px 0;
+  }
+
+  .contact h2 {
+    font-size: clamp(34px, 11vw, 48px);
+  }
+
+  .contact a {
+    gap: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  footer {
+    padding: 22px 18px;
+  }
+
+  .modal,
+  .expmodal {
+    width: 100%;
+    height: 94dvh;
+    max-height: 94dvh;
+    border-radius: 16px;
+  }
+
+  .modal aside {
+    max-height: 112px;
+    padding: 12px;
+  }
+
+  .mi {
+    min-width: 125px;
+    padding: 10px;
+  }
+
+  .modal section {
+    grid-template-rows: minmax(150px, 1fr) auto 100px;
+  }
+
+  .preview {
+    padding: 15px;
+  }
+
+  .desc {
+    padding: 0 16px 12px;
+    max-height: 145px;
+  }
+
+  .comments {
+    padding: 10px 16px;
+  }
+
+  .expmedia {
+    min-height: 145px;
+  }
+
+  .expbody {
+    padding: 24px 18px;
+  }
+
+  .x {
+    width: 34px;
+    height: 34px;
+    right: 10px;
+    top: 10px;
+  }
+
+  .chat {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .cat {
+    width: 56px;
+    height: 56px;
+  }
+
+  .cw {
+    right: 10px;
+    bottom: 76px;
+    width: calc(100vw - 20px);
+    height: min(540px, calc(100dvh - 92px));
+    max-height: calc(100dvh - 92px);
+  }
+
+  .exploregrid a {
+    padding: 18px;
+  }
+
+  .games {
+    height: calc(100dvh - 55px);
+  }
+}
+
+/* Prevent long URLs, code snippets, and embeds from creating
+   horizontal page overflow on narrow screens. */
+p,
+h1,
+h2,
+h3,
+h4,
+small,
+strong,
+a,
+button,
+pre,
+code {
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
