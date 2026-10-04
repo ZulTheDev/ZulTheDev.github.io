@@ -2717,7 +2717,7 @@ function CTFWriteupView({ slug }) {
    MAIN APPLICATION
 ========================================================= */
 
-function App({ initialContent = null }) {
+export default function App({ initialContent = null }) {
   const [content, setContent] = useState(
     initialContent ? normalizeContent(initialContent) : null
   );
@@ -3538,4 +3538,3 @@ function App({ initialContent = null }) {
   );
 }
 
-export default App;
