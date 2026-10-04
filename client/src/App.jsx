@@ -3393,7 +3393,7 @@ export default function App({ initialContent = null }) {
 
         <section>
           <small>
-            06 / FOUNDATION
+            07 / FOUNDATION
           </small>
 
           <h2>
@@ -3469,7 +3469,7 @@ export default function App({ initialContent = null }) {
         >
           <div>
             <small>
-              07 / OPEN CHANNEL
+              09 / OPEN CHANNEL
             </small>
 
             <h2>
