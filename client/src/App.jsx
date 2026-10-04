@@ -1,6 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import GiscusComments from './GiscusComments';
+const GiscusComments = lazy(() => import('./GiscusComments'));
+
+function DeferredComments(props) {
+  return (
+    <Suspense fallback={<div className="comments-loading" aria-hidden="true">Loading discussion…</div>}>
+      <GiscusComments {...props} />
+    </Suspense>
+  );
+}
 import {
   ArrowUpRight,
   ChevronRight,
@@ -313,7 +321,7 @@ function Modal({ item, type, close }) {
               GISCUS DISCUSSION
           ----------------------------------------- */}
 
-          <GiscusComments
+          <DeferredComments
             discussionTerm={`portfolio:${item.id}`}
           />
         </section>
@@ -2718,13 +2726,19 @@ function CTFWriteupView({ slug }) {
    MAIN APPLICATION
 ========================================================= */
 
-function App() {
-  const [content, setContent] = useState(null);
+function App({ initialContent = null }) {
+  const [content, setContent] = useState(() =>
+    initialContent ? normalizeContent(initialContent) : null
+  );
   const [loadProgress, setLoadProgress] = useState(8);
   const [selected, setSelected] = useState(null);
 
-  const ctfPath =
-    location.pathname.replace(/\/+$/, '');
+  const currentPath =
+    typeof window !== 'undefined'
+      ? window.location.pathname
+      : '/';
+
+  const ctfPath = currentPath.replace(/\/+$/, '');
 
   const isCtfRoute =
     ctfPath === '/ctf-blog' ||
@@ -2754,7 +2768,9 @@ function App() {
   }, [isCtfRoute]);
 
   const [page, setPage] = useState(
-    location.hash.slice(1) || 'home'
+    (typeof window !== 'undefined'
+      ? window.location.hash.slice(1)
+      : '') || 'home'
   );
 
   /* ---------------------------------------------
@@ -2770,9 +2786,32 @@ function App() {
 
     const loadContent = async () => {
       try {
-        setLoadProgress(18);
+        if (initialContent) {
+          setLoadProgress(100);
+        } else {
+          setLoadProgress(18);
+        }
 
-        const response = await fetch('/content.json');
+        const response = initialContent
+          ? null
+          : await fetch('/content.json');
+
+        if (initialContent) {
+          if (API) {
+            try {
+              const apiResponse = await fetch(`${API}/api/content`);
+              if (apiResponse.ok) {
+                const apiData = await apiResponse.json();
+                if (mounted && apiData?.profile) {
+                  setContent(normalizeContent(apiData));
+                }
+              }
+            } catch {
+              // Keep using the build-time content.
+            }
+          }
+          return;
+        }
 
         if (!response.ok) {
           throw new Error('content.json unavailable');
@@ -2831,7 +2870,7 @@ function App() {
 
     const handleHashChange = () => {
       setPage(
-        location.hash.slice(1) ||
+        window.location.hash.slice(1) ||
           'home'
       );
     };
@@ -2887,10 +2926,12 @@ function App() {
   ======================================================= */
 
   const hiringPath =
-    location.pathname.replace(/\/+$/, '') === '/port_resume';
+    currentPath.replace(/\/+$/, '') === '/port_resume';
 
   if (hiringPath) {
-    const params = new URLSearchParams(location.search);
+    const params = new URLSearchParams(
+      typeof window !== 'undefined' ? window.location.search : ''
+    );
     const rawTarget =
       params.get('type_of_work_hiring') || '';
 
