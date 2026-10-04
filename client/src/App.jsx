@@ -2738,28 +2738,6 @@ export default function App({ initialContent = null }) {
     ctfPath === '/ctf-blog/' ||
     ctfPath.startsWith('/ctf-blog/');
 
-  useEffect(() => {
-    const { deviceId, sessionId } =
-      getAnonymousIdentity();
-
-    if (!API || isCtfRoute) {
-      return;
-    }
-
-    fetch(`${API}/api/access/track`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        deviceId,
-        sessionId,
-      }),
-    }).catch(() => {
-      // Anonymous access tracking is best-effort.
-    });
-  }, [isCtfRoute]);
-
   const [page, setPage] = useState(
     currentLocation.hash.slice(1) || 'home'
   );
