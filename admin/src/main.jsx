@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
+import BuyFirstEditor from './BuyFirstEditor.jsx';
 
 const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787';
 const ONLINE_API = import.meta.env.VITE_ONLINE_API_URL || import.meta.env.VITE_COMMENTS_BACKUP_URL || 'https://zulthedevs-projects.vercel.app';
@@ -23,6 +24,7 @@ const SECTION_META = {
   appearance: 'Appearance',
   media: 'Media library',
   'ctf-writeups': 'CTF writeups',
+  'buy-first': 'Ko-fi & Buy-first',
   comments: 'Comments & moderation',
   system: 'System & AI',
   raw: 'Raw JSON',
@@ -94,6 +96,7 @@ const NAV_GROUPS = [
       'appearance',
       'media',
       'ctf-writeups',
+      'buy-first',
       'raw',
     ],
   },
@@ -221,6 +224,7 @@ const DEFAULT_CONTENT = {
   experience: [],
   education: [],
   explore: [],
+  buyFirst: [],
 };
 
 function normalizeContent(value) {
@@ -260,6 +264,7 @@ function normalizeContent(value) {
     experience: Array.isArray(source.experience) ? source.experience : [],
     education: Array.isArray(source.education) ? source.education : [],
     explore: Array.isArray(source.explore) ? source.explore : [],
+    buyFirst: Array.isArray(source.buyFirst) ? source.buyFirst : [],
   };
 }
 
@@ -951,28 +956,30 @@ function AdminShell() {
     }
   }
 
-  async function saveContent() {
-    if (!content) return;
+  async function saveContentValue(nextContent) {
+    if (!nextContent) return null;
 
     setSaving(true);
     setNotice('Saving content...');
 
     try {
-      const response = await authFetch(`${API}/api/content`, {
+      const response = await authFetch(API + '/api/content', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-
         },
-        body: JSON.stringify(content),
+        body: JSON.stringify(nextContent),
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || ('Save failed (' + response.status + ')'));
+      if (!response.ok) {
+        throw new Error(data?.error || ('Save failed (' + response.status + ')'));
+      }
 
-      const normalized = normalizeContent(data.content || content);
+      const normalized = normalizeContent(data.content || nextContent);
       setContent(normalized);
       setSavedSnapshot(JSON.stringify(normalized));
+      setRaw(JSON.stringify(normalized, null, 2));
       try { localStorage.removeItem(LOCAL_DRAFT_KEY); } catch {}
       setHasDraft(false);
 
@@ -984,24 +991,23 @@ function AdminShell() {
           ').'
         );
       } else if (deploy?.message) {
-        setNotice(
-          'Saved locally. ' +
-          deploy.message
-        );
+        setNotice('Saved locally. ' + deploy.message);
       } else {
-        setNotice(
-          'Saved successfully at ' +
-          new Date().toLocaleTimeString() +
-          '.'
-        );
+        setNotice('Saved successfully at ' + new Date().toLocaleTimeString() + '.');
       }
+
+      return normalized;
     } catch (error) {
-      setNotice(`Save failed: ${error.message}`);
+      setNotice('Save failed: ' + error.message);
+      throw error;
     } finally {
       setSaving(false);
     }
   }
 
+  async function saveContent() {
+    return saveContentValue(content);
+  }
   function updateProfile(field, value) {
     setContent((current) => ({
       ...current,
@@ -1482,6 +1488,16 @@ function AdminShell() {
               setHiringTarget={setHiringTarget}
               hiringTest={hiringTest}
               testHiringFilter={testHiringFilter}
+            />
+          )}
+
+          {section === 'buy-first' && (
+            <BuyFirstEditor
+              api={API}
+              content={content}
+              setContent={setContent}
+              savePublicContent={saveContentValue}
+              setNotice={setNotice}
             />
           )}
 
