@@ -27,6 +27,12 @@ export default async function handler(
       Boolean(
         process.env.DEEPSEEK_API_KEY
       ),
+    model:
+      process.env.DEEPSEEK_MODEL || 'deepseek-flash',
+    driveKnowledge:
+      Boolean(
+        process.env.GOOGLE_DRIVE_CHATBOT_FOLDER_ID
+      ),
     commentStorage:
       'redis',
     chatStorage:
