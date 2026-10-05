@@ -1,41 +1,31 @@
 import {
-  corsHeaders,
-} from '../lib/comments.js';
-import {
-  redisConfigured,
-} from '../lib/redis.js';
+  config,
+  integrationStatus,
+} from '../lib/config.js';
+import { applyCors, handleOptions } from '../lib/cors.js';
 
-export default async function handler(
+export default function handler(
   request,
   response
 ) {
-  for (const [key, value] of Object.entries(
-    corsHeaders(
-      request.headers.origin || ''
-    )
-  )) {
-    response.setHeader(key, value);
+  applyCors(response, request);
+
+  if (handleOptions(request, response)) {
+    return;
   }
 
-  return response.json({
+  return response.status(200).json({
     ok: true,
-    service:
-      'portfolio-online-services',
+    service: 'portfolio-online-services',
     redisConfigured:
-      redisConfigured(),
+      integrationStatus.redisConfigured,
     chatbot:
-      Boolean(
-        process.env.DEEPSEEK_API_KEY
-      ),
+      integrationStatus.chatbot,
     model:
-      process.env.DEEPSEEK_MODEL || 'deepseek-flash',
+      config.deepseek.model,
     driveKnowledge:
-      Boolean(
-        process.env.GOOGLE_DRIVE_CHATBOT_FOLDER_ID
-      ),
-    commentStorage:
-      'redis',
-    chatStorage:
-      'browser-session-only',
+      integrationStatus.driveKnowledge,
+    commentStorage: 'redis',
+    chatStorage: 'browser-session-only',
   });
 }
