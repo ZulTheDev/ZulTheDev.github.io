@@ -78,6 +78,33 @@ function cleanText(value, limit = 12000) {
     .slice(0, limit);
 }
 
+function parseRequestBody(request) {
+  const raw = request.body;
+
+  if (raw && typeof raw === 'object') {
+    return raw;
+  }
+
+  const text = Buffer.isBuffer(raw)
+    ? raw.toString('utf8')
+    : String(raw || '');
+
+  if (!text.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+
+    return parsed &&
+      typeof parsed === 'object'
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 function trimSiteContent(content) {
   if (!isZulfaqarPortfolio(content)) {
     throw new Error(
@@ -622,8 +649,10 @@ export default async function handler(
   }
 
   try {
+    const body = parseRequestBody(request);
+
     const message = String(
-      request.body?.message || ''
+      body?.message || ''
     ).trim();
 
     if (!message) {
@@ -641,12 +670,12 @@ export default async function handler(
     let clientContext = {};
 
     if (
-      request.body?.context &&
-      typeof request.body.context === 'object'
+      body?.context &&
+      typeof body.context === 'object'
     ) {
       if (
         !isZulfaqarPortfolio(
-          request.body.context
+          body.context
         )
       ) {
         return response.status(400).json({
@@ -654,7 +683,7 @@ export default async function handler(
         });
       }
 
-      clientContext = request.body.context;
+      clientContext = body.context;
     }
 
     const [siteResult, driveResult] =
@@ -691,7 +720,7 @@ export default async function handler(
         role: 'system',
         content: buildSystemPrompt(),
       },
-      ...trimHistory(request.body?.history),
+      ...trimHistory(body?.history),
       {
         role: 'user',
         content:
