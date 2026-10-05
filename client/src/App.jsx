@@ -532,7 +532,7 @@ function writeChatSession(messages) {
 const ONLINE_API =
   import.meta.env.VITE_ONLINE_API_URL ||
   import.meta.env.VITE_COMMENTS_BACKUP_URL ||
-  '';
+  'https://zul-portfolio-api.vercel.app';
 
 function Chat({ content }) {
   const [open, setOpen] = useState(false);
