@@ -597,6 +597,11 @@ function Chat({ content }) {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
+              portfolioId: 'zulfaqar-jamal',
+              page:
+                typeof window !== 'undefined'
+                  ? window.location.pathname + window.location.hash
+                  : '/',
               message,
               history,
               context: content,
