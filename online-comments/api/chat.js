@@ -601,7 +601,9 @@ export default async function handler(
   cors(response, origin);
 
   if (request.method === 'OPTIONS') {
-    return response.status(204).end();
+    return response.status(200).json({
+      ok: true,
+    });
   }
 
   if (request.method !== 'POST') {
