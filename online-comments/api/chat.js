@@ -71,13 +71,25 @@ function isZulfaqarPortfolio(value) {
   return name === PORTFOLIO_NAME.toLowerCase();
 }
 
-function containsForeignIdentity(text) {
-  const value = String(text || '').toLowerCase();
+const AUTHORIZED_IDENTITY_LABELS = [
+  'zulfaqar jamal',
+  'firesecurity',
+  'firesecuritysg',
+  'firebyte_1011',
+  'zulfra',
+  'fembyte_1011',
+  'zulfiya',
+];
 
-  return (
-    value.includes('muhammad zaki') ||
-    value.includes("zaki's portfolio") ||
-    value.includes('muhammad-zaki-portfolio')
+function containsUnauthorizedNamedIdentity(text) {
+  const value = String(text || '').toLowerCase();
+  const blockedPatterns = [
+    /\b[mn]uhammad\b/,
+    /\bzaki\b/,
+  ];
+
+  return blockedPatterns.some((pattern) =>
+    pattern.test(value)
   );
 }
 
@@ -110,7 +122,7 @@ function trimSiteContent(content) {
 
   const serialized = JSON.stringify(safe);
 
-  if (containsForeignIdentity(serialized)) {
+  if (containsUnauthorizedNamedIdentity(serialized)) {
     throw new Error(
       'Foreign portfolio identity detected in live content.'
     );
@@ -446,7 +458,7 @@ async function loadDriveKnowledge() {
       continue;
     }
 
-    if (containsForeignIdentity(text)) {
+    if (containsUnauthorizedNamedIdentity(text)) {
       console.warn(
         'Skipped Drive document containing a foreign portfolio identity:',
         file.name
@@ -561,7 +573,7 @@ function buildKnowledgeContext({
       entry.document.content;
   }
 
-  if (containsForeignIdentity(result)) {
+  if (containsUnauthorizedNamedIdentity(result)) {
     throw new Error(
       'Foreign portfolio identity detected in AI context.'
     );
@@ -590,12 +602,17 @@ function buildSystemPrompt() {
   return 'You are the professional AI portfolio assistant for ' +
     PORTFOLIO_NAME +
     '.\n\n' +
+    'AUTHORIZED IDENTITY LABELS\n' +
+    '- Zulfaqar Jamal\n' +
+    '- FireSecurity / FireSecuritySG\n' +
+    '- Firebyte_1011\n' +
+    '- ZulFra\n' +
+    '- Fembyte_1011\n' +
+    '- Zulfiya\n\n' +
     'IDENTITY BOUNDARY\n' +
-    '- You represent only ' +
-    PORTFOLIO_NAME +
-    '.\n' +
-    '- Never use information from Muhammad Zaki, another portfolio, another repository, or an unrelated person.\n' +
-    '- If supplied evidence conflicts with this identity boundary, ignore the conflicting material.\n' +
+    '- Represent only the authorized identity labels above.\n' +
+    '- Never import, attribute or introduce portfolio evidence for another person.\n' +
+    '- If supplied evidence belongs to another person, ignore it without naming that person.\n' +
     '- Never invent employers, dates, qualifications, skills, services, achievements, projects, responsibilities or availability.\n\n' +
     'EVIDENCE RULE\n' +
     '- Treat the public portfolio and approved Google Drive knowledge as the sources of truth.\n' +
