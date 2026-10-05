@@ -71,28 +71,6 @@ function isZulfaqarPortfolio(value) {
   return name === PORTFOLIO_NAME.toLowerCase();
 }
 
-const AUTHORIZED_IDENTITY_LABELS = [
-  'zulfaqar jamal',
-  'firesecurity',
-  'firesecuritysg',
-  'firebyte_1011',
-  'zulfra',
-  'fembyte_1011',
-  'zulfiya',
-];
-
-function containsUnauthorizedNamedIdentity(text) {
-  const value = String(text || '').toLowerCase();
-  const blockedPatterns = [
-    /\b[mn]uhammad\b/,
-    /\bzaki\b/,
-  ];
-
-  return blockedPatterns.some((pattern) =>
-    pattern.test(value)
-  );
-}
-
 function cleanText(value, limit = 12000) {
   return String(value || '')
     .replace(/\u0000/g, '')
@@ -121,12 +99,6 @@ function trimSiteContent(content) {
   };
 
   const serialized = JSON.stringify(safe);
-
-  if (containsUnauthorizedNamedIdentity(serialized)) {
-    throw new Error(
-      'Foreign portfolio identity detected in live content.'
-    );
-  }
 
   return serialized.slice(0, SITE_MAX_CHARS);
 }
@@ -458,14 +430,6 @@ async function loadDriveKnowledge() {
       continue;
     }
 
-    if (containsUnauthorizedNamedIdentity(text)) {
-      console.warn(
-        'Skipped Drive document containing a foreign portfolio identity:',
-        file.name
-      );
-      continue;
-    }
-
     documents.push({
       name: cleanText(file.name, 300),
       mimeType: cleanText(file.mimeType, 200),
@@ -571,12 +535,6 @@ function buildKnowledgeContext({
       entry.document.mimeType +
       '\nCONTENT:\n' +
       entry.document.content;
-  }
-
-  if (containsUnauthorizedNamedIdentity(result)) {
-    throw new Error(
-      'Foreign portfolio identity detected in AI context.'
-    );
   }
 
   return result.slice(0, 150000);
