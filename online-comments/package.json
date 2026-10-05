@@ -1,9 +1,12 @@
 {
-  "name": "zulfaqar-portfolio-online-comments",
+  "name": "zulfaqar-portfolio-online-services",
   "private": true,
   "type": "module",
   "engines": {
     "node": "24.x"
+  },
+  "scripts": {
+    "check": "node --check api/chat.js && node --check api/comments.js && node --check api/health.js"
   },
   "dependencies": {
     "redis": "^5.11.0"
