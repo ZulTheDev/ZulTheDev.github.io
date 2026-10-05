@@ -594,7 +594,10 @@ function Chat({ content }) {
           {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+              // text/plain is a CORS-safelisted content type,
+              // so the browser can send the chat POST without
+              // an OPTIONS preflight to this public API.
+              'Content-Type': 'text/plain',
             },
             body: JSON.stringify({
               portfolioId: 'zulfaqar-jamal',
