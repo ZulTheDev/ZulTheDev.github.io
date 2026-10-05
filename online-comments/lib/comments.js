@@ -1,3 +1,8 @@
+import { config } from './config.js';
+import {
+  applyCors,
+} from './cors.js';
+
 export const MAX_REPLY_COUNT = 10;
 
 export function validTerm(term) {
@@ -23,10 +28,8 @@ export function publicComment(item, ownerId) {
     createdAt: item.createdAt,
     updatedAt:
       item.updatedAt || null,
-    parentId:
-      item.parentId || null,
-    deleted:
-      Boolean(item.deleted),
+    parentId: item.parentId || null,
+    deleted: Boolean(item.deleted),
     canEdit:
       Boolean(ownerId) &&
       item.ownerId === ownerId &&
@@ -46,29 +49,23 @@ export function countUserReplies(
 }
 
 export function corsHeaders(origin) {
-  const allowed = [
-    'https://zulthedev.github.io',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5175',
-  ];
-
-  const selected =
-    allowed.includes(origin)
-      ? origin
-      : allowed[0];
-
-  return {
-    'Access-Control-Allow-Origin':
-      selected,
-    'Access-Control-Allow-Methods':
-      'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers':
-      'Content-Type',
-    'Access-Control-Max-Age':
-      '86400',
-    Vary: 'Origin',
+  const headers = {};
+  const fakeResponse = {
+    setHeader(key, value) {
+      headers[key] = value;
+    },
   };
+
+  applyCors(
+    fakeResponse,
+    {
+      headers: {
+        origin,
+      },
+    }
+  );
+
+  return headers;
 }
 
 export function json(
@@ -87,4 +84,8 @@ export function json(
       },
     }
   );
+}
+
+export function allowedClientOrigin() {
+  return config.clientOrigin;
 }
