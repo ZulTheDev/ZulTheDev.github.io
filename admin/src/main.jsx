@@ -40,7 +40,7 @@ const SECTION_META = {
   explore: 'Explore',
   appearance: 'Appearance',
   media: 'Media library',
-  'ctf-writeups': 'CTF writeups',
+  'ctf-writeups': 'Blog / writeup studio',
   comments: 'Comments & moderation',
   system: 'System & AI',
   raw: 'Raw JSON',
@@ -314,9 +314,11 @@ function newWriteup() {
 
   return {
     version: 1,
+    kind: 'ctf',
     title: 'Untitled CTF Writeup',
     slug: 'untitled-ctf-writeup',
     excerpt: '',
+    banner: '',
     author: 'Zulfaqar Jamal',
     tags: [],
     ctf: {
@@ -620,7 +622,16 @@ function AdminShell() {
 
       setNotice(
         'Published: ' +
-          (data.url || '/ctf_blog/' + slug) +
+          (
+            data.url ||
+            (
+              saved.kind === 'blog'
+                ? '/blog/' + slug
+                : saved.kind === 'webcomic'
+                  ? '/webcomic/' + slug
+                  : '/ctf_blog/' + slug
+            )
+          ) +
           deployMessage
       );
     } catch (error) {
@@ -748,7 +759,7 @@ function AdminShell() {
     }
   }
 
-  async function uploadWriteupFile(file, slug) {
+  async function uploadWriteupFile(file, slug, contentKind = 'ctf') {
     if (!file) return null;
 
     const response = await authFetch(
@@ -762,6 +773,7 @@ function AdminShell() {
           filename: file.name,
           contentType: file.type || 'application/octet-stream',
           writeupSlug: slug,
+          contentKind,
         }),
       }
     );
@@ -889,7 +901,7 @@ function AdminShell() {
     };
   }
 
-  async function loadR2Objects(slug = '') {
+  async function loadR2Objects(slug = '', contentKind = 'ctf') {
     setR2Loading(true);
 
     try {
@@ -898,10 +910,22 @@ function AdminShell() {
         ? safeWriteupSlug(prefixValue) + '/'
         : '';
 
-      const prefixes = [
-        'ctf_blog/' + suffix,
-        'ctf-blog/' + suffix,
-      ];
+      const normalizedKind =
+        ['blog', 'webcomic'].includes(
+          String(contentKind || '').toLowerCase()
+        )
+          ? String(contentKind).toLowerCase()
+          : 'ctf';
+
+      const prefixes =
+        normalizedKind === 'blog'
+          ? ['blog/' + suffix]
+          : normalizedKind === 'webcomic'
+            ? ['webcomic/' + suffix]
+            : [
+                'ctf_blog/' + suffix,
+                'ctf-blog/' + suffix,
+              ];
 
       let rows = [];
       let lastError = null;
