@@ -21,6 +21,3 @@ scripts/
 server/writeups/
 
 
-# Generated from tracked base64 image sources before client builds
-client/public/images/blog-hero-sakura-catgirl.webp
-client/public/images/blog-clueless-cat.webp
