@@ -3017,27 +3017,318 @@ function CTFWriteupDocument({
   );
 }
 
+function PolymathVectorSystem({
+  compact = false,
+}) {
+  const nodes = [
+    {
+      id: 'CPU',
+      x: 92,
+      y: 92,
+      note: 'execution / registers',
+    },
+    {
+      id: 'MEM',
+      x: 252,
+      y: 54,
+      note: 'memory / artifacts',
+    },
+    {
+      id: 'NET',
+      x: 432,
+      y: 102,
+      note: 'packets / protocols',
+    },
+    {
+      id: 'AUTH',
+      x: 592,
+      y: 62,
+      note: 'identity / trust',
+    },
+    {
+      id: 'DFIR',
+      x: 626,
+      y: 226,
+      note: 'evidence / timeline',
+    },
+    {
+      id: 'PKT',
+      x: 432,
+      y: 286,
+      note: 'capture / inspect',
+    },
+    {
+      id: 'DISK',
+      x: 244,
+      y: 248,
+      note: 'filesystem / sectors',
+    },
+    {
+      id: 'SHELL',
+      x: 86,
+      y: 238,
+      note: 'commands / process',
+    },
+  ];
+
+  const edges = [
+    ['CPU', 'MEM'],
+    ['CPU', 'SHELL'],
+    ['CPU', 'NET'],
+    ['MEM', 'DISK'],
+    ['NET', 'AUTH'],
+    ['NET', 'PKT'],
+    ['AUTH', 'DFIR'],
+    ['PKT', 'DFIR'],
+    ['DISK', 'DFIR'],
+    ['SHELL', 'DISK'],
+    ['MEM', 'NET'],
+  ];
+
+  const [activeId, setActiveId] =
+    useState('NET');
+
+  const active =
+    nodes.find(
+      (node) => node.id === activeId
+    ) || nodes[0];
+
+  const nodeById = Object.fromEntries(
+    nodes.map((node) => [
+      node.id,
+      node,
+    ])
+  );
+
+  return (
+    <div
+      className={
+        compact
+          ? 'poly-system poly-system-compact'
+          : 'poly-system'
+      }
+    >
+      <svg
+        viewBox="0 0 720 350"
+        role="img"
+        aria-label="Interactive vector map of computer systems and cybersecurity concepts"
+      >
+        <defs>
+          <pattern
+            id="poly-grid"
+            width="24"
+            height="24"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M24 0H0V24"
+              className="poly-grid-line"
+            />
+          </pattern>
+
+          <marker
+            id="poly-arrow"
+            markerWidth="8"
+            markerHeight="8"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <path
+              d="M0 0L8 3L0 6Z"
+              className="poly-arrow"
+            />
+          </marker>
+        </defs>
+
+        <rect
+          className="poly-grid"
+          x="0"
+          y="0"
+          width="720"
+          height="350"
+          fill="url(#poly-grid)"
+        />
+
+        <polygon
+          className="poly-frame"
+          points="26,24 678,24 704,50 704,306 680,330 40,330 16,306 16,52"
+        />
+
+        <g className="poly-edges">
+          {edges.map(([fromId, toId]) => {
+            const from = nodeById[fromId];
+            const to = nodeById[toId];
+
+            return (
+              <line
+                key={fromId + '-' + toId}
+                x1={from.x}
+                y1={from.y}
+                x2={to.x}
+                y2={to.y}
+                markerEnd="url(#poly-arrow)"
+              />
+            );
+          })}
+        </g>
+
+        <g className="poly-orbit">
+          <circle
+            cx="356"
+            cy="174"
+            r="118"
+          />
+          <circle
+            cx="356"
+            cy="174"
+            r="82"
+          />
+        </g>
+
+        {nodes.map((node, index) => {
+          const selected =
+            node.id === activeId;
+
+          return (
+            <g
+              key={node.id}
+              className={
+                selected
+                  ? 'poly-node active'
+                  : 'poly-node'
+              }
+              transform={
+                'translate(' +
+                node.x +
+                ' ' +
+                node.y +
+                ')'
+              }
+              tabIndex={0}
+              role="button"
+              aria-label={
+                node.id + ': ' + node.note
+              }
+              onMouseEnter={() =>
+                setActiveId(node.id)
+              }
+              onFocus={() =>
+                setActiveId(node.id)
+              }
+              onClick={() =>
+                setActiveId(node.id)
+              }
+            >
+              <polygon
+                points="-38,-20 30,-20 40,-10 40,18 30,28 -38,28 -46,20 -46,-12"
+              />
+              <circle
+                cx="-29"
+                cy="-4"
+                r="4"
+              />
+              <text
+                x="-18"
+                y="1"
+              >
+                {node.id}
+              </text>
+              <text
+                className="poly-node-index"
+                x="-30"
+                y="17"
+              >
+                {'0' + (index + 1)}
+              </text>
+            </g>
+          );
+        })}
+
+        <g className="poly-readout">
+          <text
+            x="300"
+            y="157"
+            className="poly-readout-label"
+          >
+            ACTIVE SYSTEM
+          </text>
+          <text
+            x="300"
+            y="182"
+            className="poly-readout-title"
+          >
+            {active.id}
+          </text>
+          <text
+            x="300"
+            y="204"
+            className="poly-readout-note"
+          >
+            {active.note}
+          </text>
+        </g>
+
+        <path
+          className="poly-scan"
+          d="M42 315H676"
+        />
+      </svg>
+    </div>
+  );
+}
+
 function CTFBlogIndexView() {
   const [items, setItems] =
     useState([]);
 
   useEffect(() => {
-    fetch(BASE_PATH + 'ctf-blog/index.json')
-      .then((response) =>
-        response.ok
-          ? response.json()
-          : { writeups: [] }
-      )
-      .then((data) =>
-        setItems(
-          Array.isArray(
-            data?.writeups
-          )
-            ? data.writeups
-            : []
-        )
-      )
-      .catch(() => setItems([]));
+    let active = true;
+
+    async function loadIndex() {
+      const candidates = [
+        BASE_PATH + 'ctf_blog/index.json',
+        BASE_PATH + 'ctf-blog/index.json',
+      ];
+
+      for (const url of candidates) {
+        try {
+          const response =
+            await fetch(url);
+
+          if (!response.ok) {
+            continue;
+          }
+
+          const data =
+            await response.json();
+
+          if (active) {
+            setItems(
+              Array.isArray(
+                data?.writeups
+              )
+                ? data.writeups
+                : []
+            );
+          }
+
+          return;
+        } catch {
+          // Try the legacy path next.
+        }
+      }
+
+      if (active) {
+        setItems([]);
+      }
+    }
+
+    loadIndex();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return (
@@ -3048,53 +3339,110 @@ function CTFBlogIndexView() {
             ZUL<span>/</span>JAMAL
           </b>
         </a>
-        <a href={BASE_PATH + "ctf-blog/"}>
-          CTF Blog
+
+        <a href="/blog">
+          Blog
         </a>
       </nav>
 
       <main className="writeup-index">
-        <small>CTF / WRITEUPS</small>
-        <h1>
-          Challenge notes,
-          <br />
-          <i>workflows & proof.</i>
-        </h1>
-        <p>
-          Interactive writeups built from
-          challenge sessions, evidence and
-          runnable experiments.
-        </p>
+        <section className="writeup-index-hero">
+          <div className="writeup-index-copy">
+            <small>
+              BLOG / CTF LAB
+            </small>
+
+            <h1>
+              Systems, security,
+              <br />
+              <i>workflows & proof.</i>
+            </h1>
+
+            <p>
+              Interactive cybersecurity writeups
+              with runnable experiments, system
+              maps and evidence-driven notes.
+            </p>
+
+            <div className="writeup-engine-strip">
+              <span>Cloudflare R2 media</span>
+              <span>Judge0 code runner</span>
+              <span>Pure SVG vector systems</span>
+            </div>
+          </div>
+
+          <PolymathVectorSystem />
+        </section>
 
         {!items.length ? (
           <div className="writeup-index-empty">
-            No public writeups yet.
+            <strong>
+              No public writeups yet.
+            </strong>
+            <span>
+              Published CTF notes will appear
+              here as interactive lab entries.
+            </span>
           </div>
         ) : (
           <div className="writeup-index-grid">
-            {items.map((item) => (
+            {items.map((item, index) => (
               <a
                 key={item.slug}
                 href={
-                  '/ctf-blog/' +
+                  '/ctf_blog/' +
                   item.slug
                 }
                 className="writeup-index-card"
               >
+                <div className="writeup-card-vector">
+                  <span>
+                    {String(index + 1).padStart(
+                      2,
+                      '0'
+                    )}
+                  </span>
+                  <svg
+                    viewBox="0 0 160 60"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 48L38 18L72 39L108 10L156 36" />
+                    <circle cx="38" cy="18" r="4" />
+                    <circle cx="72" cy="39" r="4" />
+                    <circle cx="108" cy="10" r="4" />
+                  </svg>
+                </div>
+
                 <small>
                   {writeupDate(
                     item.updatedAt
                   )}
                 </small>
+
                 <h2>
                   {item.title}
                 </h2>
+
                 <p>
                   {item.excerpt}
                 </p>
-                <span>
-                  Open writeup →
-                </span>
+
+                {Array.isArray(item.tags) &&
+                  item.tags.length > 0 && (
+                    <div className="writeup-index-tags">
+                      {item.tags
+                        .slice(0, 4)
+                        .map((tag) => (
+                          <span key={tag}>
+                            {tag}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+
+                <b>
+                  Open lab writeup →
+                </b>
               </a>
             ))}
           </div>
@@ -3115,34 +3463,50 @@ function CTFWriteupView({ slug }) {
   useEffect(() => {
     let mounted = true;
 
-    fetch(
-      BASE_PATH + 'ctf-blog/' +
-        encodeURIComponent(slug) +
-        '.json'
-    )
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(
-            'Writeup not found'
-          );
-        }
+    async function loadWriteup() {
+      const encoded =
+        encodeURIComponent(slug);
+      const candidates = [
+        BASE_PATH +
+          'ctf_blog/' +
+          encoded +
+          '.json',
+        BASE_PATH +
+          'ctf-blog/' +
+          encoded +
+          '.json',
+      ];
 
-        return response.json();
-      })
-      .then((data) => {
-        if (mounted) {
-          setWriteup(data);
-          setLoading(false);
+      for (const url of candidates) {
+        try {
+          const response =
+            await fetch(url);
+
+          if (!response.ok) {
+            continue;
+          }
+
+          const data =
+            await response.json();
+
+          if (mounted) {
+            setWriteup(data);
+            setLoading(false);
+          }
+
+          return;
+        } catch {
+          // Try legacy storage path.
         }
-      })
-      .catch((requestError) => {
-        if (mounted) {
-          setError(
-            requestError.message
-          );
-          setLoading(false);
-        }
-      });
+      }
+
+      if (mounted) {
+        setError('Writeup not found');
+        setLoading(false);
+      }
+    }
+
+    loadWriteup();
 
     return () => {
       mounted = false;
@@ -3152,7 +3516,7 @@ function CTFWriteupView({ slug }) {
   if (loading) {
     return (
       <div className="writeup-loading">
-        Loading writeup...
+        Loading interactive lab...
       </div>
     );
   }
@@ -3164,15 +3528,18 @@ function CTFWriteupView({ slug }) {
           <a href="/">
             ZUL/JAMAL
           </a>
-          <a href="/ctf-blog/">
-            CTF Blog
+          <a href="/blog">
+            Blog
           </a>
         </nav>
+
         <main className="writeup-error">
           <small>CTF BLOG</small>
-          <h1>{error || 'Writeup not found'}</h1>
-          <a href="/ctf-blog/">
-            Back to writeups
+          <h1>
+            {error || 'Writeup not found'}
+          </h1>
+          <a href="/blog">
+            Back to blog
           </a>
         </main>
       </>
@@ -3193,10 +3560,28 @@ function CTFWriteupView({ slug }) {
           </b>
         </a>
 
-        <a href="/ctf-blog/">
-          CTF Blog
+        <a href="/blog">
+          Blog
         </a>
       </nav>
+
+      <div className="writeup-lab-banner">
+        <div>
+          <small>
+            INTERACTIVE CTF LAB
+          </small>
+          <span>
+            Media → Cloudflare R2
+          </span>
+          <span>
+            Code execution → Judge0
+          </span>
+        </div>
+
+        <PolymathVectorSystem
+          compact
+        />
+      </div>
 
       <div className="writeup-layout">
         <WriteupSessionNav
@@ -3211,6 +3596,7 @@ function CTFWriteupView({ slug }) {
             <h1>
               {writeup.title}
             </h1>
+
             {writeup.excerpt && (
               <p>
                 {writeup.excerpt}
@@ -3222,6 +3608,7 @@ function CTFWriteupView({ slug }) {
                 {writeup.author ||
                   'Zulfaqar Jamal'}
               </span>
+
               {writeup.updatedAt && (
                 <span>
                   Updated{' '}
@@ -3232,16 +3619,21 @@ function CTFWriteupView({ slug }) {
               )}
 
               {writeup.ctf?.event && (
-                <span>{writeup.ctf.event}</span>
+                <span>
+                  {writeup.ctf.event}
+                </span>
               )}
 
               {writeup.ctf?.category && (
-                <span>{writeup.ctf.category}</span>
+                <span>
+                  {writeup.ctf.category}
+                </span>
               )}
 
               {writeup.ctf?.difficulty && (
                 <span>
-                  Difficulty: {writeup.ctf.difficulty}
+                  Difficulty:{' '}
+                  {writeup.ctf.difficulty}
                 </span>
               )}
 
@@ -3251,14 +3643,11 @@ function CTFWriteupView({ slug }) {
                 </span>
               )}
 
-              {writeup.tags
-                ?.length > 0 && (
+              {writeup.tags?.length > 0 && (
                 <div>
                   {writeup.tags.map(
                     (tag) => (
-                      <span
-                        key={tag}
-                      >
+                      <span key={tag}>
                         {tag}
                       </span>
                     )
@@ -3275,7 +3664,7 @@ function CTFWriteupView({ slug }) {
           <section className="writeup-discussion">
             <GiscusComments
               discussionTerm={
-                'ctf-blog:' +
+                'ctf_blog:' +
                 slug
               }
             />
