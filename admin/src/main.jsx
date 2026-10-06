@@ -1217,9 +1217,10 @@ function AdminShell() {
     };
 
     const checks = [
-      probe('Local API', API + '/api/health'),
-      probe('Online API', ONLINE_API + '/api/health'),
-      probe('R2', API + '/api/r2/status'),
+      probe('Private Tailscale API', API + '/api/health'),
+      probe('Online Vercel API', ONLINE_API + '/api/health'),
+      probe('Google Drive', API + '/api/drive/folders?parentId=' + encodeURIComponent(DRIVE_ROOT_ID)),
+      probe('Cloudflare R2', API + '/api/r2/status'),
       probe('GitHub App', API + '/api/github-app/status'),
       probe('Local AI', API + '/api/ai-status'),
     ];
@@ -1227,14 +1228,16 @@ function AdminShell() {
     const results = await Promise.all(checks);
     const local = results[0];
     const online = results[1];
-    const r2 = results[2];
-    const github = results[3];
-    const ai = results[4];
+    const drive = results[2];
+    const r2 = results[3];
+    const github = results[4];
+    const ai = results[5];
 
     setServiceStatus({
       local,
       ai,
       online,
+      drive,
       r2,
       github,
       checkedAt: new Date().toISOString(),
@@ -4236,7 +4239,8 @@ function SystemEditor({
     <div className="system-grid">
       <section className="panel">
         <PanelHeader eyebrow="RUNTIME" title="Service diagnostics" />
-        <div className="service-list">{[['local', 'Local API'], ['r2', 'Cloudflare R2'], ['github', 'GitHub App'], ['ai', 'Local AI'], ['online', 'Online API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
+        <p className="helper">Primary admin API: <code>{PRIVATE_API}</code>. Content changes flow through the private API, then Google Drive / Cloudflare R2 / GitHub App as needed. Vercel is checked separately as the public online service.</p>
+        <div className="service-list">{[['local', 'Private Tailscale API'], ['drive', 'Google Drive'], ['r2', 'Cloudflare R2'], ['github', 'GitHub App'], ['ai', 'Local AI'], ['online', 'Online Vercel API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
         <button className="accent-button" onClick={refreshSystem} disabled={serviceLoading}>{serviceLoading ? 'Checking...' : 'Run diagnostic'}</button>
         {serviceStatus.checkedAt && <small className="system-note">Checked {new Date(serviceStatus.checkedAt).toLocaleString()}</small>}
       </section>
