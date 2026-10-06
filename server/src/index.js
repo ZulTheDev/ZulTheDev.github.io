@@ -1933,8 +1933,14 @@ app.post(
         ok: true,
         writeup: published,
         url:
-          '/ctf_blog/' +
-          published.slug,
+          published.url ||
+          (
+            published.kind === 'blog'
+              ? '/blog/' + published.slug
+              : published.kind === 'webcomic'
+                ? '/webcomic/' + published.slug
+                : '/ctf_blog/' + published.slug
+          ),
         deploy: published.deploy || null,
       });
     } catch (error) {
