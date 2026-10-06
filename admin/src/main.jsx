@@ -609,7 +609,7 @@ function AdminShell() {
 
       setNotice(
         'Published: ' +
-          (data.url || '/ctf-blog/' + slug) +
+          (data.url || '/ctf_blog/' + slug) +
           deployMessage
       );
     } catch (error) {
@@ -883,28 +883,55 @@ function AdminShell() {
 
     try {
       const prefixValue = String(slug || '').trim();
-      const prefix = prefixValue
-        ? 'ctf-blog/' + safeWriteupSlug(prefixValue) + '/'
-        : 'ctf-blog/';
+      const suffix = prefixValue
+        ? safeWriteupSlug(prefixValue) + '/'
+        : '';
 
-      const response = await authFetch(
-        API +
-          '/api/r2/objects?prefix=' +
-          encodeURIComponent(prefix)
-      );
-      const data = await response.json();
+      const prefixes = [
+        'ctf_blog/' + suffix,
+        'ctf-blog/' + suffix,
+      ];
 
-      if (!response.ok) {
-        throw new Error(
-          data?.error || 'R2 list failed'
-        );
+      let rows = [];
+      let lastError = null;
+
+      for (const prefix of prefixes) {
+        try {
+          const response = await authFetch(
+            API +
+              '/api/r2/objects?prefix=' +
+              encodeURIComponent(prefix)
+          );
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error || 'R2 list failed'
+            );
+          }
+
+          const objects = Array.isArray(data.objects)
+            ? data.objects
+            : [];
+
+          if (objects.length) {
+            rows = objects;
+            break;
+          }
+
+          if (!rows.length) {
+            rows = objects;
+          }
+        } catch (error) {
+          lastError = error;
+        }
       }
 
-      setR2Objects(
-        Array.isArray(data.objects)
-          ? data.objects
-          : []
-      );
+      if (!rows.length && lastError) {
+        throw lastError;
+      }
+
+      setR2Objects(rows);
     } catch (error) {
       setNotice('R2 library unavailable: ' + error.message);
     } finally {
@@ -2075,7 +2102,7 @@ function WriteupsEditor({
 
           <p className="helper">
             Build a structured writeup, add sessions, attach R2 media, embed runnable code and create
-            an interactive object-to-object workflow before publishing it to <code>/ctf-blog/&lt;slug&gt;</code>.
+            an interactive object-to-object workflow before publishing it to <code>/ctf_blog/&lt;slug&gt;</code>.
           </p>
 
           {loading ? (
@@ -2119,7 +2146,7 @@ function WriteupsEditor({
             <div>
               <small>WRITEUP / {activeWriteup.status || 'DRAFT'}</small>
               <h2>{activeWriteup.title || 'Untitled CTF writeup'}</h2>
-              <span>/ctf-blog/{activeWriteup.slug || 'writeup-slug'}</span>
+              <span>/ctf_blog/{activeWriteup.slug || 'writeup-slug'}</span>
               <small className="writeup-publish-status">
                 GitHub App:{' '}
                 {githubStatus?.ok
@@ -2858,9 +2885,9 @@ function WriteupWorkspaceTab({ writeup, updateWriteup }) {
     <div className="writeup-workspace">
       <div className="writeup-workspace-toolbar">
         <div>
-          <small>INTERACTIVE CANVAS</small>
+          <small>POLYMATH VECTOR CANVAS</small>
           <h2>{workspace.title || 'Interactive workflow'}</h2>
-          <p>Drag document blocks into the canvas. Turn on Connect, then click object A and object B to create a workflow edge.</p>
+          <p>Compose system and cybersecurity diagrams as connected vector objects. Drag document blocks into the canvas, classify nodes such as host, firewall, process or packet, then connect them into an interactive workflow.</p>
         </div>
         <div className="writeup-workspace-actions">
           <button className={connectMode ? 'accent-button small' : 'ghost small'} onClick={() => { setConnectMode(!connectMode); setConnectFrom(null); }}>
@@ -3011,6 +3038,27 @@ function WorkspaceNode({
         />
         <button className="delete-button compact" onClick={onRemove}>×</button>
       </div>
+      <select
+        value={node.type || 'object'}
+        onChange={(event) => onChange(node.id, 'type', event.target.value)}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <option value="object">Object</option>
+        <option value="document-block">Document block</option>
+        <option value="host">Host / endpoint</option>
+        <option value="server">Server</option>
+        <option value="router">Router</option>
+        <option value="firewall">Firewall</option>
+        <option value="network">Network</option>
+        <option value="packet">Packet</option>
+        <option value="process">Process</option>
+        <option value="memory">Memory</option>
+        <option value="disk">Disk / filesystem</option>
+        <option value="auth">Authentication</option>
+        <option value="dfir">DFIR evidence</option>
+        <option value="threat">Threat / IOC</option>
+      </select>
+
       <select
         value={node.refBlockId || ''}
         onChange={(event) => onChange(node.id, 'refBlockId', event.target.value)}
@@ -3163,12 +3211,12 @@ function WriteupPreviewData({ writeup }) {
     <div className="writeup-preview-data">
       <div className="preview-json-card">
         <small>PUBLIC ROUTE</small>
-        <strong>/ctf-blog/{writeup.slug}</strong>
-        <p>Published data will be written to client/public/ctf-blog/{writeup.slug}.json.</p>
+        <strong>/ctf_blog/{writeup.slug}</strong>
+        <p>Published data will be written to client/public/ctf_blog/{writeup.slug}.json.</p>
       </div>
       <div className="preview-json-card">
         <small>PUBLIC DISCUSSION TERM</small>
-        <strong>ctf-blog:{writeup.slug}</strong>
+        <strong>ctf_blog:{writeup.slug}</strong>
         <p>Anonymous + GitHub discussion is attached to the bottom of the public writeup.</p>
       </div>
       <pre>{JSON.stringify(writeup, null, 2)}</pre>

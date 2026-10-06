@@ -1933,7 +1933,7 @@ app.post(
         ok: true,
         writeup: published,
         url:
-          '/ctf-blog/' +
+          '/ctf_blog/' +
           published.slug,
         deploy: published.deploy || null,
       });
@@ -2028,7 +2028,7 @@ app.get(
   async (request, response) => {
     try {
       const rawPrefix = String(
-        request.query.prefix || 'ctf-blog/'
+        request.query.prefix || 'ctf_blog/'
       ).slice(0, 200);
 
       const prefix = safeR2Prefix(rawPrefix);
@@ -2096,7 +2096,7 @@ app.post(
       }
 
       const key =
-        'ctf-blog/' +
+        'ctf_blog/' +
         slug +
         '/' +
         Date.now() +
@@ -2778,6 +2778,10 @@ Answer only from this portfolio JSON.
 Never invent facts.
 If the JSON does not contain the answer, say that the
 information is not available in the portfolio.
+Format answers for a compact chat interface using short paragraphs,
+small headings when useful, and bullet lists for multiple points.
+Avoid one giant paragraph. Markdown-style bold and inline code are
+allowed; do not output raw HTML.
 
 PORTFOLIO JSON:
 ${JSON.stringify(c)}`,

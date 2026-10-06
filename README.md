@@ -54,10 +54,10 @@ npm run dev
 
 ### CTF writeups, R2 media and Judge0
 
-The local admin includes a CTF writeup editor under **CTF writeups**. A writeup is saved as a private local draft first, then published as static JSON under `client/public/ctf-blog/`. GitHub Pages serves the public routes:
+The local admin includes a CTF writeup editor under **CTF writeups**. A writeup is saved as a private local draft first, then published as static JSON under `client/public/ctf_blog/`. GitHub Pages serves the public routes:
 
-- `/ctf-blog/`
-- `/ctf-blog/<slug>`
+- `/blog`
+- `/ctf_blog/<slug>`
 
 Each writeup can contain sessions, rich text, tables, code, media and an interactive workflow. The workflow is edited as a small drag/drop canvas: document blocks can become objects, objects can be repositioned, and edges can be connected. The public page turns those objects into clickable navigation back into the writeup.
 
@@ -77,7 +77,7 @@ R2_BUCKET_NAME=
 R2_PUBLIC_BASE_URL=
 ```
 
-The R2 media UI stores objects under a per-writeup prefix such as `ctf-blog/<slug>/...` and can request a temporary signed read URL for admin inspection.
+The R2 media UI stores objects under a per-writeup prefix such as `ctf_blog/<slug>/...` and can request a temporary signed read URL for admin inspection.
 
 #### Judge0
 
@@ -95,7 +95,7 @@ The hosted public proxy uses the same Judge0 variables in the Vercel project. Ke
 
 #### Publishing
 
-Save a draft first. **Publish** writes the static JSON/index files into `client/public/ctf-blog/`. The preferred publishing path is a GitHub App installation used as the local admin's service account. The server requests a short-lived installation token when publishing, then creates the CTF files and updates the configured branch through GitHub's Git database API. Your personal GitHub password or long-lived personal access token is not stored by the admin.
+Save a draft first. **Publish** writes the static JSON/index files into `client/public/ctf_blog/`. The preferred publishing path is a GitHub App installation used as the local admin's service account. The server requests a short-lived installation token when publishing, then creates the CTF files and updates the configured branch through GitHub's Git database API. Your personal GitHub password or long-lived personal access token is not stored by the admin.
 
 Create the GitHub App, install it only on this repository, grant the minimum repository permissions needed for the workflow, and keep the App private key in the local server's `.env` file. The expected variables are:
 
@@ -121,3 +121,10 @@ cd admin
 npm install
 npm run dev
 ```
+
+
+### Blog interaction model
+
+The public blog index is available at `/blog`. CTF writeups use `/ctf_blog/<slug>`.
+
+Writeup media is uploaded to Cloudflare R2 and rendered as image, video, audio, PDF or evidence/file blocks. Runnable code blocks use the public Judge0 proxy. System/cybersecurity visualizations use inline SVG/vector UI so they stay sharp, responsive and interactive without raster artwork.

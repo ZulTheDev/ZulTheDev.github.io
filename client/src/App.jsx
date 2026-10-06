@@ -827,6 +827,225 @@ function writeChatSession(messages) {
 
 const ONLINE_API = ONLINE_API_BASE;
 
+function renderChatInline(value, keyPrefix = 'chat-inline') {
+  const source = String(value || '');
+  const pattern =
+    /\*\*([^*\n]+)\*\*|\`([^\`\n]+)\`|\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^)]+)\)/g;
+  const parts = [];
+  let cursor = 0;
+  let match;
+  let partIndex = 0;
+
+  const pushText = (text) => {
+    if (!text) return;
+
+    parts.push(
+      text.replace(/\*\*/g, '')
+    );
+  };
+
+  while ((match = pattern.exec(source))) {
+    pushText(source.slice(cursor, match.index));
+
+    const key = keyPrefix + '-' + partIndex++;
+
+    if (match[1]) {
+      parts.push(
+        <strong key={key}>
+          {match[1]}
+        </strong>
+      );
+    } else if (match[2]) {
+      parts.push(
+        <code key={key}>
+          {match[2]}
+        </code>
+      );
+    } else if (match[3] && match[4]) {
+      parts.push(
+        <a
+          key={key}
+          href={match[4]}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {match[3]}
+        </a>
+      );
+    }
+
+    cursor = pattern.lastIndex;
+  }
+
+  pushText(source.slice(cursor));
+  return parts;
+}
+
+function ChatFormattedMessage({ text }) {
+  const lines = String(text || '')
+    .replace(/\r/g, '')
+    .split('\n');
+
+  const blocks = [];
+  let paragraph = [];
+  let listItems = [];
+  let listType = 'ul';
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+
+    const value = paragraph.join(' ').trim();
+
+    if (value) {
+      blocks.push({
+        type: 'paragraph',
+        value,
+      });
+    }
+
+    paragraph = [];
+  };
+
+  const flushList = () => {
+    if (!listItems.length) return;
+
+    blocks.push({
+      type: listType,
+      items: listItems,
+    });
+
+    listItems = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = line.match(
+      /^(#{1,3})\s+(.+)$/
+    );
+
+    if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({
+        type: 'heading',
+        level: heading[1].length,
+        value: heading[2],
+      });
+      continue;
+    }
+
+    const bullet = line.match(
+      /^[-*•]\s+(.+)$/
+    );
+
+    if (bullet) {
+      flushParagraph();
+
+      if (
+        listItems.length &&
+        listType !== 'ul'
+      ) {
+        flushList();
+      }
+
+      listType = 'ul';
+      listItems.push(bullet[1]);
+      continue;
+    }
+
+    const numbered = line.match(
+      /^\d+[.)]\s+(.+)$/
+    );
+
+    if (numbered) {
+      flushParagraph();
+
+      if (
+        listItems.length &&
+        listType !== 'ol'
+      ) {
+        flushList();
+      }
+
+      listType = 'ol';
+      listItems.push(numbered[1]);
+      continue;
+    }
+
+    flushList();
+    paragraph.push(line);
+  }
+
+  flushParagraph();
+  flushList();
+
+  return (
+    <div className="chat-rich">
+      {blocks.map((block, index) => {
+        if (block.type === 'heading') {
+          const Heading =
+            block.level === 1
+              ? 'h3'
+              : 'h4';
+
+          return (
+            <Heading key={index}>
+              {renderChatInline(
+                block.value,
+                'heading-' + index
+              )}
+            </Heading>
+          );
+        }
+
+        if (
+          block.type === 'ul' ||
+          block.type === 'ol'
+        ) {
+          const List =
+            block.type === 'ol'
+              ? 'ol'
+              : 'ul';
+
+          return (
+            <List key={index}>
+              {block.items.map(
+                (item, itemIndex) => (
+                  <li key={itemIndex}>
+                    {renderChatInline(
+                      item,
+                      'list-' +
+                        index +
+                        '-' +
+                        itemIndex
+                    )}
+                  </li>
+                )
+              )}
+            </List>
+          );
+        }
+
+        return (
+          <p key={index}>
+            {renderChatInline(
+              block.value,
+              'paragraph-' + index
+            )}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function Chat({ content }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
@@ -917,6 +1136,19 @@ function Chat({ content }) {
               t:
                 data.reply ||
                 'No reply available.',
+              meta: {
+                model:
+                  data.model || '',
+                driveDocuments:
+                  Number(
+                    data.knowledge?.driveDocuments ||
+                    0
+                  ),
+                googleDrive:
+                  Boolean(
+                    data.knowledge?.googleDrive
+                  ),
+              },
             },
           ]);
 
@@ -967,7 +1199,33 @@ function Chat({ content }) {
                       : 'usr'
                   }
                 >
-                  {message.t}
+                  <ChatFormattedMessage
+                    text={message.t}
+                  />
+
+                  {message.a &&
+                    message.meta &&
+                    (message.meta.model ||
+                      message.meta.googleDrive) && (
+                      <div className="chat-answer-meta">
+                        {message.meta.model && (
+                          <span>
+                            {message.meta.model}
+                          </span>
+                        )}
+
+                        {message.meta.googleDrive && (
+                          <span>
+                            Drive evidence
+                            {message.meta.driveDocuments
+                              ? ' · ' +
+                                message.meta.driveDocuments +
+                                ' docs'
+                              : ''}
+                          </span>
+                        )}
+                      </div>
+                    )}
                 </div>
               )
             )}
@@ -2350,7 +2608,9 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
       : [];
 
   const [selectedNode, setSelectedNode] =
-    useState(null);
+    useState(
+      nodes[0]?.id || null
+    );
 
   function openNode(node) {
     setSelectedNode(node.id);
@@ -2396,31 +2656,41 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
     )
   );
 
+  const selected =
+    nodes.find(
+      (node) =>
+        node.id === selectedNode
+    ) || nodes[0];
+
+  const selectedBlock =
+    blocks.find(
+      (item) =>
+        item.id ===
+        selected?.refBlockId
+    ) || null;
+
   return (
     <section className="writeup-workflow">
       <div className="writeup-workflow-header">
         <div>
-          <small>INTERACTIVE WORKFLOW</small>
+          <small>
+            INTERACTIVE POLYMATH VECTOR
+          </small>
           <h3>
             {workspace.title ||
               'Challenge workflow'}
           </h3>
         </div>
+
         <span>
           {nodes.length} objects ·{' '}
           {edges.length} connections
         </span>
       </div>
 
-      <div
-        className="writeup-workflow-canvas"
-        style={{
-          minWidth: width,
-          minHeight: height,
-        }}
-      >
+      <div className="writeup-vector-scroll">
         <svg
-          className="writeup-workflow-lines"
+          className="writeup-vector-map"
           width={width}
           height={height}
           viewBox={
@@ -2429,8 +2699,22 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
             ' ' +
             height
           }
+          role="img"
+          aria-label="Interactive vector workflow diagram"
         >
           <defs>
+            <pattern
+              id="writeup-vector-grid"
+              width="22"
+              height="22"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M22 0H0V22"
+                className="writeup-vector-grid-line"
+              />
+            </pattern>
+
             <marker
               id="writeup-workflow-arrow"
               markerWidth="8"
@@ -2440,95 +2724,203 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
               orient="auto"
             >
               <path
-                d="M0,0 L0,6 L8,3 z"
+                d="M0 0L8 3L0 6Z"
+                className="writeup-vector-arrow"
               />
             </marker>
           </defs>
 
-          {edges.map((edge) => {
-            const from =
-              nodes.find(
-                (node) =>
-                  node.id === edge.from
+          <rect
+            width={width}
+            height={height}
+            fill="url(#writeup-vector-grid)"
+            className="writeup-vector-background"
+          />
+
+          <g className="writeup-vector-edges">
+            {edges.map((edge) => {
+              const from =
+                nodes.find(
+                  (node) =>
+                    node.id === edge.from
+                );
+
+              const to =
+                nodes.find(
+                  (node) =>
+                    node.id === edge.to
+                );
+
+              if (!from || !to) {
+                return null;
+              }
+
+              return (
+                <line
+                  key={edge.id}
+                  x1={
+                    Number(from.x || 0) +
+                    85
+                  }
+                  y1={
+                    Number(from.y || 0) +
+                    42
+                  }
+                  x2={
+                    Number(to.x || 0) +
+                    85
+                  }
+                  y2={
+                    Number(to.y || 0) +
+                    42
+                  }
+                  markerEnd="url(#writeup-workflow-arrow)"
+                />
+              );
+            })}
+          </g>
+
+          {nodes.map((node, index) => {
+            const block =
+              blocks.find(
+                (item) =>
+                  item.id ===
+                  node.refBlockId
               );
 
-            const to =
-              nodes.find(
-                (node) =>
-                  node.id === edge.to
-              );
+            const active =
+              node.id === selectedNode;
 
-            if (!from || !to) {
-              return null;
-            }
+            const x =
+              Number(node.x || 0) + 85;
+            const y =
+              Number(node.y || 0) + 42;
+
+            const label =
+              String(
+                node.label || 'Object'
+              ).slice(0, 24);
 
             return (
-              <line
-                key={edge.id}
-                x1={
-                  Number(from.x || 0) +
-                  85
+              <g
+                key={node.id}
+                className={
+                  active
+                    ? 'writeup-vector-node active'
+                    : 'writeup-vector-node'
                 }
-                y1={
-                  Number(from.y || 0) +
-                  42
+                transform={
+                  'translate(' +
+                  x +
+                  ' ' +
+                  y +
+                  ')'
                 }
-                x2={
-                  Number(to.x || 0) + 85
+                tabIndex={0}
+                role="button"
+                aria-label={
+                  label +
+                  (block
+                    ? ', jump to ' +
+                      block.type
+                    : '')
                 }
-                y2={
-                  Number(to.y || 0) + 42
+                onClick={() =>
+                  openNode(node)
                 }
-                markerEnd="url(#writeup-workflow-arrow)"
-              />
+                onFocus={() =>
+                  setSelectedNode(node.id)
+                }
+                onMouseEnter={() =>
+                  setSelectedNode(node.id)
+                }
+              >
+                <polygon
+                  points="-76,-34 61,-34 76,-19 76,28 63,41 -70,41 -82,29 -82,-22"
+                />
+
+                <circle
+                  cx="-61"
+                  cy="-13"
+                  r="5"
+                />
+
+                <text
+                  className="writeup-vector-node-index"
+                  x="-48"
+                  y="-9"
+                >
+                  {String(index + 1).padStart(
+                    2,
+                    '0'
+                  )}
+                  {' / '}
+                  {String(
+                    node.type || 'object'
+                  ).toUpperCase()}
+                </text>
+
+                <text
+                  className="writeup-vector-node-label"
+                  x="-61"
+                  y="14"
+                >
+                  {label}
+                </text>
+
+                <text
+                  className="writeup-vector-node-link"
+                  x="-61"
+                  y="29"
+                >
+                  {block
+                    ? 'OPEN ' +
+                      String(
+                        block.type || 'block'
+                      ).toUpperCase()
+                    : 'VECTOR OBJECT'}
+                </text>
+              </g>
             );
           })}
         </svg>
+      </div>
 
-        {nodes.map((node) => {
-          const block =
-            blocks.find(
-              (item) =>
-                item.id ===
-                node.refBlockId
-            );
+      {selected && (
+        <div className="writeup-vector-inspector">
+          <div>
+            <small>
+              SELECTED OBJECT
+            </small>
+            <strong>
+              {selected.label ||
+                'Object'}
+            </strong>
+          </div>
 
-          return (
+          <span>
+            {selected.type ||
+              'object'}
+          </span>
+
+          {selectedBlock ? (
             <button
-              key={node.id}
-              className={
-                selectedNode === node.id
-                  ? 'writeup-workflow-node selected'
-                  : 'writeup-workflow-node'
-              }
-              style={{
-                left: node.x,
-                top: node.y,
-              }}
+              type="button"
               onClick={() =>
-                openNode(node)
+                openNode(selected)
               }
             >
-              <span>
-                {node.type ||
-                  'object'}
-              </span>
-
-              <strong>
-                {node.label ||
-                  'Object'}
-              </strong>
-
-              {block && (
-                <small>
-                  Jump to{' '}
-                  {block.type}
-                </small>
-              )}
+              Jump to{' '}
+              {selectedBlock.type}
+              {' '}block →
             </button>
-          );
-        })}
-      </div>
+          ) : (
+            <em>
+              No document block attached
+            </em>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -2759,27 +3151,318 @@ function CTFWriteupDocument({
   );
 }
 
+function PolymathVectorSystem({
+  compact = false,
+}) {
+  const nodes = [
+    {
+      id: 'CPU',
+      x: 92,
+      y: 92,
+      note: 'execution / registers',
+    },
+    {
+      id: 'MEM',
+      x: 252,
+      y: 54,
+      note: 'memory / artifacts',
+    },
+    {
+      id: 'NET',
+      x: 432,
+      y: 102,
+      note: 'packets / protocols',
+    },
+    {
+      id: 'AUTH',
+      x: 592,
+      y: 62,
+      note: 'identity / trust',
+    },
+    {
+      id: 'DFIR',
+      x: 626,
+      y: 226,
+      note: 'evidence / timeline',
+    },
+    {
+      id: 'PKT',
+      x: 432,
+      y: 286,
+      note: 'capture / inspect',
+    },
+    {
+      id: 'DISK',
+      x: 244,
+      y: 248,
+      note: 'filesystem / sectors',
+    },
+    {
+      id: 'SHELL',
+      x: 86,
+      y: 238,
+      note: 'commands / process',
+    },
+  ];
+
+  const edges = [
+    ['CPU', 'MEM'],
+    ['CPU', 'SHELL'],
+    ['CPU', 'NET'],
+    ['MEM', 'DISK'],
+    ['NET', 'AUTH'],
+    ['NET', 'PKT'],
+    ['AUTH', 'DFIR'],
+    ['PKT', 'DFIR'],
+    ['DISK', 'DFIR'],
+    ['SHELL', 'DISK'],
+    ['MEM', 'NET'],
+  ];
+
+  const [activeId, setActiveId] =
+    useState('NET');
+
+  const active =
+    nodes.find(
+      (node) => node.id === activeId
+    ) || nodes[0];
+
+  const nodeById = Object.fromEntries(
+    nodes.map((node) => [
+      node.id,
+      node,
+    ])
+  );
+
+  return (
+    <div
+      className={
+        compact
+          ? 'poly-system poly-system-compact'
+          : 'poly-system'
+      }
+    >
+      <svg
+        viewBox="0 0 720 350"
+        role="img"
+        aria-label="Interactive vector map of computer systems and cybersecurity concepts"
+      >
+        <defs>
+          <pattern
+            id="poly-grid"
+            width="24"
+            height="24"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M24 0H0V24"
+              className="poly-grid-line"
+            />
+          </pattern>
+
+          <marker
+            id="poly-arrow"
+            markerWidth="8"
+            markerHeight="8"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <path
+              d="M0 0L8 3L0 6Z"
+              className="poly-arrow"
+            />
+          </marker>
+        </defs>
+
+        <rect
+          className="poly-grid"
+          x="0"
+          y="0"
+          width="720"
+          height="350"
+          fill="url(#poly-grid)"
+        />
+
+        <polygon
+          className="poly-frame"
+          points="26,24 678,24 704,50 704,306 680,330 40,330 16,306 16,52"
+        />
+
+        <g className="poly-edges">
+          {edges.map(([fromId, toId]) => {
+            const from = nodeById[fromId];
+            const to = nodeById[toId];
+
+            return (
+              <line
+                key={fromId + '-' + toId}
+                x1={from.x}
+                y1={from.y}
+                x2={to.x}
+                y2={to.y}
+                markerEnd="url(#poly-arrow)"
+              />
+            );
+          })}
+        </g>
+
+        <g className="poly-orbit">
+          <circle
+            cx="356"
+            cy="174"
+            r="118"
+          />
+          <circle
+            cx="356"
+            cy="174"
+            r="82"
+          />
+        </g>
+
+        {nodes.map((node, index) => {
+          const selected =
+            node.id === activeId;
+
+          return (
+            <g
+              key={node.id}
+              className={
+                selected
+                  ? 'poly-node active'
+                  : 'poly-node'
+              }
+              transform={
+                'translate(' +
+                node.x +
+                ' ' +
+                node.y +
+                ')'
+              }
+              tabIndex={0}
+              role="button"
+              aria-label={
+                node.id + ': ' + node.note
+              }
+              onMouseEnter={() =>
+                setActiveId(node.id)
+              }
+              onFocus={() =>
+                setActiveId(node.id)
+              }
+              onClick={() =>
+                setActiveId(node.id)
+              }
+            >
+              <polygon
+                points="-38,-20 30,-20 40,-10 40,18 30,28 -38,28 -46,20 -46,-12"
+              />
+              <circle
+                cx="-29"
+                cy="-4"
+                r="4"
+              />
+              <text
+                x="-18"
+                y="1"
+              >
+                {node.id}
+              </text>
+              <text
+                className="poly-node-index"
+                x="-30"
+                y="17"
+              >
+                {'0' + (index + 1)}
+              </text>
+            </g>
+          );
+        })}
+
+        <g className="poly-readout">
+          <text
+            x="300"
+            y="157"
+            className="poly-readout-label"
+          >
+            ACTIVE SYSTEM
+          </text>
+          <text
+            x="300"
+            y="182"
+            className="poly-readout-title"
+          >
+            {active.id}
+          </text>
+          <text
+            x="300"
+            y="204"
+            className="poly-readout-note"
+          >
+            {active.note}
+          </text>
+        </g>
+
+        <path
+          className="poly-scan"
+          d="M42 315H676"
+        />
+      </svg>
+    </div>
+  );
+}
+
 function CTFBlogIndexView() {
   const [items, setItems] =
     useState([]);
 
   useEffect(() => {
-    fetch(BASE_PATH + 'ctf-blog/index.json')
-      .then((response) =>
-        response.ok
-          ? response.json()
-          : { writeups: [] }
-      )
-      .then((data) =>
-        setItems(
-          Array.isArray(
-            data?.writeups
-          )
-            ? data.writeups
-            : []
-        )
-      )
-      .catch(() => setItems([]));
+    let active = true;
+
+    async function loadIndex() {
+      const candidates = [
+        BASE_PATH + 'ctf_blog/index.json',
+        BASE_PATH + 'ctf-blog/index.json',
+      ];
+
+      for (const url of candidates) {
+        try {
+          const response =
+            await fetch(url);
+
+          if (!response.ok) {
+            continue;
+          }
+
+          const data =
+            await response.json();
+
+          if (active) {
+            setItems(
+              Array.isArray(
+                data?.writeups
+              )
+                ? data.writeups
+                : []
+            );
+          }
+
+          return;
+        } catch {
+          // Try the legacy path next.
+        }
+      }
+
+      if (active) {
+        setItems([]);
+      }
+    }
+
+    loadIndex();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return (
@@ -2790,53 +3473,110 @@ function CTFBlogIndexView() {
             ZUL<span>/</span>JAMAL
           </b>
         </a>
-        <a href={BASE_PATH + "ctf-blog/"}>
-          CTF Blog
+
+        <a href="/blog">
+          Blog
         </a>
       </nav>
 
       <main className="writeup-index">
-        <small>CTF / WRITEUPS</small>
-        <h1>
-          Challenge notes,
-          <br />
-          <i>workflows & proof.</i>
-        </h1>
-        <p>
-          Interactive writeups built from
-          challenge sessions, evidence and
-          runnable experiments.
-        </p>
+        <section className="writeup-index-hero">
+          <div className="writeup-index-copy">
+            <small>
+              BLOG / CTF LAB
+            </small>
+
+            <h1>
+              Systems, security,
+              <br />
+              <i>workflows & proof.</i>
+            </h1>
+
+            <p>
+              Interactive cybersecurity writeups
+              with runnable experiments, system
+              maps and evidence-driven notes.
+            </p>
+
+            <div className="writeup-engine-strip">
+              <span>Cloudflare R2 media</span>
+              <span>Judge0 code runner</span>
+              <span>Pure SVG vector systems</span>
+            </div>
+          </div>
+
+          <PolymathVectorSystem />
+        </section>
 
         {!items.length ? (
           <div className="writeup-index-empty">
-            No public writeups yet.
+            <strong>
+              No public writeups yet.
+            </strong>
+            <span>
+              Published CTF notes will appear
+              here as interactive lab entries.
+            </span>
           </div>
         ) : (
           <div className="writeup-index-grid">
-            {items.map((item) => (
+            {items.map((item, index) => (
               <a
                 key={item.slug}
                 href={
-                  '/ctf-blog/' +
+                  '/ctf_blog/' +
                   item.slug
                 }
                 className="writeup-index-card"
               >
+                <div className="writeup-card-vector">
+                  <span>
+                    {String(index + 1).padStart(
+                      2,
+                      '0'
+                    )}
+                  </span>
+                  <svg
+                    viewBox="0 0 160 60"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 48L38 18L72 39L108 10L156 36" />
+                    <circle cx="38" cy="18" r="4" />
+                    <circle cx="72" cy="39" r="4" />
+                    <circle cx="108" cy="10" r="4" />
+                  </svg>
+                </div>
+
                 <small>
                   {writeupDate(
                     item.updatedAt
                   )}
                 </small>
+
                 <h2>
                   {item.title}
                 </h2>
+
                 <p>
                   {item.excerpt}
                 </p>
-                <span>
-                  Open writeup →
-                </span>
+
+                {Array.isArray(item.tags) &&
+                  item.tags.length > 0 && (
+                    <div className="writeup-index-tags">
+                      {item.tags
+                        .slice(0, 4)
+                        .map((tag) => (
+                          <span key={tag}>
+                            {tag}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+
+                <b>
+                  Open lab writeup →
+                </b>
               </a>
             ))}
           </div>
@@ -2857,34 +3597,50 @@ function CTFWriteupView({ slug }) {
   useEffect(() => {
     let mounted = true;
 
-    fetch(
-      BASE_PATH + 'ctf-blog/' +
-        encodeURIComponent(slug) +
-        '.json'
-    )
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(
-            'Writeup not found'
-          );
-        }
+    async function loadWriteup() {
+      const encoded =
+        encodeURIComponent(slug);
+      const candidates = [
+        BASE_PATH +
+          'ctf_blog/' +
+          encoded +
+          '.json',
+        BASE_PATH +
+          'ctf-blog/' +
+          encoded +
+          '.json',
+      ];
 
-        return response.json();
-      })
-      .then((data) => {
-        if (mounted) {
-          setWriteup(data);
-          setLoading(false);
+      for (const url of candidates) {
+        try {
+          const response =
+            await fetch(url);
+
+          if (!response.ok) {
+            continue;
+          }
+
+          const data =
+            await response.json();
+
+          if (mounted) {
+            setWriteup(data);
+            setLoading(false);
+          }
+
+          return;
+        } catch {
+          // Try legacy storage path.
         }
-      })
-      .catch((requestError) => {
-        if (mounted) {
-          setError(
-            requestError.message
-          );
-          setLoading(false);
-        }
-      });
+      }
+
+      if (mounted) {
+        setError('Writeup not found');
+        setLoading(false);
+      }
+    }
+
+    loadWriteup();
 
     return () => {
       mounted = false;
@@ -2894,7 +3650,7 @@ function CTFWriteupView({ slug }) {
   if (loading) {
     return (
       <div className="writeup-loading">
-        Loading writeup...
+        Loading interactive lab...
       </div>
     );
   }
@@ -2906,15 +3662,18 @@ function CTFWriteupView({ slug }) {
           <a href="/">
             ZUL/JAMAL
           </a>
-          <a href="/ctf-blog/">
-            CTF Blog
+          <a href="/blog">
+            Blog
           </a>
         </nav>
+
         <main className="writeup-error">
           <small>CTF BLOG</small>
-          <h1>{error || 'Writeup not found'}</h1>
-          <a href="/ctf-blog/">
-            Back to writeups
+          <h1>
+            {error || 'Writeup not found'}
+          </h1>
+          <a href="/blog">
+            Back to blog
           </a>
         </main>
       </>
@@ -2935,10 +3694,28 @@ function CTFWriteupView({ slug }) {
           </b>
         </a>
 
-        <a href="/ctf-blog/">
-          CTF Blog
+        <a href="/blog">
+          Blog
         </a>
       </nav>
+
+      <div className="writeup-lab-banner">
+        <div>
+          <small>
+            INTERACTIVE CTF LAB
+          </small>
+          <span>
+            Media → Cloudflare R2
+          </span>
+          <span>
+            Code execution → Judge0
+          </span>
+        </div>
+
+        <PolymathVectorSystem
+          compact
+        />
+      </div>
 
       <div className="writeup-layout">
         <WriteupSessionNav
@@ -2953,6 +3730,7 @@ function CTFWriteupView({ slug }) {
             <h1>
               {writeup.title}
             </h1>
+
             {writeup.excerpt && (
               <p>
                 {writeup.excerpt}
@@ -2964,6 +3742,7 @@ function CTFWriteupView({ slug }) {
                 {writeup.author ||
                   'Zulfaqar Jamal'}
               </span>
+
               {writeup.updatedAt && (
                 <span>
                   Updated{' '}
@@ -2974,16 +3753,21 @@ function CTFWriteupView({ slug }) {
               )}
 
               {writeup.ctf?.event && (
-                <span>{writeup.ctf.event}</span>
+                <span>
+                  {writeup.ctf.event}
+                </span>
               )}
 
               {writeup.ctf?.category && (
-                <span>{writeup.ctf.category}</span>
+                <span>
+                  {writeup.ctf.category}
+                </span>
               )}
 
               {writeup.ctf?.difficulty && (
                 <span>
-                  Difficulty: {writeup.ctf.difficulty}
+                  Difficulty:{' '}
+                  {writeup.ctf.difficulty}
                 </span>
               )}
 
@@ -2993,14 +3777,11 @@ function CTFWriteupView({ slug }) {
                 </span>
               )}
 
-              {writeup.tags
-                ?.length > 0 && (
+              {writeup.tags?.length > 0 && (
                 <div>
                   {writeup.tags.map(
                     (tag) => (
-                      <span
-                        key={tag}
-                      >
+                      <span key={tag}>
                         {tag}
                       </span>
                     )
@@ -3017,7 +3798,7 @@ function CTFWriteupView({ slug }) {
           <section className="writeup-discussion">
             <GiscusComments
               discussionTerm={
-                'ctf-blog:' +
+                'ctf_blog:' +
                 slug
               }
             />
@@ -3059,8 +3840,10 @@ export default function App({ initialContent = null }) {
     pathnameWithoutBase.replace(/\/+$/, '');
 
   const isCtfRoute =
+    ctfPath === '/blog' ||
+    ctfPath === '/ctf_blog' ||
     ctfPath === '/ctf-blog' ||
-    ctfPath === '/ctf-blog/' ||
+    ctfPath.startsWith('/ctf_blog/') ||
     ctfPath.startsWith('/ctf-blog/');
 
   const isExplorationRoute =
@@ -3242,14 +4025,26 @@ export default function App({ initialContent = null }) {
      CTF BLOG ROUTES
   ======================================================= */
 
-  if (ctfPath === '/ctf-blog' || ctfPath === '/ctf-blog/') {
+  if (
+    ctfPath === '/blog' ||
+    ctfPath === '/ctf_blog' ||
+    ctfPath === '/ctf-blog'
+  ) {
     return <CTFBlogIndexView />;
   }
 
-  if (ctfPath.startsWith('/ctf-blog/')) {
+  if (
+    ctfPath.startsWith('/ctf_blog/') ||
+    ctfPath.startsWith('/ctf-blog/')
+  ) {
+    const prefix =
+      ctfPath.startsWith('/ctf_blog/')
+        ? '/ctf_blog/'
+        : '/ctf-blog/';
+
     const slug =
       decodeURIComponent(
-        ctfPath.slice('/ctf-blog/'.length)
+        ctfPath.slice(prefix.length)
       );
 
     if (slug) {
@@ -3462,8 +4257,8 @@ export default function App({ initialContent = null }) {
             Games
           </a>
 
-          <a href="/ctf-blog/" onClick={() => setMobileNavOpen(false)}>
-            CTF Blog
+          <a href="/blog" onClick={() => setMobileNavOpen(false)}>
+            Blog / CTF Labs
           </a>
         </div>
       </nav>
