@@ -2061,10 +2061,19 @@ app.post(
       'general'
     ).trim();
 
+    const contentKind =
+      String(
+        request.body?.contentKind ||
+          'ctf'
+      )
+        .trim()
+        .toLowerCase();
+
     if (
       !filename ||
       filename.length > 180 ||
-      contentType.length > 120
+      contentType.length > 120 ||
+      !['ctf', 'blog', 'webcomic'].includes(contentKind)
     ) {
       return response.status(400).json({
         error: 'invalid_upload_request',
@@ -2095,8 +2104,15 @@ app.post(
         });
       }
 
+      const prefix =
+        contentKind === 'blog'
+          ? 'blog/'
+          : contentKind === 'webcomic'
+            ? 'webcomic/'
+            : 'ctf_blog/';
+
       const key =
-        'ctf_blog/' +
+        prefix +
         slug +
         '/' +
         Date.now() +
