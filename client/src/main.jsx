@@ -79,6 +79,11 @@ function normalizeAssetPath(value) {
     normalized = `/${normalized}`;
   }
 
+  const base = import.meta.env.BASE_URL || '/';
+  if (base !== '/' && !normalized.startsWith(base)) {
+    normalized = base.replace(/\\/$/, '') + normalized;
+  }
+
   return normalized;
 }
 
@@ -2774,7 +2779,7 @@ function App() {
       try {
         setLoadProgress(18);
 
-        const response = await fetch('/content.json');
+        const response = await fetch(`${import.meta.env.BASE_URL}content.json`);
 
         if (!response.ok) {
           throw new Error('content.json unavailable');
