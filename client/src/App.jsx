@@ -3090,17 +3090,23 @@ export default function App({ initialContent = null }) {
   }, [isCtfRoute]);
 
   useEffect(() => {
-    if (!driveMediaFiles.length) {
+    if (
+      !content ||
+      !driveMediaFiles.length
+    ) {
       return;
     }
 
-    setContent((current) =>
+    const next =
       attachDriveMediaFallbacks(
-        current,
+        content,
         driveMediaFiles
-      )
-    );
-  }, [driveMediaFiles]);
+      );
+
+    if (next !== content) {
+      setContent(next);
+    }
+  }, [content, driveMediaFiles]);
 
   // Keep the first render deterministic for Astro SSR.
   // The real hash is applied immediately after hydration.
