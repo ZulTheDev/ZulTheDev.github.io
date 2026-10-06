@@ -75,3 +75,16 @@ The online comment service does not intentionally store IP addresses, precise lo
 ## Scope
 
 This service is deliberately small. It is a comment persistence endpoint for a personal portfolio, not a general-purpose backend, security-testing target, or enterprise platform.
+
+
+## Google Drive portfolio knowledge scope
+
+The public portfolio chatbot is intentionally hard-scoped to exactly one Google Drive folder:
+
+`10XU8zeRpx9Ladh501vWjZepzm0j7ZOq6`
+
+The service account should be given **Viewer** access to that folder only. The chatbot recursively scans descendant folders, searches the Drive full-text index for relevant files, and reads the most relevant Google Docs, Sheets, Slides, text, JSON and XML content for each visitor question.
+
+Binary or unsupported files are not treated as if their contents were read. Their filename, folder path, MIME type and explicit Drive description may be used as metadata evidence only. This prevents the chatbot from inventing details from an unread PDF, image, video or other binary file.
+
+The Drive folder ID is fixed in application code so a Vercel environment variable cannot accidentally widen the chatbot to a different Drive folder. A configured Media folder is accepted only when it is inside the approved root.

@@ -1,10 +1,12 @@
 import { createSign } from 'node:crypto';
 import { config } from './config.js';
 
-const MAX_FILES = 80;
-const MAX_TOTAL_CHARS = 70000;
-const FILE_MAX_CHARS = 16000;
-const MAX_KNOWLEDGE_READS = 5;
+const MAX_FILES = 2000;
+const MAX_FOLDERS = 500;
+const MAX_TOTAL_CHARS = 120000;
+const FILE_MAX_CHARS = 24000;
+const MAX_KNOWLEDGE_READS = 12;
+const KNOWLEDGE_INDEX_TTL_MS = 5 * 60 * 1000;
 const MAX_MEDIA_FILES = 250;
 const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
@@ -14,6 +16,14 @@ let discoveredMediaFolderId = '';
 let discoveredMediaFolderAt = 0;
 
 const folderCache = new Map();
+
+let knowledgeIndexCache = {
+  folderId: '',
+  files: [],
+  scannedFolders: 0,
+  truncated: false,
+  expiresAt: 0,
+};
 
 function base64url(value) {
   return Buffer.from(value)
@@ -178,20 +188,64 @@ export async function getAccessToken() {
 }
 
 async function listDriveFiles(token, rootFolderId) {
-  const discovered = [];
-  const queue = [rootFolderId];
-
-  while (
-    queue.length &&
-    discovered.length < MAX_FILES
+  if (
+    knowledgeIndexCache.folderId === rootFolderId &&
+    Date.now() < knowledgeIndexCache.expiresAt
   ) {
-    const parentId = queue.shift();
+    return knowledgeIndexCache;
+  }
+
+  const root = await getDriveMetadata(
+    token,
+    rootFolderId
+  );
+
+  if (
+    root.trashed ||
+    root.mimeType !==
+      'application/vnd.google-apps.folder'
+  ) {
+    throw new Error(
+      'Configured Google Drive scope is not an accessible folder.'
+    );
+  }
+
+  const discovered = [];
+  const queue = [
+    {
+      id: rootFolderId,
+      path: cleanText(root.name || 'Portfolio', 300),
+    },
+  ];
+  const visitedFolders = new Set();
+  let truncated = false;
+
+  while (queue.length) {
+    if (
+      discovered.length >= MAX_FILES ||
+      visitedFolders.size >= MAX_FOLDERS
+    ) {
+      truncated = true;
+      break;
+    }
+
+    const current = queue.shift();
+
+    if (
+      !current?.id ||
+      visitedFolders.has(current.id)
+    ) {
+      continue;
+    }
+
+    visitedFolders.add(current.id);
+
     let pageToken = '';
 
     do {
       const params = new URLSearchParams({
         q:
-          `'${parentId}' in parents and trashed = false`,
+          `'${current.id}' in parents and trashed = false`,
         pageSize: '100',
         fields:
           'nextPageToken,files(id,name,mimeType,modifiedTime,description,parents,size)',
@@ -214,17 +268,38 @@ async function listDriveFiles(token, rootFolderId) {
       );
 
       for (const file of data.files || []) {
+        const filePath =
+          current.path +
+          '/' +
+          cleanText(file.name, 300);
+
         if (
           file.mimeType ===
           'application/vnd.google-apps.folder'
         ) {
-          queue.push(file.id);
+          if (
+            visitedFolders.size + queue.length <
+            MAX_FOLDERS
+          ) {
+            queue.push({
+              id: file.id,
+              path: filePath,
+            });
+          } else {
+            truncated = true;
+          }
+
           continue;
         }
 
-        discovered.push(file);
+        discovered.push({
+          ...file,
+          folderPath: current.path,
+          fullPath: filePath,
+        });
 
         if (discovered.length >= MAX_FILES) {
+          truncated = true;
           break;
         }
       }
@@ -236,7 +311,88 @@ async function listDriveFiles(token, rootFolderId) {
     );
   }
 
-  return discovered;
+  knowledgeIndexCache = {
+    folderId: rootFolderId,
+    files: discovered,
+    scannedFolders: visitedFolders.size,
+    truncated,
+    expiresAt:
+      Date.now() +
+      KNOWLEDGE_INDEX_TTL_MS,
+  };
+
+  return knowledgeIndexCache;
+}
+
+
+async function searchDriveIndexMatches(
+  token,
+  allowedFiles,
+  terms
+) {
+  const searchableTerms =
+    terms
+      .filter((term) =>
+        /^[a-z0-9_-]{3,40}$/.test(term)
+      )
+      .slice(0, 6);
+
+  if (!searchableTerms.length) {
+    return new Set();
+  }
+
+  const allowedById = new Map(
+    allowedFiles.map((file) => [
+      file.id,
+      file,
+    ])
+  );
+
+  const query =
+    'trashed = false and (' +
+    searchableTerms
+      .map(
+        (term) =>
+          `fullText contains '${term}'`
+      )
+      .join(' or ') +
+    ')';
+
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      pageSize: '100',
+      fields: 'files(id)',
+      includeItemsFromAllDrives: 'true',
+      supportsAllDrives: 'true',
+    });
+
+    const data = await fetchJson(
+      'https://www.googleapis.com/drive/v3/files?' +
+        params.toString(),
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      12000
+    );
+
+    return new Set(
+      (data.files || [])
+        .map((file) => file.id)
+        .filter((id) =>
+          allowedById.has(id)
+        )
+    );
+  } catch (error) {
+    console.warn(
+      'Google Drive full-text index search unavailable:',
+      error?.message || error
+    );
+
+    return new Set();
+  }
 }
 
 function isReadableKnowledgeMime(mimeType) {
@@ -315,11 +471,154 @@ export function driveKnowledgeConfigured() {
   );
 }
 
+function knowledgeTerms(query = '') {
+  const stop = new Set([
+    'about',
+    'and',
+    'are',
+    'can',
+    'for',
+    'from',
+    'have',
+    'his',
+    'how',
+    'information',
+    'me',
+    'my',
+    'of',
+    'say',
+    'tell',
+    'the',
+    'their',
+    'they',
+    'this',
+    'what',
+    'who',
+    'with',
+    'you',
+    'zul',
+  ]);
+
+  const requested = String(query)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(
+      (term) =>
+        term.length >= 3 &&
+        !stop.has(term)
+    );
+
+  const identity = String(
+    config.portfolioName || ''
+  )
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((term) => term.length >= 3);
+
+  return Array.from(
+    new Set([
+      ...requested,
+      ...identity,
+    ])
+  ).slice(0, 24);
+}
+
+function fileKnowledgeScore(file, terms) {
+  const name =
+    String(file.name || '').toLowerCase();
+  const description =
+    String(file.description || '').toLowerCase();
+  const path =
+    String(file.fullPath || '').toLowerCase();
+  const haystack =
+    name + ' ' + description + ' ' + path;
+
+  let score = 0;
+
+  for (const term of terms) {
+    if (name.includes(term)) {
+      score += 8;
+    }
+
+    if (description.includes(term)) {
+      score += 5;
+    }
+
+    if (path.includes(term)) {
+      score += 3;
+    }
+  }
+
+  const portfolioSignals = [
+    'resume',
+    'cv',
+    'profile',
+    'about',
+    'experience',
+    'education',
+    'certificate',
+    'certification',
+    'award',
+    'achievement',
+    'project',
+    'ctf',
+    'cyber',
+    'security',
+    'writeup',
+    'portfolio',
+    'intern',
+    'skill',
+    'leadership',
+    'volunteer',
+  ];
+
+  for (const signal of portfolioSignals) {
+    if (haystack.includes(signal)) {
+      score += 2;
+    }
+  }
+
+  if (isReadableKnowledgeMime(file.mimeType)) {
+    score += 2;
+  }
+
+  return score;
+}
+
+function metadataKnowledgeDocument(file) {
+  const description =
+    cleanText(file.description || '', 4000);
+
+  return {
+    name: cleanText(file.name, 300),
+    mimeType: cleanText(file.mimeType, 200),
+    modifiedTime: file.modifiedTime || '',
+    sourcePath:
+      cleanText(file.fullPath || file.name, 600),
+    evidenceMode: 'metadata',
+    content: cleanText(
+      [
+        'FILE METADATA ONLY — do not claim details that are not explicit here.',
+        'Name: ' + (file.name || ''),
+        'Folder path: ' + (file.folderPath || ''),
+        'MIME type: ' + (file.mimeType || ''),
+        description
+          ? 'Drive description: ' + description
+          : 'Drive description: not provided',
+      ].join('\n'),
+      FILE_MAX_CHARS
+    ),
+  };
+}
+
 export async function loadDriveKnowledge(query = '') {
   if (!driveKnowledgeConfigured()) {
     return {
       configured: false,
       documents: [],
+      scannedFiles: 0,
+      scannedFolders: 0,
+      truncated: false,
     };
   }
 
@@ -331,42 +630,74 @@ export async function loadDriveKnowledge(query = '') {
     );
   }
 
-  const files = await listDriveFiles(
+  const index = await listDriveFiles(
     token,
     config.drive.folderId
   );
 
-  const terms = String(query)
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((term) => term.length >= 3);
+  const files =
+    Array.isArray(index.files)
+      ? index.files
+      : [];
+
+  const terms = knowledgeTerms(query);
+  const fullTextMatches =
+    await searchDriveIndexMatches(
+      token,
+      files,
+      terms
+    );
 
   const scored = files
-    .filter((file) =>
-      isReadableKnowledgeMime(file.mimeType)
-    )
-    .map((file) => {
-      const haystack =
-        `${file.name} ${file.description || ''}`.toLowerCase();
-
-      const score = terms.reduce(
-        (total, term) =>
-          total +
-          (haystack.includes(term) ? 1 : 0),
-        0
-      );
-
-      return { file, score };
-    })
+    .map((file) => ({
+      file,
+      score:
+        fileKnowledgeScore(
+          file,
+          terms
+        ) +
+        (
+          fullTextMatches.has(file.id)
+            ? 20
+            : 0
+        ),
+      matchedByDriveIndex:
+        fullTextMatches.has(file.id),
+    }))
     .sort(
       (a, b) =>
         b.score - a.score ||
-        a.file.name.localeCompare(b.file.name)
+        String(
+          b.file.modifiedTime || ''
+        ).localeCompare(
+          String(
+            a.file.modifiedTime || ''
+          )
+        ) ||
+        String(a.file.name || '').localeCompare(
+          String(b.file.name || '')
+        )
+    );
+
+  const readable = scored
+    .filter(({ file }) =>
+      isReadableKnowledgeMime(
+        file.mimeType
+      )
     )
     .slice(0, MAX_KNOWLEDGE_READS);
 
+  const metadataOnly = scored
+    .filter(
+      ({ file }) =>
+        !isReadableKnowledgeMime(
+          file.mimeType
+        )
+    )
+    .slice(0, 8);
+
   const loaded = await Promise.all(
-    scored.map(async ({ file }) => {
+    readable.map(async ({ file }) => {
       try {
         const content = await readFile(
           token,
@@ -374,24 +705,35 @@ export async function loadDriveKnowledge(query = '') {
         );
 
         if (!content) {
-          return null;
+          return metadataKnowledgeDocument(
+            file
+          );
         }
 
         return {
           name: cleanText(file.name, 300),
-          mimeType: cleanText(file.mimeType, 200),
+          mimeType:
+            cleanText(file.mimeType, 200),
           modifiedTime:
             file.modifiedTime || '',
+          sourcePath:
+            cleanText(
+              file.fullPath || file.name,
+              600
+            ),
+          evidenceMode: 'content',
           content,
         };
       } catch (error) {
         console.warn(
-          'Drive knowledge file skipped:',
+          'Drive knowledge file could not be read; using metadata:',
           file.name,
           error?.message || error
         );
 
-        return null;
+        return metadataKnowledgeDocument(
+          file
+        );
       }
     })
   );
@@ -399,22 +741,48 @@ export async function loadDriveKnowledge(query = '') {
   const documents = [];
   let totalChars = 0;
 
-  for (const document of loaded) {
+  for (const document of [
+    ...loaded,
+    ...metadataOnly.map(
+      ({ file }) =>
+        metadataKnowledgeDocument(file)
+    ),
+  ]) {
     if (!document) {
       continue;
     }
 
-    documents.push(document);
-    totalChars += document.content.length;
+    const remaining =
+      MAX_TOTAL_CHARS - totalChars;
 
-    if (totalChars >= MAX_TOTAL_CHARS) {
+    if (remaining <= 0) {
       break;
     }
+
+    documents.push({
+      ...document,
+      content:
+        document.content.slice(
+          0,
+          remaining
+        ),
+    });
+
+    totalChars +=
+      Math.min(
+        document.content.length,
+        remaining
+      );
   }
 
   return {
     configured: true,
     documents,
+    scannedFiles: files.length,
+    scannedFolders:
+      Number(index.scannedFolders || 0),
+    truncated:
+      Boolean(index.truncated),
   };
 }
 
@@ -457,8 +825,40 @@ async function getDriveMetadata(token, fileId) {
 }
 
 async function discoverMediaFolderId(token) {
+  const rootFolderId = config.drive.folderId;
+
+  if (!rootFolderId) {
+    return '';
+  }
+
   if (config.drive.mediaFolderId) {
-    return config.drive.mediaFolderId;
+    const candidate =
+      await getDriveMetadata(
+        token,
+        config.drive.mediaFolderId
+      );
+
+    const candidateAllowed =
+      config.drive.mediaFolderId ===
+        rootFolderId ||
+      (
+        candidate.mimeType ===
+          'application/vnd.google-apps.folder' &&
+        !candidate.trashed &&
+        await fileIsWithinFolder(
+          token,
+          candidate,
+          rootFolderId
+        )
+      );
+
+    if (candidateAllowed) {
+      return config.drive.mediaFolderId;
+    }
+
+    console.warn(
+      'Ignoring GOOGLE_DRIVE_MEDIA_FOLDER_ID because it is outside the approved portfolio Drive scope.'
+    );
   }
 
   if (
@@ -468,8 +868,6 @@ async function discoverMediaFolderId(token) {
   ) {
     return discoveredMediaFolderId;
   }
-
-  const rootFolderId = config.drive.folderId;
 
   if (!rootFolderId) {
     return '';

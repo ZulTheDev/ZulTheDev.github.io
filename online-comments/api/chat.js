@@ -142,32 +142,68 @@ async function loadSiteContext() {
 }
 
 function rankDocuments(documents, message) {
+  const stop = new Set([
+    'about',
+    'and',
+    'are',
+    'can',
+    'for',
+    'from',
+    'have',
+    'information',
+    'me',
+    'my',
+    'say',
+    'tell',
+    'the',
+    'this',
+    'what',
+    'who',
+    'with',
+    'you',
+  ]);
+
   const terms = String(message)
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((term) => term.length >= 3);
+    .filter(
+      (term) =>
+        term.length >= 3 &&
+        !stop.has(term)
+    );
 
   return documents
-    .map((document) => {
+    .map((document, index) => {
       const haystack =
-        `${document.name} ${document.content}`
+        `${document.name} ${document.sourcePath || ''} ${document.content}`
           .toLowerCase();
 
-      const score = terms.reduce(
+      const textScore = terms.reduce(
         (total, term) =>
           total +
           (haystack.includes(term) ? 1 : 0),
         0
       );
 
-      return { document, score };
+      // loadDriveKnowledge already ranks the complete approved
+      // folder. Preserve that relevance order for broad prompts,
+      // while still allowing explicit visitor terms to dominate.
+      const prior =
+        Math.max(
+          0,
+          documents.length - index
+        );
+
+      return {
+        document,
+        score:
+          textScore * 100 +
+          prior,
+      };
     })
     .sort(
       (a, b) =>
-        b.score - a.score ||
-        a.document.name.localeCompare(
-          b.document.name
-        )
+        b.score - a.score
     )
     .slice(0, 8);
 }
@@ -194,8 +230,12 @@ function buildContext({
     context +=
       '\n\nGOOGLE DRIVE DOCUMENT: ' +
       entry.document.name +
+      '\nPATH: ' +
+      (entry.document.sourcePath || entry.document.name) +
       '\nTYPE: ' +
       entry.document.mimeType +
+      '\nEVIDENCE MODE: ' +
+      (entry.document.evidenceMode || 'content') +
       '\nCONTENT:\n' +
       entry.document.content;
   }
@@ -222,6 +262,9 @@ function buildSystemPrompt() {
     '',
     'EVIDENCE RULE',
     '- Use the public portfolio and approved Google Drive knowledge as sources of truth.',
+    '- Google Drive retrieval is strictly limited to the single approved portfolio folder and its descendants. Never imply access to any other Drive folder or file.',
+    '- For open-ended questions about Zul, actively synthesize useful facts from the supplied Drive evidence instead of relying only on the static portfolio.',
+    '- If a Drive item is marked EVIDENCE MODE: metadata, use only its filename, path, MIME type and explicit Drive description. Do not infer the unseen file contents.',
     '- Distinguish facts from inference.',
     '- When evidence is missing, say the portfolio does not currently provide enough information.',
     '',
@@ -321,6 +364,9 @@ export default async function handler(
       configured:
         driveKnowledgeConfigured(),
       documents: [],
+      scannedFiles: 0,
+      scannedFolders: 0,
+      truncated: false,
     };
 
     try {
@@ -374,6 +420,18 @@ export default async function handler(
           ),
         driveDocuments:
           selectedDrive.length,
+        scannedFiles:
+          Number(
+            driveResult.scannedFiles || 0
+          ),
+        scannedFolders:
+          Number(
+            driveResult.scannedFolders || 0
+          ),
+        truncated:
+          Boolean(
+            driveResult.truncated
+          ),
       },
       persistentStorage: false,
     });
