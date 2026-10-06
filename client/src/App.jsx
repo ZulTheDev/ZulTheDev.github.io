@@ -827,6 +827,225 @@ function writeChatSession(messages) {
 
 const ONLINE_API = ONLINE_API_BASE;
 
+function renderChatInline(value, keyPrefix = 'chat-inline') {
+  const source = String(value || '');
+  const pattern =
+    /\*\*([^*\n]+)\*\*|\`([^\`\n]+)\`|\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^)]+)\)/g;
+  const parts = [];
+  let cursor = 0;
+  let match;
+  let partIndex = 0;
+
+  const pushText = (text) => {
+    if (!text) return;
+
+    parts.push(
+      text.replace(/\*\*/g, '')
+    );
+  };
+
+  while ((match = pattern.exec(source))) {
+    pushText(source.slice(cursor, match.index));
+
+    const key = keyPrefix + '-' + partIndex++;
+
+    if (match[1]) {
+      parts.push(
+        <strong key={key}>
+          {match[1]}
+        </strong>
+      );
+    } else if (match[2]) {
+      parts.push(
+        <code key={key}>
+          {match[2]}
+        </code>
+      );
+    } else if (match[3] && match[4]) {
+      parts.push(
+        <a
+          key={key}
+          href={match[4]}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {match[3]}
+        </a>
+      );
+    }
+
+    cursor = pattern.lastIndex;
+  }
+
+  pushText(source.slice(cursor));
+  return parts;
+}
+
+function ChatFormattedMessage({ text }) {
+  const lines = String(text || '')
+    .replace(/\r/g, '')
+    .split('\n');
+
+  const blocks = [];
+  let paragraph = [];
+  let listItems = [];
+  let listType = 'ul';
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+
+    const value = paragraph.join(' ').trim();
+
+    if (value) {
+      blocks.push({
+        type: 'paragraph',
+        value,
+      });
+    }
+
+    paragraph = [];
+  };
+
+  const flushList = () => {
+    if (!listItems.length) return;
+
+    blocks.push({
+      type: listType,
+      items: listItems,
+    });
+
+    listItems = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = line.match(
+      /^(#{1,3})\s+(.+)$/
+    );
+
+    if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({
+        type: 'heading',
+        level: heading[1].length,
+        value: heading[2],
+      });
+      continue;
+    }
+
+    const bullet = line.match(
+      /^[-*•]\s+(.+)$/
+    );
+
+    if (bullet) {
+      flushParagraph();
+
+      if (
+        listItems.length &&
+        listType !== 'ul'
+      ) {
+        flushList();
+      }
+
+      listType = 'ul';
+      listItems.push(bullet[1]);
+      continue;
+    }
+
+    const numbered = line.match(
+      /^\d+[.)]\s+(.+)$/
+    );
+
+    if (numbered) {
+      flushParagraph();
+
+      if (
+        listItems.length &&
+        listType !== 'ol'
+      ) {
+        flushList();
+      }
+
+      listType = 'ol';
+      listItems.push(numbered[1]);
+      continue;
+    }
+
+    flushList();
+    paragraph.push(line);
+  }
+
+  flushParagraph();
+  flushList();
+
+  return (
+    <div className="chat-rich">
+      {blocks.map((block, index) => {
+        if (block.type === 'heading') {
+          const Heading =
+            block.level === 1
+              ? 'h3'
+              : 'h4';
+
+          return (
+            <Heading key={index}>
+              {renderChatInline(
+                block.value,
+                'heading-' + index
+              )}
+            </Heading>
+          );
+        }
+
+        if (
+          block.type === 'ul' ||
+          block.type === 'ol'
+        ) {
+          const List =
+            block.type === 'ol'
+              ? 'ol'
+              : 'ul';
+
+          return (
+            <List key={index}>
+              {block.items.map(
+                (item, itemIndex) => (
+                  <li key={itemIndex}>
+                    {renderChatInline(
+                      item,
+                      'list-' +
+                        index +
+                        '-' +
+                        itemIndex
+                    )}
+                  </li>
+                )
+              )}
+            </List>
+          );
+        }
+
+        return (
+          <p key={index}>
+            {renderChatInline(
+              block.value,
+              'paragraph-' + index
+            )}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function Chat({ content }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
@@ -917,6 +1136,19 @@ function Chat({ content }) {
               t:
                 data.reply ||
                 'No reply available.',
+              meta: {
+                model:
+                  data.model || '',
+                driveDocuments:
+                  Number(
+                    data.knowledge?.driveDocuments ||
+                    0
+                  ),
+                googleDrive:
+                  Boolean(
+                    data.knowledge?.googleDrive
+                  ),
+              },
             },
           ]);
 
@@ -967,7 +1199,33 @@ function Chat({ content }) {
                       : 'usr'
                   }
                 >
-                  {message.t}
+                  <ChatFormattedMessage
+                    text={message.t}
+                  />
+
+                  {message.a &&
+                    message.meta &&
+                    (message.meta.model ||
+                      message.meta.googleDrive) && (
+                      <div className="chat-answer-meta">
+                        {message.meta.model && (
+                          <span>
+                            {message.meta.model}
+                          </span>
+                        )}
+
+                        {message.meta.googleDrive && (
+                          <span>
+                            Drive evidence
+                            {message.meta.driveDocuments
+                              ? ' · ' +
+                                message.meta.driveDocuments +
+                                ' docs'
+                              : ''}
+                          </span>
+                        )}
+                      </div>
+                    )}
                 </div>
               )
             )}
