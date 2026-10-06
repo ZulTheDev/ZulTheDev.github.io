@@ -3294,130 +3294,12 @@ export default function App({ initialContent = null }) {
         </section>
 
         {/* =================================================
-            AWARDS
-        ================================================= */}
-
-        <section id="awards">
-          <small>
-            03 / RECOGNITION
-          </small>
-
-          <h2>
-            Awards & Honour
-          </h2>
-
-          <Rail
-            items={content.awards}
-            onOpen={(item) =>
-              setSelected([
-                'Award',
-                item,
-              ])
-            }
-          />
-        </section>
-
-        {/* =================================================
-            PROJECTS
-        ================================================= */}
-
-        <section id="projects">
-          <small>
-            04 / LAB
-          </small>
-
-          <h2>
-            Project & Research
-          </h2>
-
-          <Rail
-            items={content.projects}
-            onOpen={(item) =>
-              setSelected(['Project', item])
-            }
-          />
-
-          <div className="section-subhead">
-            <small>RESEARCH</small>
-            <h3>Research</h3>
-          </div>
-
-          <Rail
-            items={content.research}
-            onOpen={(item) =>
-              setSelected(['Research', item])
-            }
-          />
-        </section>
-
-        {/* =================================================
-            WORK EXPERIENCE
-        ================================================= */}
-
-        <section id="experience">
-          <small>
-            05 / TIMELINE
-          </small>
-
-          <h2>
-            Work experience
-          </h2>
-
-          <div className="timeline">
-            {content.experience.map(
-              (item) => (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    setSelected([
-                      'exp',
-                      item,
-                    ])
-                  }
-                >
-                  <div>
-                    <strong>
-                      {item.company}
-                    </strong>
-
-                    <span>
-                      {item.role}
-                    </span>
-                  </div>
-
-                  <div className="bar">
-                    <i
-                      style={{
-                        width: `${Math.max(
-                          8,
-                          (months(
-                            item.start,
-                            item.end
-                          ) /
-                            maxDuration) *
-                            100
-                        )}%`,
-                      }}
-                    />
-                  </div>
-
-                  <small>
-                    {date(item.start)} —{' '}
-                    {date(item.end)}
-                  </small>
-                </button>
-              )
-            )}
-          </div>
-        </section>
-
-        {/* =================================================
             EDUCATION
         ================================================= */}
 
         <section>
           <small>
-            07 / FOUNDATION
+            03 / FOUNDATION & RECOGNITION
           </small>
 
           <h2>
@@ -3473,6 +3355,125 @@ export default function App({ initialContent = null }) {
           </div>
         </section>
 
+
+        {/* =================================================
+            AWARDS
+        ================================================= */}
+
+        <section id="awards">
+          <small>
+            03 / HONOURS
+          </small>
+
+          <h2>
+            Awards & Honour
+          </h2>
+
+          <Rail
+            items={content.awards}
+            onOpen={(item) =>
+              setSelected([
+                'Award',
+                item,
+              ])
+            }
+          />
+        </section>
+
+        {/* =================================================
+            PROJECTS
+        ================================================= */}
+
+        <section id="projects">
+          <small>
+            05 / LAB
+          </small>
+
+          <h2>
+            Project & Research
+          </h2>
+
+          <Rail
+            items={content.projects}
+            onOpen={(item) =>
+              setSelected(['Project', item])
+            }
+          />
+
+          <div className="section-subhead">
+            <small>RESEARCH</small>
+            <h3>Research</h3>
+          </div>
+
+          <Rail
+            items={content.research}
+            onOpen={(item) =>
+              setSelected(['Research', item])
+            }
+          />
+        </section>
+
+        {/* =================================================
+            WORK EXPERIENCE
+        ================================================= */}
+
+        <section id="experience">
+          <small>
+            06 / TIMELINE
+          </small>
+
+          <h2>
+            Work experience
+          </h2>
+
+          <div className="timeline">
+            {content.experience.map(
+              (item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    setSelected([
+                      'exp',
+                      item,
+                    ])
+                  }
+                >
+                  <div>
+                    <strong>
+                      {item.company}
+                    </strong>
+
+                    <span>
+                      {item.role}
+                    </span>
+                  </div>
+
+                  <div className="bar">
+                    <i
+                      style={{
+                        width: `${Math.max(
+                          8,
+                          (months(
+                            item.start,
+                            item.end
+                          ) /
+                            maxDuration) *
+                            100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+
+                  <small>
+                    {date(item.start)} —{' '}
+                    {date(item.end)}
+                  </small>
+                </button>
+              )
+            )}
+          </div>
+        </section>
+
         {/* =================================================
             SKILLS
         ================================================= */}
@@ -3519,7 +3520,7 @@ export default function App({ initialContent = null }) {
         >
           <div>
             <small>
-              09 / OPEN CHANNEL
+              08 / OPEN CHANNEL
             </small>
 
             <h2>
