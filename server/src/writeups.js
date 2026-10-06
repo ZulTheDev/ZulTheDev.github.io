@@ -342,14 +342,25 @@ function r2Client() {
 }
 
 export function safeR2Key(value) {
-  const key = String(value || '').trim().replace(/^\/+/, '');
-  const isCurrent = key.startsWith('ctf_blog/');
-  const isLegacy = key.startsWith('ctf-blog/');
+  const key =
+    String(value || '')
+      .trim()
+      .replace(/^\/+/, '');
+
+  const allowed =
+    [
+      'ctf_blog/',
+      'ctf-blog/',
+      'blog/',
+      'webcomic/',
+    ].some((prefix) =>
+      key.startsWith(prefix)
+    );
 
   if (
     !key ||
     key.includes('..') ||
-    (!isCurrent && !isLegacy)
+    !allowed
   ) {
     throw new Error('invalid_r2_key');
   }
@@ -357,19 +368,30 @@ export function safeR2Key(value) {
   return key;
 }
 
-export function safeR2Prefix(value = 'ctf_blog/') {
-  const prefix = String(value || '').trim().replace(/^\/+/, '');
-  const isCurrent =
-    prefix === 'ctf_blog/' ||
-    prefix.startsWith('ctf_blog/');
-  const isLegacy =
-    prefix === 'ctf-blog/' ||
-    prefix.startsWith('ctf-blog/');
+export function safeR2Prefix(
+  value = 'ctf_blog/'
+) {
+  const prefix =
+    String(value || '')
+      .trim()
+      .replace(/^\/+/, '');
+
+  const allowed =
+    [
+      'ctf_blog/',
+      'ctf-blog/',
+      'blog/',
+      'webcomic/',
+    ].some(
+      (candidate) =>
+        prefix === candidate ||
+        prefix.startsWith(candidate)
+    );
 
   if (
     !prefix ||
     prefix.includes('..') ||
-    (!isCurrent && !isLegacy)
+    !allowed
   ) {
     throw new Error('invalid_r2_prefix');
   }
