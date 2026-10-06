@@ -21,9 +21,9 @@
       "https://www.linkedin.com/in/zulfaqarnet",
       "https://zulthedev.github.io/",
       "https://orcid.org/0009-0004-2126-7780"
-    ]
+    ],
+    "resumeUrl": "https://zulthedev.github.io/ZulTheDev.github.io/resume.pdf"
   },
-
   "settings": {
     "theme": {
       "bg": "#0e0b13",
@@ -34,7 +34,6 @@
       "line": "#302635"
     }
   },
-
   "recent": [
     {
       "id": "recent-nitec-cyber",
@@ -57,7 +56,6 @@
       "description": "Developing software and exploring technical projects driven by curiosity, automation and practical problem-solving."
     }
   ],
-
   "certifications": [
     {
       "id": "cert-cct",
@@ -110,7 +108,6 @@
       "media": []
     }
   ],
-
   "achievements": [
     {
       "id": "achievement-infinity-code",
@@ -143,7 +140,6 @@
       "media": []
     }
   ],
-
   "awards": [
     {
       "id": "award-edusave-2022",
@@ -176,7 +172,6 @@
       "media": []
     }
   ],
-
   "projects": [
     {
       "id": "project-vapt-python",
@@ -209,7 +204,6 @@
       "media": []
     }
   ],
-
   "research": [
     {
       "id": "research-dfir",
@@ -242,7 +236,6 @@
       "media": []
     }
   ],
-
   "experience": [
     {
       "id": "exp-infinity-code",
@@ -390,7 +383,6 @@
       "media": []
     }
   ],
-
   "education": [
     {
       "id": "edu-ite-higher-nitec",
@@ -414,7 +406,6 @@
       "description": "Primary education."
     }
   ],
-
   "explore": [
     "Cybersecurity",
     "DFIR",
@@ -430,5 +421,31 @@
     "Bioinformatics",
     "Neuroengineering",
     "Brain-Computer Interfaces"
-  ]
+  ],
+  "skills": {
+    "technical": [
+      "Cybersecurity",
+      "DFIR",
+      "Cyber Threat Intelligence",
+      "VAPT fundamentals",
+      "Security automation",
+      "Network communication",
+      "Risk management",
+      "CTF / security challenges"
+    ],
+    "soft": [
+      "Leadership",
+      "Team training",
+      "Problem solving",
+      "Communication",
+      "Project management",
+      "Organisation",
+      "Time management",
+      "Self-learning"
+    ],
+    "languages": [],
+    "programming": [
+      "Python"
+    ]
+  }
 }
