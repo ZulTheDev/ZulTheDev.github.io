@@ -6,7 +6,7 @@
     "node": "24.x"
   },
   "scripts": {
-    "check": "node --check api/chat.js && node --check api/comments.js && node --check api/health.js && node --check api/hiring.js"
+    "check": "node --check api/chat.js && node --check api/comments.js && node --check api/health.js && node --check api/hiring.js && node --check api/drive/media.js && node --check 'api/drive/image/[id].js' && node --check lib/drive.js && node --check lib/deepseek.js"
   },
   "dependencies": {
     "redis": "^5.11.0"

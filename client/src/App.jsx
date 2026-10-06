@@ -19,6 +19,12 @@ const BASE_PATH = import.meta.env.BASE_URL || '/';
 const API = normalizeApiBase(
   import.meta.env.VITE_API_BASE_URL
 );
+const ONLINE_API_BASE = normalizeApiBase(
+  import.meta.env.VITE_ONLINE_API_URL ||
+    import.meta.env.VITE_COMMENTS_BACKUP_URL ||
+    'https://zul-portfolio-api.vercel.app'
+);
+const MEDIA_API = API || ONLINE_API_BASE;
 const CONTENT_API_ENABLED =
   import.meta.env.VITE_ENABLE_CONTENT_API === 'true';
 
@@ -120,9 +126,9 @@ function resolvePortfolioMediaSrc(media) {
     media.googleDriveId ||
     '';
 
-  if (driveId && API) {
+  if (driveId && MEDIA_API) {
     return (
-      API +
+      MEDIA_API +
       '/api/drive/image/' +
       encodeURIComponent(driveId)
     );
@@ -157,6 +163,20 @@ function resolveCardImage(item) {
     }
   }
 
+  const directDriveId =
+    item.imageDriveId ||
+    item.thumbnailDriveId ||
+    item.driveId ||
+    '';
+
+  if (directDriveId && MEDIA_API) {
+    return (
+      MEDIA_API +
+      '/api/drive/image/' +
+      encodeURIComponent(directDriveId)
+    );
+  }
+
   const imageMedia = Array.isArray(item.media)
     ? item.media.find((media) => {
         const type = String(media?.type || '').toLowerCase();
@@ -169,6 +189,164 @@ function resolveCardImage(item) {
   return imageMedia
     ? resolvePortfolioMediaSrc(imageMedia)
     : '';
+}
+
+
+function mediaMatchKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\.[a-z0-9]{2,6}$/i, '')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function inferDriveMediaForItem(item, files) {
+  if (
+    !item ||
+    !Array.isArray(files) ||
+    !files.length
+  ) {
+    return null;
+  }
+
+  const primaryKeys = [
+    item.id,
+    item.title,
+    item.role,
+  ]
+    .map(mediaMatchKey)
+    .filter((value) => value.length >= 5);
+
+  const secondaryKeys = [
+    item.company,
+    item.issuer,
+  ]
+    .map(mediaMatchKey)
+    .filter((value) => value.length >= 8);
+
+  if (!primaryKeys.length && !secondaryKeys.length) {
+    return null;
+  }
+
+  const match = files.find((file) => {
+    const fileKey = mediaMatchKey(file.name);
+
+    const primaryMatch = primaryKeys.some(
+      (key) =>
+        fileKey === key ||
+        fileKey.startsWith(key) ||
+        fileKey.includes(key)
+    );
+
+    const secondaryMatch = secondaryKeys.some(
+      (key) =>
+        fileKey === key ||
+        fileKey.startsWith(key)
+    );
+
+    return primaryMatch || secondaryMatch;
+  });
+
+  if (!match) {
+    return null;
+  }
+
+  const mimeType = String(
+    match.mimeType || ''
+  ).toLowerCase();
+
+  const type = mimeType.startsWith('image/')
+    ? 'image'
+    : mimeType === 'application/pdf'
+      ? 'pdf'
+      : mimeType.startsWith('video/')
+        ? 'video'
+        : mimeType.startsWith('audio/')
+          ? 'audio'
+          : 'link';
+
+  return {
+    type,
+    title: match.name || item.title || 'Drive media',
+    driveId: match.id,
+    mimeType: match.mimeType || '',
+    source: 'google-drive-media-fallback',
+  };
+}
+
+function attachDriveMediaFallbacks(data, files) {
+  if (!data || !Array.isArray(files) || !files.length) {
+    return data;
+  }
+
+  const sections = [
+    'projects',
+    'certifications',
+    'achievements',
+    'awards',
+    'research',
+    'experience',
+  ];
+
+  let changed = false;
+  const next = {
+    ...data,
+  };
+
+  for (const section of sections) {
+    const items = Array.isArray(data[section])
+      ? data[section]
+      : [];
+
+    next[section] = items.map((item) => {
+      const media = Array.isArray(item.media)
+        ? item.media
+        : [];
+
+      const alreadyHasDriveFallback =
+        media.some(
+          (entry) =>
+            entry?.source ===
+            'google-drive-media-fallback'
+        );
+
+      const hasVisualMedia = media.some(
+        (entry) =>
+          resolvePortfolioMediaSrc(entry) &&
+          ['image', 'pdf', 'video', 'audio'].includes(
+            String(entry?.type || '').toLowerCase()
+          )
+      );
+
+      if (
+        alreadyHasDriveFallback ||
+        hasVisualMedia
+      ) {
+        return item;
+      }
+
+      const fallback =
+        inferDriveMediaForItem(
+          item,
+          files
+        );
+
+      if (!fallback) {
+        return item;
+      }
+
+      changed = true;
+
+      return {
+        ...item,
+        media: [
+          fallback,
+          ...media,
+        ],
+      };
+    });
+  }
+
+  return changed ? next : data;
 }
 
 function normalizeContent(data) {
@@ -453,7 +631,25 @@ function ExpModal({ x, close }) {
         --------------------------------------------- */}
 
         <div className="expmedia">
-          ฅ^•ﻌ•^ฅ
+          {(() => {
+            const media = Array.isArray(x.media)
+              ? x.media.find(
+                  (item) =>
+                    String(item?.type || '').toLowerCase() === 'image' &&
+                    resolvePortfolioMediaSrc(item)
+                )
+              : null;
+
+            return media ? (
+              <img
+                src={resolvePortfolioMediaSrc(media)}
+                alt={media.alt || media.title || x.role || 'Experience media'}
+                loading="lazy"
+              />
+            ) : (
+              'ฅ^•ﻌ•^ฅ'
+            );
+          })()}
         </div>
 
         {/* ---------------------------------------------
@@ -629,11 +825,7 @@ function writeChatSession(messages) {
   }
 }
 
-const ONLINE_API = normalizeApiBase(
-  import.meta.env.VITE_ONLINE_API_URL ||
-    import.meta.env.VITE_COMMENTS_BACKUP_URL ||
-    'https://zul-portfolio-api.vercel.app'
-);
+const ONLINE_API = ONLINE_API_BASE;
 
 function Chat({ content }) {
   const [open, setOpen] = useState(false);
@@ -851,8 +1043,8 @@ function ProfilePhoto({ profile }) {
     '';
 
   const driveProxySrc =
-    API && driveId
-      ? `${API}/api/drive/image/${encodeURIComponent(driveId)}`
+    MEDIA_API && driveId
+      ? `${MEDIA_API}/api/drive/image/${encodeURIComponent(driveId)}`
       : '';
 
   const driveDirectSrc =
@@ -1265,8 +1457,14 @@ function HiringPortfolioView({
           .filter(
             (media) =>
               media &&
-              media.type === 'image' &&
-              (media.src || media.url || media.local)
+              String(media.type || '').toLowerCase() === 'image' &&
+              (
+                media.src ||
+                media.url ||
+                media.local ||
+                media.driveId ||
+                media.googleDriveId
+              )
           )
           .map((media) => ({
             ...media,
@@ -2841,6 +3039,7 @@ export default function App({ initialContent = null }) {
   const [loadProgress, setLoadProgress] = useState(initialContent ? 100 : 8);
   const [selected, setSelected] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [driveMediaFiles, setDriveMediaFiles] = useState([]);
 
   useEffect(() => {
     window.dispatchEvent(new Event('portfolio:hydrated'));
@@ -2867,6 +3066,60 @@ export default function App({ initialContent = null }) {
   const isExplorationRoute =
     pathnameWithoutBase === '/exploration' ||
     pathnameWithoutBase === '/exploration/';
+
+  useEffect(() => {
+    if (!ONLINE_API || isCtfRoute) {
+      return;
+    }
+
+    let active = true;
+
+    fetch(ONLINE_API + '/api/drive/media')
+      .then((response) =>
+        response.ok
+          ? response.json()
+          : { files: [] }
+      )
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+
+        setDriveMediaFiles(
+          Array.isArray(data?.files)
+            ? data.files
+            : []
+        );
+      })
+      .catch(() => {
+        if (active) {
+          setDriveMediaFiles([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isCtfRoute]);
+
+  useEffect(() => {
+    if (
+      !content ||
+      !driveMediaFiles.length
+    ) {
+      return;
+    }
+
+    const next =
+      attachDriveMediaFallbacks(
+        content,
+        driveMediaFiles
+      );
+
+    if (next !== content) {
+      setContent(next);
+    }
+  }, [content, driveMediaFiles]);
 
   // Keep the first render deterministic for Astro SSR.
   // The real hash is applied immediately after hydration.

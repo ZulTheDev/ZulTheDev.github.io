@@ -2456,42 +2456,232 @@ app.put(
    GOOGLE DRIVE MEDIA
 ========================================================= */
 
+async function resolveDriveMediaFolder(d, rootFolderId) {
+  const configured =
+    String(
+      process.env.GOOGLE_DRIVE_MEDIA_FOLDER_ID ||
+        ''
+    ).trim();
+
+  if (configured) {
+    return configured;
+  }
+
+  const result = await d.files.list({
+    q:
+      `'${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id,name,mimeType)',
+    pageSize: 100,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  const mediaFolder =
+    (result.data.files || []).find(
+      (item) =>
+        String(item.name || '')
+          .trim()
+          .toLowerCase() === 'media'
+    );
+
+  return mediaFolder?.id || rootFolderId;
+}
+
+async function listDriveMediaRecursive(d, rootFolderId) {
+  const queue = [rootFolderId];
+  const files = [];
+
+  while (queue.length && files.length < 250) {
+    const parentId = queue.shift();
+    let pageToken;
+
+    do {
+      const result = await d.files.list({
+        q:
+          `'${parentId}' in parents and trashed=false`,
+        fields:
+          'nextPageToken,files(id,name,mimeType,webViewLink,thumbnailLink,modifiedTime,size,parents)',
+        pageSize: 100,
+        orderBy: 'modifiedTime desc',
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+        pageToken,
+      });
+
+      for (const item of result.data.files || []) {
+        if (
+          item.mimeType ===
+          'application/vnd.google-apps.folder'
+        ) {
+          queue.push(item.id);
+          continue;
+        }
+
+        const type =
+          String(item.mimeType || '').toLowerCase();
+
+        if (
+          type.startsWith('image/') ||
+          type.startsWith('video/') ||
+          type.startsWith('audio/') ||
+          type === 'application/pdf'
+        ) {
+          files.push({
+            ...item,
+            proxyUrl:
+              '/api/drive/image/' +
+              encodeURIComponent(item.id),
+          });
+        }
+
+        if (files.length >= 250) {
+          break;
+        }
+      }
+
+      pageToken =
+        result.data.nextPageToken || undefined;
+    } while (pageToken && files.length < 250);
+  }
+
+  return files;
+}
+
 app.get(
   '/api/drive/media',
   async (request, response) => {
     const d = drive();
 
-    const folderId =
+    const rootFolderId =
       process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
 
-    if (!d || !folderId) {
+    if (!d || !rootFolderId) {
       return response.status(503).json({
         error: 'drive_not_configured',
       });
     }
 
     try {
-      const result =
-        await d.files.list({
-          q: `'${folderId}' in parents and trashed=false`,
-          fields:
-            'files(id,name,mimeType,webViewLink,thumbnailLink,modifiedTime)',
-          pageSize: 100,
-          orderBy:
-            'modifiedTime desc',
-        });
+      const mediaFolderId =
+        await resolveDriveMediaFolder(
+          d,
+          rootFolderId
+        );
 
-      response.json(
-        result.data.files || []
-      );
+      const files =
+        await listDriveMediaRecursive(
+          d,
+          mediaFolderId
+        );
+
+      response.json(files);
     } catch (error) {
       console.error(
-        'Google Drive error:',
+        'Google Drive media error:',
         error?.message || error
       );
 
       response.status(500).json({
         error: 'drive_error',
+      });
+    }
+  }
+);
+
+app.get(
+  '/api/drive/image/:id',
+  async (request, response) => {
+    const d = drive();
+
+    if (!d) {
+      return response.status(503).json({
+        error: 'drive_not_configured',
+      });
+    }
+
+    const fileId =
+      String(request.params.id || '').trim();
+
+    if (!/^[a-zA-Z0-9_-]{10,200}$/.test(fileId)) {
+      return response.status(400).json({
+        error: 'invalid_drive_file_id',
+      });
+    }
+
+    try {
+      const metadata = await d.files.get({
+        fileId,
+        fields:
+          'id,name,mimeType,size,trashed',
+        supportsAllDrives: true,
+      });
+
+      const file = metadata.data || {};
+      const mimeType =
+        String(file.mimeType || '')
+          .toLowerCase();
+
+      if (
+        file.trashed ||
+        !(
+          mimeType.startsWith('image/') ||
+          mimeType.startsWith('video/') ||
+          mimeType.startsWith('audio/') ||
+          mimeType === 'application/pdf'
+        )
+      ) {
+        return response.status(404).json({
+          error: 'drive_media_not_found',
+        });
+      }
+
+      const media = await d.files.get(
+        {
+          fileId,
+          alt: 'media',
+          supportsAllDrives: true,
+        },
+        {
+          responseType: 'stream',
+        }
+      );
+
+      response.setHeader(
+        'Content-Type',
+        file.mimeType ||
+          'application/octet-stream'
+      );
+      response.setHeader(
+        'Cache-Control',
+        'private, max-age=300'
+      );
+
+      media.data.on('error', (error) => {
+        console.error(
+          'Drive media stream error:',
+          error?.message || error
+        );
+
+        if (!response.headersSent) {
+          response.status(502).end();
+        } else {
+          response.destroy(error);
+        }
+      });
+
+      media.data.pipe(response);
+    } catch (error) {
+      console.error(
+        'Google Drive media proxy error:',
+        error?.message || error
+      );
+
+      response.status(
+        Number(error?.code) === 404
+          ? 404
+          : 502
+      ).json({
+        error: 'drive_media_unavailable',
       });
     }
   }

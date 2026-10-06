@@ -207,7 +207,7 @@ export default async function handler(
 
     const model =
       process.env.DEEPSEEK_MODEL ||
-      'deepseek-flash';
+      'deepseek-chat';
 
     const system =
       "You are a hiring-oriented portfolio filter. Given a requested work type and a catalog of portfolio evidence, select only the evidence that is materially relevant. Do not rewrite, invent or modify the source information. Return strict JSON with these array keys only: experience, projects, certifications, achievements, awards, education. Each value must contain only IDs already present in the catalog. Prefer direct relevance and transferable evidence. Keep the selection focused rather than returning everything.";

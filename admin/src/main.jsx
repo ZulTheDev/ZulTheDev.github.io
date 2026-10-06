@@ -1206,15 +1206,76 @@ function AdminShell() {
 
   async function loadDriveMedia() {
     setDriveLoading(true);
+
+    const candidates = [
+      API,
+      ONLINE_API,
+    ].filter(
+      (value, index, list) =>
+        value &&
+        list.indexOf(value) === index
+    );
+
+    let lastError = null;
+
     try {
-      const response = await authFetch(API + '/api/drive/media');
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || 'Drive API returned ' + response.status);
-      setDriveMedia(Array.isArray(data) ? data : []);
-      setNotice('Loaded ' + (Array.isArray(data) ? data.length : 0) + ' Drive media items.');
+      for (const base of candidates) {
+        try {
+          const response = await authFetch(
+            base + '/api/drive/media'
+          );
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+                'Drive API returned ' +
+                  response.status
+            );
+          }
+
+          const rows = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.files)
+              ? data.files
+              : [];
+
+          const normalized = rows.map(
+            (item) => ({
+              ...item,
+              proxyUrl:
+                item.proxyUrl?.startsWith('http')
+                  ? item.proxyUrl
+                  : item.proxyPath
+                    ? base + item.proxyPath
+                    : item.proxyUrl
+                      ? base + item.proxyUrl
+                      : '',
+            })
+          );
+
+          setDriveMedia(normalized);
+          setNotice(
+            'Loaded ' +
+              normalized.length +
+              ' Drive media items.'
+          );
+          return;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw (
+        lastError ||
+        new Error('No Drive API is configured.')
+      );
     } catch (error) {
       setDriveMedia([]);
-      setNotice('Drive media unavailable: ' + error.message);
+      setNotice(
+        'Drive media unavailable: ' +
+          error.message
+      );
     } finally {
       setDriveLoading(false);
     }
@@ -3495,7 +3556,7 @@ function MediaLibraryEditor({ driveMedia, driveLoading, loadDriveMedia, content,
     <section className="panel">
       <PanelHeader eyebrow="GOOGLE DRIVE" title="Media library" />
       <div className="media-library-toolbar">
-        <p className="helper">Browse the configured Drive root in read-only mode. Copy IDs into media items or attach a file to the profile image.</p>
+        <p className="helper">Browse the Google Drive Media folder (including nested folders) in read-only mode. The admin tries the local Drive API first, then the hosted portfolio API. Copy a file ID into any media item or attach it to the profile image.</p>
         <button className="accent-button" onClick={loadDriveMedia} disabled={driveLoading}>{driveLoading ? 'Loading...' : 'Refresh Drive'}</button>
       </div>
       <div className="profile-drive-row">
@@ -3505,7 +3566,7 @@ function MediaLibraryEditor({ driveMedia, driveLoading, loadDriveMedia, content,
         <div className="drive-grid">
           {driveMedia.map((item) => (
             <article className="drive-card" key={item.id}>
-              {item.thumbnailLink ? <img src={item.thumbnailLink} alt="" /> : <div className="drive-thumb">FILE</div>}
+              {(item.proxyUrl || item.thumbnailLink) ? <img src={item.proxyUrl || item.thumbnailLink} alt={item.name || 'Drive media'} /> : <div className="drive-thumb">FILE</div>}
               <div><strong title={item.name}>{item.name}</strong><small>{item.mimeType || 'Unknown type'}</small><code>{item.id}</code></div>
               <div className="drive-actions">
                 <button className="ghost small" onClick={() => navigator.clipboard?.writeText(item.id)}>Copy ID</button>
