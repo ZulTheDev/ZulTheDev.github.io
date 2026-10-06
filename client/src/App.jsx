@@ -191,6 +191,151 @@ function resolveCardImage(item) {
     : '';
 }
 
+
+function mediaMatchKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\.[a-z0-9]{2,6}$/i, '')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function inferDriveMediaForItem(item, files) {
+  if (
+    !item ||
+    !Array.isArray(files) ||
+    !files.length
+  ) {
+    return null;
+  }
+
+  const keys = [
+    item.id,
+    item.title,
+    item.role,
+    item.company,
+    item.issuer,
+  ]
+    .map(mediaMatchKey)
+    .filter((value) => value.length >= 5);
+
+  if (!keys.length) {
+    return null;
+  }
+
+  const match = files.find((file) => {
+    const fileKey = mediaMatchKey(file.name);
+
+    return keys.some(
+      (key) =>
+        fileKey === key ||
+        fileKey.startsWith(key) ||
+        fileKey.includes(key)
+    );
+  });
+
+  if (!match) {
+    return null;
+  }
+
+  const mimeType = String(
+    match.mimeType || ''
+  ).toLowerCase();
+
+  const type = mimeType.startsWith('image/')
+    ? 'image'
+    : mimeType === 'application/pdf'
+      ? 'pdf'
+      : mimeType.startsWith('video/')
+        ? 'video'
+        : mimeType.startsWith('audio/')
+          ? 'audio'
+          : 'link';
+
+  return {
+    type,
+    title: match.name || item.title || 'Drive media',
+    driveId: match.id,
+    mimeType: match.mimeType || '',
+    source: 'google-drive-media-fallback',
+  };
+}
+
+function attachDriveMediaFallbacks(data, files) {
+  if (!data || !Array.isArray(files) || !files.length) {
+    return data;
+  }
+
+  const sections = [
+    'projects',
+    'certifications',
+    'achievements',
+    'awards',
+    'research',
+    'experience',
+  ];
+
+  let changed = false;
+  const next = {
+    ...data,
+  };
+
+  for (const section of sections) {
+    const items = Array.isArray(data[section])
+      ? data[section]
+      : [];
+
+    next[section] = items.map((item) => {
+      const media = Array.isArray(item.media)
+        ? item.media
+        : [];
+
+      const alreadyHasDriveFallback =
+        media.some(
+          (entry) =>
+            entry?.source ===
+            'google-drive-media-fallback'
+        );
+
+      const hasVisualMedia = media.some(
+        (entry) =>
+          resolvePortfolioMediaSrc(entry) &&
+          ['image', 'pdf', 'video', 'audio'].includes(
+            String(entry?.type || '').toLowerCase()
+          )
+      );
+
+      if (
+        alreadyHasDriveFallback ||
+        hasVisualMedia
+      ) {
+        return item;
+      }
+
+      const fallback =
+        inferDriveMediaForItem(
+          item,
+          files
+        );
+
+      if (!fallback) {
+        return item;
+      }
+
+      changed = true;
+
+      return {
+        ...item,
+        media: [
+          fallback,
+          ...media,
+        ],
+      };
+    });
+  }
+
+  return changed ? next : data;
+}
+
 function normalizeContent(data) {
   const source = data || {};
   const profile = source.profile || {};
@@ -2881,10 +3026,59 @@ export default function App({ initialContent = null }) {
   const [loadProgress, setLoadProgress] = useState(initialContent ? 100 : 8);
   const [selected, setSelected] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [driveMediaFiles, setDriveMediaFiles] = useState([]);
 
   useEffect(() => {
     window.dispatchEvent(new Event('portfolio:hydrated'));
   }, []);
+
+  useEffect(() => {
+    if (!ONLINE_API || isCtfRoute) {
+      return;
+    }
+
+    let active = true;
+
+    fetch(ONLINE_API + '/api/drive/media')
+      .then((response) =>
+        response.ok
+          ? response.json()
+          : { files: [] }
+      )
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+
+        setDriveMediaFiles(
+          Array.isArray(data?.files)
+            ? data.files
+            : []
+        );
+      })
+      .catch(() => {
+        if (active) {
+          setDriveMediaFiles([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isCtfRoute]);
+
+  useEffect(() => {
+    if (!driveMediaFiles.length) {
+      return;
+    }
+
+    setContent((current) =>
+      attachDriveMediaFallbacks(
+        current,
+        driveMediaFiles
+      )
+    );
+  }, [driveMediaFiles]);
 
   const currentLocation =
     typeof window !== 'undefined'
