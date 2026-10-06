@@ -1,0 +1,57 @@
+name: Validate Portfolio
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Build and Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install and build client
+        working-directory: client
+        run: |
+          npm install
+          npm run build
+
+      - name: Install and build private admin
+        working-directory: admin
+        run: |
+          npm install
+          npm run build
+
+      - name: Verify server JavaScript syntax
+        run: |
+          node --check server/src/index.js
+          node --check server/src/writeups.js
+          node --check server/src/github-app.js
+
+      - name: Verify blog assets and indexes
+        shell: bash
+        run: |
+          set -e
+          test -s client/public/images/blog-hero-sakura-catgirl.webp
+          test -s client/public/images/blog-clueless-cat.webp
+          test -s client/dist/images/blog-hero-sakura-catgirl.webp
+          test -s client/dist/images/blog-clueless-cat.webp
+          test -s client/dist/blog/index.json
+          test -s client/dist/ctf_blog/index.json
+          test -s client/dist/webcomic/index.json
+
+          echo "Blog/admin validation passed."
