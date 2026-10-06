@@ -19,7 +19,7 @@ import {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export const writeupDraftDir = path.join(repoRoot, 'server', 'writeups');
-export const writeupPublishDir = path.join(repoRoot, 'client', 'public', 'ctf-blog');
+export const writeupPublishDir = path.join(repoRoot, 'client', 'public', 'ctf_blog');
 
 export function slugify(value) {
   return String(value || '')
@@ -175,7 +175,7 @@ export async function publishWriteup(writeup) {
   }
 
   const publishedWriteupPath =
-    'client/public/ctf-blog/' +
+    'client/public/ctf_blog/' +
     slug +
     '.json';
 
@@ -224,7 +224,7 @@ export async function publishWriteup(writeup) {
         content: publishedWriteupContent,
       },
       {
-        path: 'client/public/ctf-blog/index.json',
+        path: 'client/public/ctf_blog/index.json',
         content: publishedIndexContent,
       },
     ]
@@ -260,11 +260,13 @@ function r2Client() {
 
 export function safeR2Key(value) {
   const key = String(value || '').trim().replace(/^\/+/, '');
+  const isCurrent = key.startsWith('ctf_blog/');
+  const isLegacy = key.startsWith('ctf-blog/');
 
   if (
     !key ||
     key.includes('..') ||
-    !key.startsWith('ctf-blog/')
+    (!isCurrent && !isLegacy)
   ) {
     throw new Error('invalid_r2_key');
   }
@@ -272,14 +274,19 @@ export function safeR2Key(value) {
   return key;
 }
 
-export function safeR2Prefix(value = 'ctf-blog/') {
+export function safeR2Prefix(value = 'ctf_blog/') {
   const prefix = String(value || '').trim().replace(/^\/+/, '');
+  const isCurrent =
+    prefix === 'ctf_blog/' ||
+    prefix.startsWith('ctf_blog/');
+  const isLegacy =
+    prefix === 'ctf-blog/' ||
+    prefix.startsWith('ctf-blog/');
 
   if (
     !prefix ||
     prefix.includes('..') ||
-    prefix === 'ctf-blog' ||
-    (!prefix.startsWith('ctf-blog/') && prefix !== 'ctf-blog/')
+    (!isCurrent && !isLegacy)
   ) {
     throw new Error('invalid_r2_prefix');
   }
@@ -351,7 +358,7 @@ export function r2PublicUrl(key) {
       .join('/');
 }
 
-export async function listR2Objects(prefix = 'ctf-blog/') {
+export async function listR2Objects(prefix = 'ctf_blog/') {
   const safePrefix = safeR2Prefix(prefix);
 
   const result = await r2Client().send(
