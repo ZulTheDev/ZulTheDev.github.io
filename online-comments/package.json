@@ -6,7 +6,7 @@
     "node": "24.x"
   },
   "scripts": {
-    "check": "node --check api/chat.js && node --check api/comments.js && node --check api/health.js"
+    "check": "node --check api/chat.js && node --check api/comments.js && node --check api/health.js && node --check api/hiring.js"
   },
   "dependencies": {
     "redis": "^5.11.0"
