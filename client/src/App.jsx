@@ -121,6 +121,46 @@ function resolvePortfolioMediaSrc(media) {
   return '';
 }
 
+function resolveCardImage(item) {
+  if (!item || typeof item !== 'object') {
+    return '';
+  }
+
+  const directImage =
+    item.image ||
+    item.thumbnail ||
+    item.cover ||
+    item.picture ||
+    '';
+
+  if (typeof directImage === 'string') {
+    const normalized = normalizeAssetPath(directImage);
+
+    if (normalized) {
+      return normalized;
+    }
+  } else if (directImage && typeof directImage === 'object') {
+    const resolved = resolvePortfolioMediaSrc(directImage);
+
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  const imageMedia = Array.isArray(item.media)
+    ? item.media.find((media) => {
+        const type = String(media?.type || '').toLowerCase();
+        const mimeType = String(media?.mimeType || '').toLowerCase();
+
+        return type === 'image' || mimeType.startsWith('image/');
+      })
+    : null;
+
+  return imageMedia
+    ? resolvePortfolioMediaSrc(imageMedia)
+    : '';
+}
+
 function normalizeContent(data) {
   const source = data || {};
   const profile = source.profile || {};
@@ -163,7 +203,12 @@ function normalizeContent(data) {
    HORIZONTAL CONTENT RAIL
 ========================================================= */
 
-function Rail({ items, onOpen }) {
+function Rail({
+  items,
+  onOpen,
+  mediaPlaceholder = '',
+  mediaVariant = '',
+}) {
   return (
     <div className="rail">
       {items.length === 0 ? (
@@ -172,27 +217,64 @@ function Rail({ items, onOpen }) {
           <h3>No entries yet</h3>
           <p>Add items from the admin content manager.</p>
         </div>
-      ) : (items.map((item) => (
-        <button
-          className="card"
-          key={item.id}
-          onClick={() => onOpen(item)}
-        >
-          <small>
-            {item.issuer ||
-              item.category ||
-              'Portfolio'}
-          </small>
+      ) : (items.map((item) => {
+        const cardImage = mediaPlaceholder
+          ? resolveCardImage(item)
+          : '';
 
-          <h3>{item.title}</h3>
+        return (
+          <button
+            className={
+              'card' +
+              (mediaPlaceholder
+                ? ' card-with-media'
+                : '')
+            }
+            key={item.id}
+            onClick={() => onOpen(item)}
+          >
+            {mediaPlaceholder && (
+              <div
+                className={
+                  'card-media' +
+                  (mediaVariant
+                    ? ` card-media--${mediaVariant}`
+                    : '')
+                }
+              >
+                {cardImage ? (
+                  <img
+                    src={cardImage}
+                    alt={item.title || mediaPlaceholder}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="card-media-placeholder">
+                    <span>{mediaPlaceholder}</span>
+                    <small>Picture placeholder</small>
+                  </div>
+                )}
+              </div>
+            )}
 
-          <p>{item.description}</p>
+            <div className="card-copy">
+              <small>
+                {item.issuer ||
+                  item.category ||
+                  'Portfolio'}
+              </small>
 
-          <b>
-            Open <ArrowUpRight size={14} />
-          </b>
-        </button>
-      )))}
+              <h3>{item.title}</h3>
+
+              <p>{item.description}</p>
+
+              <b>
+                Open <ArrowUpRight size={14} />
+              </b>
+            </div>
+          </button>
+        );
+      }))}
     </div>
   );
 }
@@ -3102,6 +3184,10 @@ export default function App({ initialContent = null }) {
         </div>
 
         <div className="site-nav-extra-links">
+          <a href="/port_resume" onClick={() => setMobileNavOpen(false)}>
+            Resume
+          </a>
+
           <a href={(import.meta.env.BASE_URL || '/') + 'exploration/'} onClick={() => setMobileNavOpen(false)}>
             Explore{' '}
             <Sparkles size={13} />
@@ -3275,6 +3361,8 @@ export default function App({ initialContent = null }) {
 
           <Rail
             items={content.certifications}
+            mediaPlaceholder="Certificate image"
+            mediaVariant="certificate"
             onOpen={(item) =>
               setSelected(['Certification', item])
             }
@@ -3395,6 +3483,8 @@ export default function App({ initialContent = null }) {
 
           <Rail
             items={content.projects}
+            mediaPlaceholder="Project image"
+            mediaVariant="project"
             onOpen={(item) =>
               setSelected(['Project', item])
             }
