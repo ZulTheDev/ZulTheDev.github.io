@@ -2,28 +2,39 @@ import { createSign } from 'node:crypto';
 import { config } from './config.js';
 
 const MAX_FILES = 80;
-const MAX_TOTAL_CHARS = 90000;
-const FILE_MAX_CHARS = 18000;
+const MAX_TOTAL_CHARS = 70000;
+const FILE_MAX_CHARS = 16000;
+const MAX_KNOWLEDGE_READS = 8;
+const MAX_MEDIA_FILES = 250;
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
 let accessToken = '';
 let accessTokenExpiresAt = 0;
+let discoveredMediaFolderId = '';
+let discoveredMediaFolderAt = 0;
+
+const folderCache = new Map();
 
 function base64url(value) {
   return Buffer.from(value)
     .toString('base64')
-    .replace(/\\+/g, '-')
-    .replace(/\\//g, '_')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
     .replace(/=+$/g, '');
 }
 
 function cleanText(value, limit = 12000) {
   return String(value ?? '')
-    .replace(/\\u0000/g, '')
-    .replace(/\\r/g, '')
+    .replace(/\u0000/g, '')
+    .replace(/\r/g, '')
     .slice(0, limit);
 }
 
-async function fetchText(url, options = {}, timeoutMs = 12000) {
+async function fetchWithTimeout(
+  url,
+  options = {},
+  timeoutMs = 12000
+) {
   const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort(),
@@ -31,26 +42,52 @@ async function fetchText(url, options = {}, timeoutMs = 12000) {
   );
 
   try {
-    const response = await fetch(url, {
+    return await fetch(url, {
       ...options,
       signal: controller.signal,
     });
-
-    const raw = await response.text();
-
-    if (!response.ok) {
-      throw new Error(
-        `Google Drive request failed with HTTP ${response.status}`
-      );
-    }
-
-    return raw;
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function getAccessToken() {
+async function fetchText(
+  url,
+  options = {},
+  timeoutMs = 12000
+) {
+  const response = await fetchWithTimeout(
+    url,
+    options,
+    timeoutMs
+  );
+
+  const raw = await response.text();
+
+  if (!response.ok) {
+    throw new Error(
+      `Google Drive request failed with HTTP ${response.status}`
+    );
+  }
+
+  return raw;
+}
+
+async function fetchJson(
+  url,
+  options = {},
+  timeoutMs = 12000
+) {
+  const raw = await fetchText(
+    url,
+    options,
+    timeoutMs
+  );
+
+  return raw ? JSON.parse(raw) : {};
+}
+
+export async function getAccessToken() {
   if (
     accessToken &&
     Date.now() < accessTokenExpiresAt
@@ -93,11 +130,11 @@ async function getAccessToken() {
   const signature = signer
     .sign(privateKey)
     .toString('base64')
-    .replace(/\\+/g, '-')
-    .replace(/\\//g, '_')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
     .replace(/=+$/g, '');
 
-  const tokenResponse = await fetch(
+  const tokenResponse = await fetchWithTimeout(
     'https://oauth2.googleapis.com/token',
     {
       method: 'POST',
@@ -111,7 +148,8 @@ async function getAccessToken() {
         assertion:
           `${unsignedToken}.${signature}`,
       }),
-    }
+    },
+    12000
   );
 
   const tokenData = await tokenResponse
@@ -156,7 +194,7 @@ async function listDriveFiles(token, rootFolderId) {
           `'${parentId}' in parents and trashed = false`,
         pageSize: '100',
         fields:
-          'nextPageToken,files(id,name,mimeType,modifiedTime,description)',
+          'nextPageToken,files(id,name,mimeType,modifiedTime,description,parents,size)',
         includeItemsFromAllDrives: 'true',
         supportsAllDrives: 'true',
       });
@@ -165,7 +203,7 @@ async function listDriveFiles(token, rootFolderId) {
         params.set('pageToken', pageToken);
       }
 
-      const raw = await fetchText(
+      const data = await fetchJson(
         'https://www.googleapis.com/drive/v3/files?' +
           params.toString(),
         {
@@ -174,8 +212,6 @@ async function listDriveFiles(token, rootFolderId) {
           },
         }
       );
-
-      const data = JSON.parse(raw);
 
       for (const file of data.files || []) {
         if (
@@ -201,6 +237,19 @@ async function listDriveFiles(token, rootFolderId) {
   }
 
   return discovered;
+}
+
+function isReadableKnowledgeMime(mimeType) {
+  const type = String(mimeType || '');
+
+  return (
+    type === 'application/vnd.google-apps.document' ||
+    type === 'application/vnd.google-apps.spreadsheet' ||
+    type === 'application/vnd.google-apps.presentation' ||
+    type.startsWith('text/') ||
+    type === 'application/json' ||
+    type === 'application/xml'
+  );
 }
 
 async function readFile(token, file) {
@@ -252,7 +301,7 @@ async function readFile(token, file) {
           Authorization: `Bearer ${token}`,
         },
       },
-      12000
+      10000
     ),
     FILE_MAX_CHARS
   );
@@ -275,6 +324,7 @@ export async function loadDriveKnowledge(query = '') {
   }
 
   const token = await getAccessToken();
+
   if (!token) {
     throw new Error(
       'Google Drive is configured but could not authenticate.'
@@ -285,8 +335,6 @@ export async function loadDriveKnowledge(query = '') {
     token,
     config.drive.folderId
   );
-  const documents = [];
-  let totalChars = 0;
 
   const terms = String(query)
     .toLowerCase()
@@ -294,6 +342,9 @@ export async function loadDriveKnowledge(query = '') {
     .filter((term) => term.length >= 3);
 
   const scored = files
+    .filter((file) =>
+      isReadableKnowledgeMime(file.mimeType)
+    )
     .map((file) => {
       const haystack =
         `${file.name} ${file.description || ''}`.toLowerCase();
@@ -311,7 +362,11 @@ export async function loadDriveKnowledge(query = '') {
       (a, b) =>
         b.score - a.score ||
         a.file.name.localeCompare(b.file.name)
-    );
+    )
+    .slice(0, MAX_KNOWLEDGE_READS);
+
+  const documents = [];
+  let totalChars = 0;
 
   for (const { file } of scored) {
     try {
@@ -349,5 +404,340 @@ export async function loadDriveKnowledge(query = '') {
   return {
     configured: true,
     documents,
+  };
+}
+
+function isAllowedMediaMime(mimeType) {
+  const type = String(mimeType || '').toLowerCase();
+
+  return (
+    type.startsWith('image/') ||
+    type.startsWith('video/') ||
+    type.startsWith('audio/') ||
+    type === 'application/pdf'
+  );
+}
+
+async function getDriveMetadata(token, fileId) {
+  if (folderCache.has(fileId)) {
+    return folderCache.get(fileId);
+  }
+
+  const params = new URLSearchParams({
+    fields:
+      'id,name,mimeType,modifiedTime,parents,size,trashed',
+    supportsAllDrives: 'true',
+  });
+
+  const data = await fetchJson(
+    'https://www.googleapis.com/drive/v3/files/' +
+      encodeURIComponent(fileId) +
+      '?' +
+      params.toString(),
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  folderCache.set(fileId, data);
+  return data;
+}
+
+async function discoverMediaFolderId(token) {
+  if (config.drive.mediaFolderId) {
+    return config.drive.mediaFolderId;
+  }
+
+  if (
+    discoveredMediaFolderId &&
+    Date.now() - discoveredMediaFolderAt <
+      10 * 60 * 1000
+  ) {
+    return discoveredMediaFolderId;
+  }
+
+  const rootFolderId = config.drive.folderId;
+
+  if (!rootFolderId) {
+    return '';
+  }
+
+  const params = new URLSearchParams({
+    q:
+      `'${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+    pageSize: '100',
+    fields: 'files(id,name,mimeType)',
+    includeItemsFromAllDrives: 'true',
+    supportsAllDrives: 'true',
+  });
+
+  const data = await fetchJson(
+    'https://www.googleapis.com/drive/v3/files?' +
+      params.toString(),
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  const mediaFolder = (data.files || []).find(
+    (file) =>
+      String(file.name || '')
+        .trim()
+        .toLowerCase() === 'media'
+  );
+
+  discoveredMediaFolderId =
+    mediaFolder?.id || rootFolderId;
+  discoveredMediaFolderAt = Date.now();
+
+  return discoveredMediaFolderId;
+}
+
+async function fileIsWithinFolder(
+  token,
+  file,
+  boundaryFolderId
+) {
+  const queue = [
+    ...(Array.isArray(file.parents)
+      ? file.parents
+      : []),
+  ];
+  const visited = new Set();
+  let depth = 0;
+
+  while (queue.length && depth < 30) {
+    const parentId = queue.shift();
+
+    if (
+      !parentId ||
+      visited.has(parentId)
+    ) {
+      continue;
+    }
+
+    if (parentId === boundaryFolderId) {
+      return true;
+    }
+
+    visited.add(parentId);
+    depth += 1;
+
+    try {
+      const parent = await getDriveMetadata(
+        token,
+        parentId
+      );
+
+      for (const nextParent of parent.parents || []) {
+        if (!visited.has(nextParent)) {
+          queue.push(nextParent);
+        }
+      }
+    } catch {
+      // If a parent cannot be inspected, keep checking
+      // the remaining known ancestry instead of widening access.
+    }
+  }
+
+  return false;
+}
+
+export async function listDriveMediaFiles() {
+  if (!driveKnowledgeConfigured()) {
+    return {
+      configured: false,
+      folderId: '',
+      files: [],
+    };
+  }
+
+  const token = await getAccessToken();
+  const mediaFolderId =
+    await discoverMediaFolderId(token);
+
+  if (!mediaFolderId) {
+    return {
+      configured: true,
+      folderId: '',
+      files: [],
+    };
+  }
+
+  const queue = [mediaFolderId];
+  const files = [];
+
+  while (
+    queue.length &&
+    files.length < MAX_MEDIA_FILES
+  ) {
+    const parentId = queue.shift();
+    let pageToken = '';
+
+    do {
+      const params = new URLSearchParams({
+        q:
+          `'${parentId}' in parents and trashed = false`,
+        pageSize: '100',
+        fields:
+          'nextPageToken,files(id,name,mimeType,modifiedTime,parents,size)',
+        includeItemsFromAllDrives: 'true',
+        supportsAllDrives: 'true',
+      });
+
+      if (pageToken) {
+        params.set('pageToken', pageToken);
+      }
+
+      const data = await fetchJson(
+        'https://www.googleapis.com/drive/v3/files?' +
+          params.toString(),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      for (const file of data.files || []) {
+        if (
+          file.mimeType ===
+          'application/vnd.google-apps.folder'
+        ) {
+          queue.push(file.id);
+          continue;
+        }
+
+        if (isAllowedMediaMime(file.mimeType)) {
+          files.push({
+            id: file.id,
+            name: cleanText(file.name, 300),
+            mimeType: cleanText(file.mimeType, 120),
+            modifiedTime: file.modifiedTime || '',
+            size: Number(file.size || 0),
+          });
+        }
+
+        if (files.length >= MAX_MEDIA_FILES) {
+          break;
+        }
+      }
+
+      pageToken = data.nextPageToken || '';
+    } while (
+      pageToken &&
+      files.length < MAX_MEDIA_FILES
+    );
+  }
+
+  return {
+    configured: true,
+    folderId: mediaFolderId,
+    files,
+  };
+}
+
+export async function getDriveMediaFile(fileId) {
+  if (!driveKnowledgeConfigured()) {
+    const error = new Error('drive_not_configured');
+    error.status = 503;
+    throw error;
+  }
+
+  const id = String(fileId || '').trim();
+
+  if (!/^[a-zA-Z0-9_-]{10,200}$/.test(id)) {
+    const error = new Error('invalid_drive_file_id');
+    error.status = 400;
+    throw error;
+  }
+
+  const token = await getAccessToken();
+  const boundaryFolderId =
+    await discoverMediaFolderId(token);
+
+  const file = await getDriveMetadata(
+    token,
+    id
+  );
+
+  if (
+    file.trashed ||
+    !isAllowedMediaMime(file.mimeType)
+  ) {
+    const error = new Error('drive_media_not_found');
+    error.status = 404;
+    throw error;
+  }
+
+  const allowed = await fileIsWithinFolder(
+    token,
+    file,
+    boundaryFolderId
+  );
+
+  if (!allowed) {
+    const error = new Error('drive_media_not_allowed');
+    error.status = 403;
+    throw error;
+  }
+
+  const size = Number(file.size || 0);
+
+  if (size && size > MAX_MEDIA_BYTES) {
+    const error = new Error('drive_media_too_large');
+    error.status = 413;
+    throw error;
+  }
+
+  const response = await fetchWithTimeout(
+    'https://www.googleapis.com/drive/v3/files/' +
+      encodeURIComponent(id) +
+      '?alt=media&supportsAllDrives=true',
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+    15000
+  );
+
+  if (!response.ok) {
+    const error = new Error(
+      `drive_media_http_${response.status}`
+    );
+    error.status =
+      response.status === 404
+        ? 404
+        : 502;
+    throw error;
+  }
+
+  const buffer = Buffer.from(
+    await response.arrayBuffer()
+  );
+
+  if (buffer.length > MAX_MEDIA_BYTES) {
+    const error = new Error('drive_media_too_large');
+    error.status = 413;
+    throw error;
+  }
+
+  return {
+    buffer,
+    id,
+    name: cleanText(file.name, 300),
+    mimeType:
+      cleanText(
+        file.mimeType,
+        120
+      ) ||
+      'application/octet-stream',
+    modifiedTime: file.modifiedTime || '',
+    size: buffer.length,
   };
 }
