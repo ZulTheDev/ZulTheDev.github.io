@@ -883,28 +883,55 @@ function AdminShell() {
 
     try {
       const prefixValue = String(slug || '').trim();
-      const prefix = prefixValue
-        ? 'ctf_blog/' + safeWriteupSlug(prefixValue) + '/'
-        : 'ctf_blog/';
+      const suffix = prefixValue
+        ? safeWriteupSlug(prefixValue) + '/'
+        : '';
 
-      const response = await authFetch(
-        API +
-          '/api/r2/objects?prefix=' +
-          encodeURIComponent(prefix)
-      );
-      const data = await response.json();
+      const prefixes = [
+        'ctf_blog/' + suffix,
+        'ctf-blog/' + suffix,
+      ];
 
-      if (!response.ok) {
-        throw new Error(
-          data?.error || 'R2 list failed'
-        );
+      let rows = [];
+      let lastError = null;
+
+      for (const prefix of prefixes) {
+        try {
+          const response = await authFetch(
+            API +
+              '/api/r2/objects?prefix=' +
+              encodeURIComponent(prefix)
+          );
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error || 'R2 list failed'
+            );
+          }
+
+          const objects = Array.isArray(data.objects)
+            ? data.objects
+            : [];
+
+          if (objects.length) {
+            rows = objects;
+            break;
+          }
+
+          if (!rows.length) {
+            rows = objects;
+          }
+        } catch (error) {
+          lastError = error;
+        }
       }
 
-      setR2Objects(
-        Array.isArray(data.objects)
-          ? data.objects
-          : []
-      );
+      if (!rows.length && lastError) {
+        throw lastError;
+      }
+
+      setR2Objects(rows);
     } catch (error) {
       setNotice('R2 library unavailable: ' + error.message);
     } finally {
