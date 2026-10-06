@@ -23,6 +23,7 @@ const ONLINE_API = normalizeApiBase(
 );
 const PUBLIC_SITE = 'https://zulthedev.github.io/';
 const HIRING_ROUTE = PUBLIC_SITE + 'port_resume?type_of_work_hiring=technical_officer';
+const DRIVE_ROOT_ID = '10XU8zeRpx9Ladh501vWjZepzm0j7ZOq6';
 const LOCAL_DRAFT_KEY = 'zul-admin-local-draft-v1';
 
 const SECTION_META = {
@@ -1567,6 +1568,7 @@ function AdminShell() {
               loadDriveMedia={loadDriveMedia}
               content={content}
               updateImage={updateImage}
+              setNotice={setNotice}
             />
           )}
 
@@ -3697,26 +3699,489 @@ function ServiceRow({ label, item }) {
   );
 }
 
-function MediaLibraryEditor({ driveMedia, driveLoading, loadDriveMedia, content, updateImage }) {
+function MediaLibraryEditor({
+  driveMedia,
+  driveLoading,
+  loadDriveMedia,
+  content,
+  updateImage,
+  setNotice,
+}) {
+  const [folders, setFolders] =
+    useState([]);
+  const [targetFolderId, setTargetFolderId] =
+    useState(DRIVE_ROOT_ID);
+  const [folderName, setFolderName] =
+    useState('');
+  const [driveBusy, setDriveBusy] =
+    useState(false);
+
+  useEffect(() => {
+    loadFolders();
+  }, []);
+
+  async function loadFolders() {
+    try {
+      const response = await fetch(
+        API +
+          '/api/drive/folders?parentId=' +
+          encodeURIComponent(
+            DRIVE_ROOT_ID
+          )
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          'Folder list failed'
+        );
+      }
+
+      setFolders(
+        Array.isArray(data.folders)
+          ? data.folders
+          : []
+      );
+    } catch (error) {
+      setFolders([]);
+      setNotice?.(
+        'Drive folders unavailable: ' +
+          error.message
+      );
+    }
+  }
+
+  async function createFolder() {
+    const name =
+      folderName.trim();
+
+    if (!name) {
+      return;
+    }
+
+    setDriveBusy(true);
+
+    try {
+      const response = await fetch(
+        API + '/api/drive/folders',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            name,
+            parentId:
+              targetFolderId ||
+              DRIVE_ROOT_ID,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          'Drive folder creation failed'
+        );
+      }
+
+      setFolderName('');
+      setNotice?.(
+        'Created Drive folder: ' +
+          (data.folder?.name || name)
+      );
+      await loadFolders();
+      await loadDriveMedia();
+    } catch (error) {
+      setNotice?.(
+        'Drive folder creation failed: ' +
+          error.message
+      );
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  async function fileToBase64(file) {
+    return new Promise(
+      (resolve, reject) => {
+        const reader =
+          new FileReader();
+
+        reader.onload = () => {
+          const raw =
+            String(
+              reader.result || ''
+            );
+          const comma =
+            raw.indexOf(',');
+
+          resolve(
+            comma >= 0
+              ? raw.slice(comma + 1)
+              : ''
+          );
+        };
+
+        reader.onerror = () =>
+          reject(
+            new Error(
+              'Could not read file.'
+            )
+          );
+
+        reader.readAsDataURL(file);
+      }
+    );
+  }
+
+  async function uploadDriveFile(
+    event
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setNotice?.(
+        'Drive upload must be 15 MB or smaller in this admin build.'
+      );
+      return;
+    }
+
+    setDriveBusy(true);
+
+    try {
+      const contentBase64 =
+        await fileToBase64(file);
+
+      const response = await fetch(
+        API + '/api/drive/upload',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            name: file.name,
+            mimeType:
+              file.type ||
+              'application/octet-stream',
+            parentId:
+              targetFolderId ||
+              DRIVE_ROOT_ID,
+            contentBase64,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          'Drive upload failed'
+        );
+      }
+
+      setNotice?.(
+        'Uploaded to Google Drive: ' +
+          (data.file?.name ||
+            file.name)
+      );
+
+      await loadDriveMedia();
+    } catch (error) {
+      setNotice?.(
+        'Drive upload failed: ' +
+          error.message
+      );
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  async function updateDriveFile(
+    item,
+    payload
+  ) {
+    setDriveBusy(true);
+
+    try {
+      const response = await fetch(
+        API +
+          '/api/drive/files/' +
+          encodeURIComponent(item.id),
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          'Drive update failed'
+        );
+      }
+
+      setNotice?.(
+        'Updated Drive file: ' +
+          (data.file?.name ||
+            item.name)
+      );
+
+      await loadDriveMedia();
+    } catch (error) {
+      setNotice?.(
+        'Drive update failed: ' +
+          error.message
+      );
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
   return (
     <section className="panel">
-      <PanelHeader eyebrow="GOOGLE DRIVE" title="Media library" />
+      <PanelHeader
+        eyebrow="GOOGLE DRIVE"
+        title="Media & file manager"
+      />
+
       <div className="media-library-toolbar">
-        <p className="helper">Browse the Google Drive Media folder (including nested folders) in read-only mode. The admin tries the local Drive API first, then the hosted portfolio API. Copy a file ID into any media item or attach it to the profile image.</p>
-        <button className="accent-button" onClick={loadDriveMedia} disabled={driveLoading}>{driveLoading ? 'Loading...' : 'Refresh Drive'}</button>
+        <div>
+          <p className="helper">
+            This admin talks to the private Tailscale API first. It can create folders, upload files, rename and move items inside the approved portfolio Drive root. The Vercel chatbot remains read-only.
+          </p>
+          <code className="drive-root-chip">
+            root: {DRIVE_ROOT_ID}
+          </code>
+        </div>
+
+        <button
+          className="accent-button"
+          onClick={loadDriveMedia}
+          disabled={
+            driveLoading ||
+            driveBusy
+          }
+        >
+          {driveLoading
+            ? 'Loading...'
+            : 'Refresh Drive'}
+        </button>
       </div>
+
+      <div className="drive-manager-actions">
+        <label className="field">
+          <span>
+            Target folder
+          </span>
+          <select
+            value={targetFolderId}
+            onChange={(event) =>
+              setTargetFolderId(
+                event.target.value
+              )
+            }
+          >
+            <option value={DRIVE_ROOT_ID}>
+              Portfolio root
+            </option>
+            {folders.map(
+              (folder) => (
+                <option
+                  key={folder.id}
+                  value={folder.id}
+                >
+                  {folder.name}
+                </option>
+              )
+            )}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>
+            New folder
+          </span>
+          <input
+            value={folderName}
+            onChange={(event) =>
+              setFolderName(
+                event.target.value
+              )
+            }
+            placeholder="e.g. Media / Certificates"
+          />
+        </label>
+
+        <button
+          className="ghost"
+          type="button"
+          onClick={createFolder}
+          disabled={
+            driveBusy ||
+            !folderName.trim()
+          }
+        >
+          Create folder
+        </button>
+
+        <label className="accent-button file-button">
+          {driveBusy
+            ? 'Working...'
+            : 'Upload to Drive'}
+          <input
+            type="file"
+            disabled={driveBusy}
+            onChange={uploadDriveFile}
+          />
+        </label>
+      </div>
+
       <div className="profile-drive-row">
-        <Field label="Profile Drive file ID" value={content.profile.image?.driveId || ''} onChange={(v) => updateImage('driveId', v)} />
+        <Field
+          label="Profile Drive file ID"
+          value={
+            content.profile.image
+              ?.driveId || ''
+          }
+          onChange={(value) =>
+            updateImage(
+              'driveId',
+              value
+            )
+          }
+        />
       </div>
-      {!driveMedia.length ? <div className="media-empty">No Drive media loaded yet.</div> : (
+
+      {!driveMedia.length ? (
+        <div className="media-empty">
+          No Drive media loaded yet.
+        </div>
+      ) : (
         <div className="drive-grid">
           {driveMedia.map((item) => (
-            <article className="drive-card" key={item.id}>
-              {(item.proxyUrl || item.thumbnailLink) ? <img src={item.proxyUrl || item.thumbnailLink} alt={item.name || 'Drive media'} /> : <div className="drive-thumb">FILE</div>}
-              <div><strong title={item.name}>{item.name}</strong><small>{item.mimeType || 'Unknown type'}</small><code>{item.id}</code></div>
+            <article
+              className="drive-card"
+              key={item.id}
+            >
+              {(item.proxyUrl ||
+                item.thumbnailLink) ? (
+                <img
+                  src={
+                    item.proxyUrl ||
+                    item.thumbnailLink
+                  }
+                  alt={
+                    item.name ||
+                    'Drive media'
+                  }
+                />
+              ) : (
+                <div className="drive-thumb">
+                  FILE
+                </div>
+              )}
+
+              <div>
+                <strong title={item.name}>
+                  {item.name}
+                </strong>
+                <small>
+                  {item.mimeType ||
+                    'Unknown type'}
+                </small>
+                <code>{item.id}</code>
+              </div>
+
               <div className="drive-actions">
-                <button className="ghost small" onClick={() => navigator.clipboard?.writeText(item.id)}>Copy ID</button>
-                <button className="accent-button small" onClick={() => updateImage('driveId', item.id)}>Use for profile</button>
+                <button
+                  className="ghost small"
+                  onClick={() =>
+                    navigator.clipboard?.writeText(
+                      item.id
+                    )
+                  }
+                >
+                  Copy ID
+                </button>
+
+                <button
+                  className="accent-button small"
+                  onClick={() =>
+                    updateImage(
+                      'driveId',
+                      item.id
+                    )
+                  }
+                >
+                  Use for profile
+                </button>
+
+                <button
+                  className="ghost small"
+                  disabled={driveBusy}
+                  onClick={() =>
+                    updateDriveFile(
+                      item,
+                      {
+                        parentId:
+                          targetFolderId,
+                      }
+                    )
+                  }
+                >
+                  Move here
+                </button>
+
+                <button
+                  className="ghost small"
+                  disabled={driveBusy}
+                  onClick={() => {
+                    const name =
+                      window.prompt(
+                        'Rename Drive file',
+                        item.name || ''
+                      );
+
+                    if (
+                      name &&
+                      name.trim()
+                    ) {
+                      updateDriveFile(
+                        item,
+                        {
+                          name:
+                            name.trim(),
+                        }
+                      );
+                    }
+                  }}
+                >
+                  Rename
+                </button>
               </div>
             </article>
           ))}
