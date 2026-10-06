@@ -192,7 +192,9 @@ function safePublishedPath(value) {
   if (
     (
       !filePath.startsWith('client/public/ctf_blog/') &&
-      !filePath.startsWith('client/public/ctf-blog/')
+      !filePath.startsWith('client/public/ctf-blog/') &&
+      !filePath.startsWith('client/public/blog/') &&
+      !filePath.startsWith('client/public/webcomic/')
     ) ||
     filePath.includes('..') ||
     filePath.startsWith('/') ||
@@ -492,8 +494,8 @@ export async function publishFilesWithGitHubApp({
   }
 
   const commitMessage =
-    'Publish CTF writeup: ' +
-    String(title || 'Untitled writeup')
+    'Publish portfolio document: ' +
+    String(title || 'Untitled document')
       .replace(
         /[^a-zA-Z0-9 _-]/g,
         ''
@@ -513,7 +515,7 @@ export async function publishFilesWithGitHubApp({
       body: {
         message:
           commitMessage ||
-          'Publish CTF writeup',
+          'Publish portfolio document',
         tree: tree.sha,
         parents: [headSha],
       },
