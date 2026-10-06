@@ -1,0 +1,36 @@
+---
+import PortfolioApp from '../App.jsx';
+import BootScreen from '../components/BootScreen.astro';
+import { loadInitialContent } from '../data/content-loader.js';
+import '../style.css';
+import '../responsive.css';
+
+const initialContent = loadInitialContent();
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0e0b13" />
+    <meta
+      name="description"
+      content="Zulfaqar Jamal — cybersecurity, software development, projects, research, certifications and work experience."
+    />
+    <link rel="preconnect" href="https://giscus.app" crossorigin />
+    <link rel="dns-prefetch" href="//drive.google.com" />
+    <title>Zulfaqar Jamal</title>
+  </head>
+
+  <body>
+    <PortfolioApp
+      initialContent={initialContent}
+      client:only="react"
+    >
+      <BootScreen slot="fallback" />
+    </PortfolioApp>
+  </body>
+</html>

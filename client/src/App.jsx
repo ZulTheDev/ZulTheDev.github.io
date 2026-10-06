@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import GiscusComments from './GiscusComments';
 import {
   ArrowUpRight,
   ChevronRight,
   X,
+  Menu,
   Sparkles,
 } from 'lucide-react';
-import './style.css';
-
 const API = import.meta.env.VITE_API_BASE_URL || '';
+const CONTENT_API_ENABLED =
+  import.meta.env.VITE_ENABLE_CONTENT_API === 'true';
 
 const GAMES =
   import.meta.env.VITE_GAMES_URL ||
@@ -493,31 +493,28 @@ function BotAvatar({ size = 28 }) {
 
 const CHAT_SESSION_KEY = 'portfolio-ai-chat-session';
 
+const DEFAULT_CHAT_MESSAGES = [
+  {
+    a: 1,
+    t: "Ask me about Zul's work, skills, projects or certifications.",
+  },
+];
+
 function readChatSession() {
   try {
     const saved = sessionStorage.getItem(CHAT_SESSION_KEY);
 
     if (!saved) {
-      return [
-        {
-          a: 1,
-          t: "Ask me about Zul's work, skills, projects or certifications.",
-        },
-      ];
+      return DEFAULT_CHAT_MESSAGES;
     }
 
     const parsed = JSON.parse(saved);
 
     return Array.isArray(parsed) && parsed.length
       ? parsed.slice(-20)
-      : [];
+      : DEFAULT_CHAT_MESSAGES;
   } catch {
-    return [
-      {
-        a: 1,
-        t: "Ask me about Zul's work, skills, projects or certifications.",
-      },
-    ];
+    return DEFAULT_CHAT_MESSAGES;
   }
 }
 
@@ -535,17 +532,26 @@ function writeChatSession(messages) {
 const ONLINE_API =
   import.meta.env.VITE_ONLINE_API_URL ||
   import.meta.env.VITE_COMMENTS_BACKUP_URL ||
-  '';
+  'https://zul-portfolio-api.vercel.app';
 
 function Chat({ content }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
   const [messages, setMessages] =
-    useState(() => readChatSession());
+    useState(DEFAULT_CHAT_MESSAGES);
+  const [chatSessionReady, setChatSessionReady] =
+    useState(false);
 
   useEffect(() => {
-    writeChatSession(messages);
-  }, [messages]);
+    setMessages(readChatSession());
+    setChatSessionReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (chatSessionReady) {
+      writeChatSession(messages);
+    }
+  }, [messages, chatSessionReady]);
 
   async function send() {
     const message = question.trim();
@@ -588,9 +594,17 @@ function Chat({ content }) {
           {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+              // text/plain is a CORS-safelisted content type,
+              // so the browser can send the chat POST without
+              // an OPTIONS preflight to this public API.
+              'Content-Type': 'text/plain',
             },
             body: JSON.stringify({
+              portfolioId: 'zulfaqar-jamal',
+              page:
+                typeof window !== 'undefined'
+                  ? window.location.pathname + window.location.hash
+                  : '/',
               message,
               history,
               context: content,
@@ -2719,44 +2733,34 @@ function CTFWriteupView({ slug }) {
    MAIN APPLICATION
 ========================================================= */
 
-function App() {
-  const [content, setContent] = useState(null);
-  const [loadProgress, setLoadProgress] = useState(8);
+export default function App({ initialContent = null }) {
+  const [content, setContent] = useState(
+    initialContent ? normalizeContent(initialContent) : null
+  );
+  const [loadProgress, setLoadProgress] = useState(initialContent ? 100 : 8);
   const [selected, setSelected] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    window.dispatchEvent(new Event('portfolio:hydrated'));
+  }, []);
+
+  const currentLocation =
+    typeof window !== 'undefined'
+      ? window.location
+      : { pathname: '', hash: '', search: '' };
 
   const ctfPath =
-    location.pathname.replace(/\/+$/, '');
+    currentLocation.pathname.replace(/\/+$/, '');
 
   const isCtfRoute =
     ctfPath === '/ctf-blog' ||
     ctfPath === '/ctf-blog/' ||
     ctfPath.startsWith('/ctf-blog/');
 
-  useEffect(() => {
-    const { deviceId, sessionId } =
-      getAnonymousIdentity();
-
-    if (!API || isCtfRoute) {
-      return;
-    }
-
-    fetch(`${API}/api/access/track`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        deviceId,
-        sessionId,
-      }),
-    }).catch(() => {
-      // Anonymous access tracking is best-effort.
-    });
-  }, [isCtfRoute]);
-
-  const [page, setPage] = useState(
-    location.hash.slice(1) || 'home'
-  );
+  // Keep the first render deterministic for Astro SSR.
+  // The real hash is applied immediately after hydration.
+  const [page, setPage] = useState('home');
 
   /* ---------------------------------------------
      LOAD CONTENT
@@ -2771,43 +2775,49 @@ function App() {
 
     const loadContent = async () => {
       try {
-        setLoadProgress(18);
-
-        const response = await fetch('/content.json');
-
-        if (!response.ok) {
-          throw new Error('content.json unavailable');
+        if (!initialContent) {
+          setLoadProgress(18);
         }
 
-        setLoadProgress(42);
+        const response = initialContent
+          ? null
+          : await fetch('/content.json');
 
-        const data = await response.json();
+        if (!initialContent) {
+          if (!response.ok) {
+            throw new Error('content.json unavailable');
+          }
 
-        setLoadProgress(68);
+          setLoadProgress(42);
 
-        if (mounted) {
-          setContent(normalizeContent(data));
+          const data = await response.json();
+
+          setLoadProgress(68);
+
+          if (mounted) {
+            setContent(normalizeContent(data));
+          }
         }
 
         /*
          * API is optional. Static content remains the fallback.
          */
-        if (API) {
+        if (CONTENT_API_ENABLED && API) {
           try {
             const apiResponse = await fetch(
-              `${API}/api/content`
+              `${API}/api/content`,
+              { cache: 'no-store' }
             );
 
             if (apiResponse.ok) {
               const apiData = await apiResponse.json();
 
-              setLoadProgress(88);
+              if (mounted) {
+                setLoadProgress(88);
 
-              if (
-                mounted &&
-                apiData?.profile
-              ) {
-                setContent(normalizeContent(apiData));
+                if (apiData?.profile) {
+                  setContent(normalizeContent(apiData));
+                }
               }
             }
           } catch {
@@ -2824,7 +2834,18 @@ function App() {
       }
     };
 
-    loadContent();
+    if (initialContent) {
+      // Initial HTML already contains the static portfolio data.
+      // Refresh optional API content during idle time.
+      const run = () => loadContent();
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(run, { timeout: 2500 });
+      } else {
+        window.setTimeout(run, 1200);
+      }
+    } else {
+      loadContent();
+    }
 
     /* -------------------------------------------
        HASH ROUTING
@@ -2832,20 +2853,22 @@ function App() {
 
     const handleHashChange = () => {
       setPage(
-        location.hash.slice(1) ||
+        window.location.hash.slice(1) ||
           'home'
       );
     };
 
-    addEventListener(
+    window.addEventListener(
       'hashchange',
       handleHashChange
     );
 
+    handleHashChange();
+
     return () => {
       mounted = false;
 
-      removeEventListener(
+      window.removeEventListener(
         'hashchange',
         handleHashChange
       );
@@ -2888,10 +2911,10 @@ function App() {
   ======================================================= */
 
   const hiringPath =
-    location.pathname.replace(/\/+$/, '') === '/port_resume';
+    currentLocation.pathname.replace(/\/+$/, '') === '/port_resume';
 
   if (hiringPath) {
-    const params = new URLSearchParams(location.search);
+    const params = new URLSearchParams(currentLocation.search);
     const rawTarget =
       params.get('type_of_work_hiring') || '';
 
@@ -3014,14 +3037,32 @@ function App() {
           NAVIGATION
       =================================================== */}
 
-      <nav>
-        <a href="#home">
+      <nav className={mobileNavOpen ? 'mobile-nav-open' : ''}>
+        <a
+          href="#home"
+          className="site-nav-brand"
+          onClick={() => setMobileNavOpen(false)}
+        >
           <b>
             ZUL<span>/</span>JAMAL
           </b>
         </a>
 
-        <div>
+        <button
+          type="button"
+          className="mobile-nav-toggle"
+          aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={mobileNavOpen}
+          aria-controls="mobile-site-navigation"
+          onClick={() => setMobileNavOpen((open) => !open)}
+        >
+          {mobileNavOpen ? <X size={25} /> : <Menu size={25} />}
+        </button>
+
+        <div
+          id="mobile-site-navigation"
+          className="site-nav-links"
+        >
           {[
             'home',
             'recent',
@@ -3034,24 +3075,27 @@ function App() {
             <a
               key={item}
               href={`#${item}`}
+              onClick={() => setMobileNavOpen(false)}
             >
               {item}
             </a>
           ))}
         </div>
 
-        <a href="#explore">
-          Explore{' '}
-          <Sparkles size={13} />
-        </a>
+        <div className="site-nav-extra-links">
+          <a href="#explore" onClick={() => setMobileNavOpen(false)}>
+            Explore{' '}
+            <Sparkles size={13} />
+          </a>
 
-        <a href="#games">
-          Games
-        </a>
+          <a href="#games" onClick={() => setMobileNavOpen(false)}>
+            Games
+          </a>
 
-        <a href="/ctf-blog/">
-          CTF Blog
-        </a>
+          <a href="/ctf-blog/" onClick={() => setMobileNavOpen(false)}>
+            CTF Blog
+          </a>
+        </div>
       </nav>
 
       <main>
@@ -3495,12 +3539,3 @@ function App() {
   );
 }
 
-/* =========================================================
-   REACT ROOT
-========================================================= */
-
-createRoot(
-  document.getElementById('root')
-).render(
-  <App />
-);

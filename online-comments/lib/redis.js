@@ -1,21 +1,24 @@
 import { createClient } from 'redis';
+import { config } from './config.js';
 
 let clientPromise = null;
 
 export function redisConfigured() {
   return Boolean(
-    process.env.REDIS_URL
+    config.redis.url
   );
 }
 
 export async function getRedis() {
   if (!redisConfigured()) {
-    throw new Error('redis_not_configured');
+    throw new Error(
+      'redis_not_configured'
+    );
   }
 
   if (!clientPromise) {
     const client = createClient({
-      url: process.env.REDIS_URL,
+      url: config.redis.url,
     });
 
     client.on('error', (error) => {
@@ -37,7 +40,9 @@ export async function getRedis() {
   return clientPromise;
 }
 
-export async function readCommentsForTerm(term) {
+export async function readCommentsForTerm(
+  term
+) {
   const redis = await getRedis();
 
   const ids = await redis.zRange(

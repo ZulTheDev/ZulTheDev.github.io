@@ -2522,7 +2522,7 @@ app.get(
 
       model:
         process.env.DEEPSEEK_MODEL ||
-        'deepseek-chat',
+        'deepseek-flash',
     });
   }
 );
@@ -2568,7 +2568,7 @@ app.post(
 
     const deepseekModel =
       process.env.DEEPSEEK_MODEL ||
-      'deepseek-chat';
+      'deepseek-flash';
 
     const backupUrl =
       process.env.TAILSCALE_AI_URL;

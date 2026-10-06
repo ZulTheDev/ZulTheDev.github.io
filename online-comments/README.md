@@ -75,3 +75,23 @@ The online comment service does not intentionally store IP addresses, precise lo
 ## Scope
 
 This service is deliberately small. It is a comment persistence endpoint for a personal portfolio, not a general-purpose backend, security-testing target, or enterprise platform.
+
+
+## AI portfolio assistant
+
+The public chatbot is scoped to **Zulfaqar Jamal only**. It combines the live static portfolio with an optional, separate Google Drive knowledge folder before sending the relevant evidence to DeepSeek.
+
+Configure these Vercel variables for the AI service:
+
+```env
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-flash
+GOOGLE_SERVICE_ACCOUNT_EMAIL=
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
+GOOGLE_DRIVE_CHATBOT_FOLDER_ID=
+PORTFOLIO_CONTENT_URL=https://zulthedev.github.io/content.json
+```
+
+The Google service account must have access to the dedicated chatbot folder. The chatbot intentionally does not fall back to a generic Drive/root folder because that could mix another person's portfolio into Zulfaqar's knowledge.
+
+Legacy DeepSeek model names such as `deepseek-chat` and `deepseek-reasoner` are normalized to `deepseek-flash` by the API. DeepSeek's current API documentation lists `deepseek-flash` as the supported Flash model. 

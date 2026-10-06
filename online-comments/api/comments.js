@@ -1,10 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
   countUserReplies,
-  corsHeaders,
-  json,
-  MAX_REPLY_COUNT,
   publicComment,
+  MAX_REPLY_COUNT,
   validAnonymousId,
   validTerm,
 } from '../lib/comments.js';
@@ -14,22 +12,19 @@ import {
   redisConfigured,
   saveComment,
 } from '../lib/redis.js';
+import {
+  applyCors,
+  handleOptions,
+} from '../lib/cors.js';
 
 export default async function handler(
   request,
   response
 ) {
-  const origin =
-    request.headers.origin || '';
+  applyCors(response, request);
 
-  if (request.method === 'OPTIONS') {
-    for (const [key, value] of Object.entries(
-      corsHeaders(origin)
-    )) {
-      response.setHeader(key, value);
-    }
-
-    return response.status(204).end();
+  if (handleOptions(request, response)) {
+    return;
   }
 
   try {
@@ -37,31 +32,24 @@ export default async function handler(
       const term = String(
         request.query?.term || ''
       ).trim();
-
       const deviceId = String(
         request.query?.deviceId || ''
       ).trim();
 
-
       if (!term || !validTerm(term)) {
-        return response
-          .status(400)
-          .json({
-            error: 'invalid_term',
-          });
+        return response.status(400).json({
+          error: 'invalid_term',
+        });
       }
 
       if (!redisConfigured()) {
-        return response
-          .status(503)
-          .json({
-            error: 'redis_not_configured',
-          });
+        return response.status(503).json({
+          error: 'redis_not_configured',
+        });
       }
 
       const comments =
         await readCommentsForTerm(term);
-
       const replyCount =
         validAnonymousId(deviceId)
           ? countUserReplies(
@@ -70,13 +58,7 @@ export default async function handler(
             )
           : 0;
 
-      for (const [key, value] of Object.entries(
-        corsHeaders(origin)
-      )) {
-        response.setHeader(key, value);
-      }
-
-      return response.json({
+      return response.status(200).json({
         comments:
           comments.map((item) =>
             publicComment(
@@ -92,74 +74,56 @@ export default async function handler(
       const term = String(
         request.body?.term || ''
       ).trim();
-
       const name = String(
         request.body?.name || ''
       ).trim();
-
       const comment = String(
         request.body?.comment || ''
       ).trim();
-
       const parentId =
         request.body?.parentId
           ? String(
               request.body.parentId
             ).trim()
           : null;
-
       const deviceId = String(
         request.body?.deviceId || ''
       ).trim();
 
-
       if (!term || !validTerm(term)) {
-        return response
-          .status(400)
-          .json({
-            error: 'invalid_term',
-          });
+        return response.status(400).json({
+          error: 'invalid_term',
+        });
       }
 
       if (!validAnonymousId(deviceId)) {
-        return response
-          .status(400)
-          .json({
-            error:
-              'invalid_anonymous_id',
-          });
+        return response.status(400).json({
+          error: 'invalid_anonymous_id',
+        });
       }
 
       if (!name) {
-        return response
-          .status(400)
-          .json({
-            error: 'name_required',
-          });
+        return response.status(400).json({
+          error: 'name_required',
+        });
       }
 
       if (name.length > 50) {
-        return response
-          .status(400)
-          .json({
-            error: 'name_too_long',
-          });
+        return response.status(400).json({
+          error: 'name_too_long',
+        });
       }
 
       if (!comment) {
-        return response
-          .status(400)
-          .json({
-            error: 'comment_required',
-          });
+        return response.status(400).json({
+          error: 'comment_required',
+        });
       }
 
       if (comment.length > 2000) {
-        return response
-          .status(400)
-          .json({
-            error: 'comment_too_long',
-          });
+        return response.status(400).json({
+          error: 'comment_too_long',
+        });
       }
 
       if (
@@ -168,45 +132,32 @@ export default async function handler(
           parentId
         )
       ) {
-        return response
-          .status(400)
-          .json({
-            error: 'invalid_parent',
-          });
+        return response.status(400).json({
+          error: 'invalid_parent',
+        });
       }
 
       if (parentId) {
         const parent =
-          await findComment(
-            parentId
-          );
+          await findComment(parentId);
 
         if (
           !parent ||
           parent.term !== term
         ) {
-          return response
-            .status(404)
-            .json({
-              error:
-                'parent_not_found',
-            });
+          return response.status(404).json({
+            error: 'parent_not_found',
+          });
         }
 
         if (parent.deleted) {
-          return response
-            .status(400)
-            .json({
-              error:
-                'parent_deleted',
-            });
+          return response.status(400).json({
+            error: 'parent_deleted',
+          });
         }
 
         const comments =
-          await readCommentsForTerm(
-            term
-          );
-
+          await readCommentsForTerm(term);
         const replyCount =
           countUserReplies(
             comments,
@@ -217,14 +168,11 @@ export default async function handler(
           replyCount >=
           MAX_REPLY_COUNT
         ) {
-          return response
-            .status(429)
-            .json({
-              error:
-                'reply_limit_reached',
-              message:
-                'Reply limit reached for this anonymous browser (10).',
-            });
+          return response.status(429).json({
+            error: 'reply_limit_reached',
+            message:
+              'Reply limit reached for this anonymous browser (10).',
+          });
         }
       }
 
@@ -245,53 +193,27 @@ export default async function handler(
 
       await saveComment(item);
 
-      for (const [key, value] of Object.entries(
-        corsHeaders(origin)
-      )) {
-        response.setHeader(key, value);
-      }
-
-      return response
-        .status(201)
-        .json({
-          ok: true,
-          comment:
-            publicComment(
-              item,
-              deviceId
-            ),
-        });
-    }
-
-    for (const [key, value] of Object.entries(
-      corsHeaders(origin)
-    )) {
-      response.setHeader(key, value);
-    }
-
-    return response
-      .status(405)
-      .json({
-        error:
-          'method_not_allowed',
+      return response.status(201).json({
+        ok: true,
+        comment:
+          publicComment(
+            item,
+            deviceId
+          ),
       });
+    }
+
+    return response.status(405).json({
+      error: 'method_not_allowed',
+    });
   } catch (error) {
     console.error(
       'Online comment API error:',
       error?.message || error
     );
 
-    for (const [key, value] of Object.entries(
-      corsHeaders(origin)
-    )) {
-      response.setHeader(key, value);
-    }
-
-    return response
-      .status(503)
-      .json({
-        error:
-          'comments_unavailable',
-      });
+    return response.status(503).json({
+      error: 'comments_unavailable',
+    });
   }
 }

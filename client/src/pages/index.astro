@@ -1,0 +1,137 @@
+---
+import PortfolioApp from '../App.jsx';
+import { loadInitialContent } from '../data/content-loader.js';
+import '../style.css';
+import '../responsive.css';
+
+const initialContent = loadInitialContent();
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0e0b13" />
+    <meta
+      name="description"
+      content="Zulfaqar Jamal — cybersecurity, software development, projects, research, certifications and work experience."
+    />
+    <link rel="preconnect" href="https://giscus.app" crossorigin />
+    <link rel="dns-prefetch" href="//drive.google.com" />
+    <title>Zulfaqar Jamal</title>
+    <style is:global>
+      #portfolio-boot {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition:
+          opacity 180ms ease,
+          visibility 180ms ease;
+      }
+
+      #portfolio-boot.is-ready {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <PortfolioApp
+      initialContent={initialContent}
+      client:idle={{ timeout: 1500 }}
+    />
+
+    <div
+      id="portfolio-boot"
+      class="loading-screen"
+      role="status"
+      aria-live="polite"
+      aria-label="Loading Zulfaqar Jamal portfolio"
+    >
+      <div class="loader-shell">
+        <div class="loader-ring">
+          <div class="loader-ring-inner"></div>
+          <span class="tick tick-1"></span>
+          <span class="tick tick-2"></span>
+          <span class="tick tick-3"></span>
+          <span class="tick tick-4"></span>
+          <span class="tick tick-5"></span>
+          <span class="tick tick-6"></span>
+          <span class="tick tick-7"></span>
+          <span class="tick tick-8"></span>
+          <div class="loader-scanner"></div>
+
+          <div class="coder-cat">
+            <div class="cat-ear cat-ear-left"></div>
+            <div class="cat-ear cat-ear-right"></div>
+            <div class="cat-head">
+              <span class="cat-eye cat-eye-left"></span>
+              <span class="cat-eye cat-eye-right"></span>
+              <span class="cat-nose">⌁</span>
+              <span class="cat-mouth">ω</span>
+            </div>
+            <div class="cat-laptop">
+              <div class="cat-screen"><span>&gt;_</span></div>
+              <div class="cat-base"></div>
+            </div>
+            <div class="cat-paw cat-paw-left"></div>
+            <div class="cat-paw cat-paw-right"></div>
+          </div>
+        </div>
+
+        <div class="loader-status">
+          <div class="loader-label">
+            <span>ฅ^•ﻌ•^ฅ</span>
+            <strong> booting zul.exe </strong>
+            <span>ฅ^•ﻌ•^ฅ</span>
+          </div>
+
+          <div class="loader-progress">
+            <span style="width: 76%"></span>
+          </div>
+
+          <div class="loader-meta">
+            <span>WAITING FOR IDLE</span>
+            <span>76%</span>
+          </div>
+
+          <div class="loader-subtext">
+            Astro rendered the portfolio. Waiting for the browser to hydrate it...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script is:inline>
+      (() => {
+        const boot = document.getElementById('portfolio-boot');
+        if (!boot) return;
+
+        let fallbackTimer;
+
+        const hideBootScreen = () => {
+          boot.classList.add('is-ready');
+
+          if (fallbackTimer) {
+            window.clearTimeout(fallbackTimer);
+          }
+        };
+
+        window.addEventListener(
+          'portfolio:hydrated',
+          hideBootScreen,
+          { once: true }
+        );
+
+        // Never trap a visitor behind the loader if JavaScript hydration
+        // fails. Astro's server-rendered HTML remains visible underneath.
+        fallbackTimer = window.setTimeout(hideBootScreen, 6000);
+      })();
+    </script>
+  </body>
+</html>
