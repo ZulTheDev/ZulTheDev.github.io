@@ -3032,6 +3032,28 @@ export default function App({ initialContent = null }) {
     window.dispatchEvent(new Event('portfolio:hydrated'));
   }, []);
 
+  const currentLocation =
+    typeof window !== 'undefined'
+      ? window.location
+      : { pathname: '', hash: '', search: '' };
+
+  const pathnameWithoutBase =
+    currentLocation.pathname.startsWith(BASE_PATH)
+      ? '/' + currentLocation.pathname.slice(BASE_PATH.length).replace(/^\/+/, '')
+      : currentLocation.pathname;
+
+  const ctfPath =
+    pathnameWithoutBase.replace(/\/+$/, '');
+
+  const isCtfRoute =
+    ctfPath === '/ctf-blog' ||
+    ctfPath === '/ctf-blog/' ||
+    ctfPath.startsWith('/ctf-blog/');
+
+  const isExplorationRoute =
+    pathnameWithoutBase === '/exploration' ||
+    pathnameWithoutBase === '/exploration/';
+
   useEffect(() => {
     if (!ONLINE_API || isCtfRoute) {
       return;
@@ -3079,28 +3101,6 @@ export default function App({ initialContent = null }) {
       )
     );
   }, [driveMediaFiles]);
-
-  const currentLocation =
-    typeof window !== 'undefined'
-      ? window.location
-      : { pathname: '', hash: '', search: '' };
-
-  const pathnameWithoutBase =
-    currentLocation.pathname.startsWith(BASE_PATH)
-      ? '/' + currentLocation.pathname.slice(BASE_PATH.length).replace(/^\/+/, '')
-      : currentLocation.pathname;
-
-  const ctfPath =
-    pathnameWithoutBase.replace(/\/+$/, '');
-
-  const isCtfRoute =
-    ctfPath === '/ctf-blog' ||
-    ctfPath === '/ctf-blog/' ||
-    ctfPath.startsWith('/ctf-blog/');
-
-  const isExplorationRoute =
-    pathnameWithoutBase === '/exploration' ||
-    pathnameWithoutBase === '/exploration/';
 
   // Keep the first render deterministic for Astro SSR.
   // The real hash is applied immediately after hydration.
