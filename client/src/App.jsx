@@ -1144,6 +1144,20 @@ function Chat({ content }) {
                     data.knowledge?.driveDocuments ||
                     0
                   ),
+                scannedFiles:
+                  Number(
+                    data.knowledge?.scannedFiles ||
+                    0
+                  ),
+                scannedFolders:
+                  Number(
+                    data.knowledge?.scannedFolders ||
+                    0
+                  ),
+                truncated:
+                  Boolean(
+                    data.knowledge?.truncated
+                  ),
                 googleDrive:
                   Boolean(
                     data.knowledge?.googleDrive
@@ -1221,6 +1235,19 @@ function Chat({ content }) {
                               ? ' · ' +
                                 message.meta.driveDocuments +
                                 ' docs'
+                              : ''}
+                            {message.meta.scannedFiles
+                              ? ' · scanned ' +
+                                message.meta.scannedFiles +
+                                ' files'
+                              : ''}
+                            {message.meta.scannedFolders
+                              ? ' / ' +
+                                message.meta.scannedFolders +
+                                ' folders'
+                              : ''}
+                            {message.meta.truncated
+                              ? ' · partial index'
                               : ''}
                           </span>
                         )}
