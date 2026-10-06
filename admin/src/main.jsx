@@ -2133,15 +2133,15 @@ function WriteupsEditor({
         <section className="panel">
           <div className="panel-head">
             <div>
-              <small>CTF BLOG</small>
-              <h2>Writeup workspace</h2>
+              <small>CONTENT STUDIO</small>
+              <h2>Blog & writeup workspace</h2>
             </div>
             <button className="accent-button" onClick={startNew}>+ New writeup</button>
           </div>
 
           <p className="helper">
-            Build a structured writeup, add sessions, attach R2 media, embed runnable code and create
-            an interactive object-to-object workflow before publishing it to <code>/ctf_blog/&lt;slug&gt;</code>.
+            Build CTF writeups, blog posts or webcomic cards. Add sessions, references, tables, R2 media,
+            runnable Judge0 code and an interactive vector workspace before publishing through the GitHub App.
           </p>
 
           {loading ? (
@@ -2161,7 +2161,7 @@ function WriteupsEditor({
                     onClick={() => openWriteup(item.slug)}
                   >
                     <div>
-                      <small>{item.status || 'draft'} · {item.slug}</small>
+                      <small>{String(item.kind || 'ctf').toUpperCase()} · {item.status || 'draft'} · {item.slug}</small>
                       <strong>{item.title || 'Untitled writeup'}</strong>
                       <span>{item.excerpt || 'No excerpt yet.'}</span>
                     </div>
@@ -2183,9 +2183,15 @@ function WriteupsEditor({
         <section className="panel writeup-editor-panel">
           <div className="writeup-editor-head">
             <div>
-              <small>WRITEUP / {activeWriteup.status || 'DRAFT'}</small>
-              <h2>{activeWriteup.title || 'Untitled CTF writeup'}</h2>
-              <span>/ctf_blog/{activeWriteup.slug || 'writeup-slug'}</span>
+              <small>{String(activeWriteup.kind || 'ctf').toUpperCase()} / {activeWriteup.status || 'DRAFT'}</small>
+              <h2>{activeWriteup.title || 'Untitled document'}</h2>
+              <span>{
+                activeWriteup.kind === 'blog'
+                  ? '/blog/' + (activeWriteup.slug || 'article-slug')
+                  : activeWriteup.kind === 'webcomic'
+                    ? '/webcomic/' + (activeWriteup.slug || 'comic-slug')
+                    : '/ctf_blog/' + (activeWriteup.slug || 'writeup-slug')
+              }</span>
               <small className="writeup-publish-status">
                 GitHub App:{' '}
                 {githubStatus?.ok
@@ -2377,6 +2383,19 @@ function WriteupDocumentEditor({
       <aside className="writeup-session-rail">
         <div className="writeup-meta-card">
           <label className="field">
+            <span>Document type</span>
+            <select
+              value={writeup.kind || 'ctf'}
+              onChange={(event) =>
+                updateField('kind', event.target.value)
+              }
+            >
+              <option value="ctf">CTF writeup</option>
+              <option value="blog">Blog / field note</option>
+              <option value="webcomic">Webcomic wild card</option>
+            </select>
+          </label>
+          <label className="field">
             <span>Title</span>
             <input value={writeup.title || ''} onChange={(e) => updateField('title', e.target.value)} />
           </label>
@@ -2389,6 +2408,14 @@ function WriteupDocumentEditor({
             <textarea rows={4} value={writeup.excerpt || ''} onChange={(e) => updateField('excerpt', e.target.value)} />
           </label>
           <label className="field">
+            <span>Banner image URL</span>
+            <input
+              value={writeup.banner || ''}
+              onChange={(e) => updateField('banner', e.target.value)}
+              placeholder="R2/public image URL"
+            />
+          </label>
+          <label className="field">
             <span>Tags, comma separated</span>
             <input
               value={Array.isArray(writeup.tags) ? writeup.tags.join(', ') : ''}
@@ -2396,13 +2423,15 @@ function WriteupDocumentEditor({
             />
           </label>
 
-          <div className="writeup-ctf-meta-grid">
-            <Field label="Event / CTF" value={writeup.ctf?.event || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), event: v })} />
-            <Field label="Category" value={writeup.ctf?.category || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), category: v })} />
-            <Field label="Difficulty" value={writeup.ctf?.difficulty || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), difficulty: v })} />
-            <Field label="Points" value={writeup.ctf?.points || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), points: v })} />
-            <Field wide label="Flag (optional)" value={writeup.ctf?.flag || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), flag: v })} />
-          </div>
+          {(writeup.kind || 'ctf') === 'ctf' && (
+            <div className="writeup-ctf-meta-grid">
+              <Field label="Event / CTF" value={writeup.ctf?.event || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), event: v })} />
+              <Field label="Category" value={writeup.ctf?.category || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), category: v })} />
+              <Field label="Difficulty" value={writeup.ctf?.difficulty || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), difficulty: v })} />
+              <Field label="Points" value={writeup.ctf?.points || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), points: v })} />
+              <Field wide label="Flag (optional)" value={writeup.ctf?.flag || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), flag: v })} />
+            </div>
+          )}
         </div>
 
         <div className="writeup-session-list">
@@ -2471,6 +2500,7 @@ function WriteupDocumentEditor({
               uploadFile={uploadFile}
               addBlock={addBlock}
               writeupSlug={writeup.slug || writeup.title}
+              contentKind={writeup.kind || 'ctf'}
             />
           ))}
 
@@ -2501,6 +2531,7 @@ function WriteupBlockEditor({
   moveDown,
   uploadFile,
   writeupSlug,
+  contentKind,
 }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
@@ -2559,7 +2590,11 @@ function WriteupBlockEditor({
     if (!file) return;
 
     try {
-      const media = await uploadFile(file, writeupSlug || 'writeup-media');
+      const media = await uploadFile(
+        file,
+        writeupSlug || 'writeup-media',
+        contentKind || 'ctf'
+      );
       update({
         ...block,
         media,
@@ -3227,9 +3262,12 @@ function WriteupR2MediaTab({
 
   useEffect(() => {
     if (writeup?.slug) {
-      loadR2Objects(writeup.slug);
+      loadR2Objects(
+        writeup.slug,
+        writeup.kind || 'ctf'
+      );
     }
-  }, [writeup?.slug]);
+  }, [writeup?.slug, writeup?.kind]);
 
   async function upload(event) {
     const file = event.target.files?.[0];
@@ -3243,7 +3281,8 @@ function WriteupR2MediaTab({
     try {
       const media = await uploadFile(
         file,
-        writeup.slug || writeup.title
+        writeup.slug || writeup.title,
+        writeup.kind || 'ctf'
       );
 
       setUploaded(media);
@@ -3284,7 +3323,12 @@ function WriteupR2MediaTab({
           </label>
           <button
             className="ghost"
-            onClick={() => loadR2Objects(writeup.slug || writeup.title)}
+            onClick={() =>
+              loadR2Objects(
+                writeup.slug || writeup.title,
+                writeup.kind || 'ctf'
+              )
+            }
             disabled={r2Loading}
           >
             {r2Loading ? 'Loading...' : 'Refresh R2'}
@@ -3338,13 +3382,27 @@ function WriteupPreviewData({ writeup }) {
     <div className="writeup-preview-data">
       <div className="preview-json-card">
         <small>PUBLIC ROUTE</small>
-        <strong>/ctf_blog/{writeup.slug}</strong>
-        <p>Published data will be written to client/public/ctf_blog/{writeup.slug}.json.</p>
+        <strong>{
+          writeup.kind === 'blog'
+            ? '/blog/' + writeup.slug
+            : writeup.kind === 'webcomic'
+              ? '/webcomic/' + writeup.slug
+              : '/ctf_blog/' + writeup.slug
+        }</strong>
+        <p>{
+          writeup.kind === 'blog'
+            ? 'Published data will be written to client/public/blog/' + writeup.slug + '.json.'
+            : writeup.kind === 'webcomic'
+              ? 'Published data will be written to client/public/webcomic/' + writeup.slug + '.json and surfaced as a wild card.'
+              : 'Published data will be written to client/public/ctf_blog/' + writeup.slug + '.json.'
+        }</p>
       </div>
       <div className="preview-json-card">
         <small>PUBLIC DISCUSSION TERM</small>
-        <strong>ctf_blog:{writeup.slug}</strong>
-        <p>Anonymous + GitHub discussion is attached to the bottom of the public writeup.</p>
+        <strong>{
+          (writeup.kind || 'ctf') + ':' + writeup.slug
+        }</strong>
+        <p>Blog and CTF documents can attach the public discussion layer. Webcomic cards currently open as a wild-card modal.</p>
       </div>
       <pre>{JSON.stringify(writeup, null, 2)}</pre>
     </div>
