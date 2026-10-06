@@ -190,7 +190,10 @@ function safePublishedPath(value) {
   const filePath = String(value || '').trim();
 
   if (
-    !filePath.startsWith('client/public/ctf-blog/') ||
+    (
+      !filePath.startsWith('client/public/ctf_blog/') &&
+      !filePath.startsWith('client/public/ctf-blog/')
+    ) ||
     filePath.includes('..') ||
     filePath.startsWith('/') ||
     filePath.length > 500
