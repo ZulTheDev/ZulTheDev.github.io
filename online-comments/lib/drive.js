@@ -400,11 +400,154 @@ export function driveKnowledgeConfigured() {
   );
 }
 
+function knowledgeTerms(query = '') {
+  const stop = new Set([
+    'about',
+    'and',
+    'are',
+    'can',
+    'for',
+    'from',
+    'have',
+    'his',
+    'how',
+    'information',
+    'me',
+    'my',
+    'of',
+    'say',
+    'tell',
+    'the',
+    'their',
+    'they',
+    'this',
+    'what',
+    'who',
+    'with',
+    'you',
+    'zul',
+  ]);
+
+  const requested = String(query)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(
+      (term) =>
+        term.length >= 3 &&
+        !stop.has(term)
+    );
+
+  const identity = String(
+    config.portfolioName || ''
+  )
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((term) => term.length >= 3);
+
+  return Array.from(
+    new Set([
+      ...requested,
+      ...identity,
+    ])
+  ).slice(0, 24);
+}
+
+function fileKnowledgeScore(file, terms) {
+  const name =
+    String(file.name || '').toLowerCase();
+  const description =
+    String(file.description || '').toLowerCase();
+  const path =
+    String(file.fullPath || '').toLowerCase();
+  const haystack =
+    name + ' ' + description + ' ' + path;
+
+  let score = 0;
+
+  for (const term of terms) {
+    if (name.includes(term)) {
+      score += 8;
+    }
+
+    if (description.includes(term)) {
+      score += 5;
+    }
+
+    if (path.includes(term)) {
+      score += 3;
+    }
+  }
+
+  const portfolioSignals = [
+    'resume',
+    'cv',
+    'profile',
+    'about',
+    'experience',
+    'education',
+    'certificate',
+    'certification',
+    'award',
+    'achievement',
+    'project',
+    'ctf',
+    'cyber',
+    'security',
+    'writeup',
+    'portfolio',
+    'intern',
+    'skill',
+    'leadership',
+    'volunteer',
+  ];
+
+  for (const signal of portfolioSignals) {
+    if (haystack.includes(signal)) {
+      score += 2;
+    }
+  }
+
+  if (isReadableKnowledgeMime(file.mimeType)) {
+    score += 2;
+  }
+
+  return score;
+}
+
+function metadataKnowledgeDocument(file) {
+  const description =
+    cleanText(file.description || '', 4000);
+
+  return {
+    name: cleanText(file.name, 300),
+    mimeType: cleanText(file.mimeType, 200),
+    modifiedTime: file.modifiedTime || '',
+    sourcePath:
+      cleanText(file.fullPath || file.name, 600),
+    evidenceMode: 'metadata',
+    content: cleanText(
+      [
+        'FILE METADATA ONLY — do not claim details that are not explicit here.',
+        'Name: ' + (file.name || ''),
+        'Folder path: ' + (file.folderPath || ''),
+        'MIME type: ' + (file.mimeType || ''),
+        description
+          ? 'Drive description: ' + description
+          : 'Drive description: not provided',
+      ].join('\n'),
+      FILE_MAX_CHARS
+    ),
+  };
+}
+
 export async function loadDriveKnowledge(query = '') {
   if (!driveKnowledgeConfigured()) {
     return {
       configured: false,
       documents: [],
+      scannedFiles: 0,
+      scannedFolders: 0,
+      truncated: false,
     };
   }
 
@@ -416,42 +559,61 @@ export async function loadDriveKnowledge(query = '') {
     );
   }
 
-  const files = await listDriveFiles(
+  const index = await listDriveFiles(
     token,
     config.drive.folderId
   );
 
-  const terms = String(query)
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((term) => term.length >= 3);
+  const files =
+    Array.isArray(index.files)
+      ? index.files
+      : [];
+
+  const terms = knowledgeTerms(query);
 
   const scored = files
-    .filter((file) =>
-      isReadableKnowledgeMime(file.mimeType)
-    )
-    .map((file) => {
-      const haystack =
-        `${file.name} ${file.description || ''}`.toLowerCase();
-
-      const score = terms.reduce(
-        (total, term) =>
-          total +
-          (haystack.includes(term) ? 1 : 0),
-        0
-      );
-
-      return { file, score };
-    })
+    .map((file) => ({
+      file,
+      score:
+        fileKnowledgeScore(
+          file,
+          terms
+        ),
+    }))
     .sort(
       (a, b) =>
         b.score - a.score ||
-        a.file.name.localeCompare(b.file.name)
+        String(
+          b.file.modifiedTime || ''
+        ).localeCompare(
+          String(
+            a.file.modifiedTime || ''
+          )
+        ) ||
+        String(a.file.name || '').localeCompare(
+          String(b.file.name || '')
+        )
+    );
+
+  const readable = scored
+    .filter(({ file }) =>
+      isReadableKnowledgeMime(
+        file.mimeType
+      )
     )
     .slice(0, MAX_KNOWLEDGE_READS);
 
+  const metadataOnly = scored
+    .filter(
+      ({ file }) =>
+        !isReadableKnowledgeMime(
+          file.mimeType
+        )
+    )
+    .slice(0, 8);
+
   const loaded = await Promise.all(
-    scored.map(async ({ file }) => {
+    readable.map(async ({ file }) => {
       try {
         const content = await readFile(
           token,
@@ -459,24 +621,35 @@ export async function loadDriveKnowledge(query = '') {
         );
 
         if (!content) {
-          return null;
+          return metadataKnowledgeDocument(
+            file
+          );
         }
 
         return {
           name: cleanText(file.name, 300),
-          mimeType: cleanText(file.mimeType, 200),
+          mimeType:
+            cleanText(file.mimeType, 200),
           modifiedTime:
             file.modifiedTime || '',
+          sourcePath:
+            cleanText(
+              file.fullPath || file.name,
+              600
+            ),
+          evidenceMode: 'content',
           content,
         };
       } catch (error) {
         console.warn(
-          'Drive knowledge file skipped:',
+          'Drive knowledge file could not be read; using metadata:',
           file.name,
           error?.message || error
         );
 
-        return null;
+        return metadataKnowledgeDocument(
+          file
+        );
       }
     })
   );
@@ -484,22 +657,48 @@ export async function loadDriveKnowledge(query = '') {
   const documents = [];
   let totalChars = 0;
 
-  for (const document of loaded) {
+  for (const document of [
+    ...loaded,
+    ...metadataOnly.map(
+      ({ file }) =>
+        metadataKnowledgeDocument(file)
+    ),
+  ]) {
     if (!document) {
       continue;
     }
 
-    documents.push(document);
-    totalChars += document.content.length;
+    const remaining =
+      MAX_TOTAL_CHARS - totalChars;
 
-    if (totalChars >= MAX_TOTAL_CHARS) {
+    if (remaining <= 0) {
       break;
     }
+
+    documents.push({
+      ...document,
+      content:
+        document.content.slice(
+          0,
+          remaining
+        ),
+    });
+
+    totalChars +=
+      Math.min(
+        document.content.length,
+        remaining
+      );
   }
 
   return {
     configured: true,
     documents,
+    scannedFiles: files.length,
+    scannedFolders:
+      Number(index.scannedFolders || 0),
+    truncated:
+      Boolean(index.truncated),
   };
 }
 
