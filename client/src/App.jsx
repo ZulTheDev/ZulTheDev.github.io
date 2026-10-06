@@ -3706,8 +3706,9 @@ export default function App({ initialContent = null }) {
     pathnameWithoutBase.replace(/\/+$/, '');
 
   const isCtfRoute =
+    ctfPath === '/blog' ||
     ctfPath === '/ctf-blog' ||
-    ctfPath === '/ctf-blog/' ||
+    ctfPath.startsWith('/ctf_blog/') ||
     ctfPath.startsWith('/ctf-blog/');
 
   const isExplorationRoute =
@@ -3889,14 +3890,25 @@ export default function App({ initialContent = null }) {
      CTF BLOG ROUTES
   ======================================================= */
 
-  if (ctfPath === '/ctf-blog' || ctfPath === '/ctf-blog/') {
+  if (
+    ctfPath === '/blog' ||
+    ctfPath === '/ctf-blog'
+  ) {
     return <CTFBlogIndexView />;
   }
 
-  if (ctfPath.startsWith('/ctf-blog/')) {
+  if (
+    ctfPath.startsWith('/ctf_blog/') ||
+    ctfPath.startsWith('/ctf-blog/')
+  ) {
+    const prefix =
+      ctfPath.startsWith('/ctf_blog/')
+        ? '/ctf_blog/'
+        : '/ctf-blog/';
+
     const slug =
       decodeURIComponent(
-        ctfPath.slice('/ctf-blog/'.length)
+        ctfPath.slice(prefix.length)
       );
 
     if (slug) {
@@ -4109,8 +4121,8 @@ export default function App({ initialContent = null }) {
             Games
           </a>
 
-          <a href="/ctf-blog/" onClick={() => setMobileNavOpen(false)}>
-            CTF Blog
+          <a href="/blog" onClick={() => setMobileNavOpen(false)}>
+            Blog / CTF Labs
           </a>
         </div>
       </nav>
