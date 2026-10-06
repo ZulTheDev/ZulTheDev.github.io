@@ -4844,3 +4844,159 @@ footer a:hover{text-decoration:underline}
     padding:0 18px;
   }
 }
+
+
+/* Public writeup workspace: pure SVG/vector interaction */
+.writeup-vector-scroll{
+  overflow:auto;
+  border-top:1px solid rgba(255,255,255,.055);
+  border-bottom:1px solid rgba(255,255,255,.055);
+  background:#09080d;
+}
+
+.writeup-vector-map{
+  display:block;
+  min-width:760px;
+  background:
+    radial-gradient(circle at 50% 45%,rgba(91,206,250,.045),transparent 32%),
+    #09080d;
+}
+
+.writeup-vector-grid-line{
+  fill:none;
+  stroke:rgba(255,255,255,.038);
+  stroke-width:.65;
+}
+
+.writeup-vector-background{
+  opacity:.96;
+}
+
+.writeup-vector-edges line{
+  stroke:rgba(91,206,250,.42);
+  stroke-width:1.4;
+  stroke-dasharray:8 7;
+  animation:polyDash 8s linear infinite;
+}
+
+.writeup-vector-arrow{
+  fill:#5bcefa;
+  opacity:.72;
+}
+
+.writeup-vector-node{
+  cursor:pointer;
+  outline:none;
+}
+
+.writeup-vector-node polygon{
+  fill:#141019;
+  stroke:#423747;
+  stroke-width:1.25;
+  transition:
+    fill .18s ease,
+    stroke .18s ease,
+    filter .18s ease;
+}
+
+.writeup-vector-node circle{
+  fill:#f2a8d4;
+  opacity:.58;
+}
+
+.writeup-vector-node text{
+  font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  pointer-events:none;
+}
+
+.writeup-vector-node-index{
+  fill:#807486;
+  font-size:8px;
+  letter-spacing:.06em;
+}
+
+.writeup-vector-node-label{
+  fill:#e9dfea;
+  font-size:11px;
+  font-weight:800;
+}
+
+.writeup-vector-node-link{
+  fill:#776b7e;
+  font-size:7px;
+  letter-spacing:.08em;
+}
+
+.writeup-vector-node:hover polygon,
+.writeup-vector-node:focus polygon,
+.writeup-vector-node.active polygon{
+  fill:#211728;
+  stroke:#5bcefa;
+  filter:drop-shadow(0 0 8px rgba(91,206,250,.18));
+}
+
+.writeup-vector-node:hover circle,
+.writeup-vector-node:focus circle,
+.writeup-vector-node.active circle{
+  fill:#5bcefa;
+  opacity:1;
+}
+
+.writeup-vector-node:hover .writeup-vector-node-link,
+.writeup-vector-node:focus .writeup-vector-node-link,
+.writeup-vector-node.active .writeup-vector-node-link{
+  fill:#f2a8d4;
+}
+
+.writeup-vector-inspector{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:13px 16px;
+  background:#100d14;
+}
+
+.writeup-vector-inspector > div{
+  display:grid;
+  gap:2px;
+  min-width:0;
+}
+
+.writeup-vector-inspector small{
+  color:#756979;
+  font-size:8px;
+  letter-spacing:.12em;
+}
+
+.writeup-vector-inspector strong{
+  color:#e7dce9;
+  font-size:11px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.writeup-vector-inspector > span{
+  margin-left:auto;
+  padding:4px 7px;
+  border:1px solid var(--l);
+  border-radius:999px;
+  color:#9b8fa1;
+  font-size:9px;
+  text-transform:uppercase;
+}
+
+.writeup-vector-inspector button{
+  border:1px solid rgba(91,206,250,.28);
+  border-radius:8px;
+  background:#101821;
+  color:#aee9ff;
+  padding:7px 9px;
+  cursor:pointer;
+  font-size:9px;
+}
+
+.writeup-vector-inspector em{
+  color:#756979;
+  font-size:9px;
+}
