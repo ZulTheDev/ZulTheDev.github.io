@@ -609,7 +609,7 @@ function AdminShell() {
 
       setNotice(
         'Published: ' +
-          (data.url || '/ctf-blog/' + slug) +
+          (data.url || '/ctf_blog/' + slug) +
           deployMessage
       );
     } catch (error) {
@@ -884,8 +884,8 @@ function AdminShell() {
     try {
       const prefixValue = String(slug || '').trim();
       const prefix = prefixValue
-        ? 'ctf-blog/' + safeWriteupSlug(prefixValue) + '/'
-        : 'ctf-blog/';
+        ? 'ctf_blog/' + safeWriteupSlug(prefixValue) + '/'
+        : 'ctf_blog/';
 
       const response = await authFetch(
         API +
@@ -2075,7 +2075,7 @@ function WriteupsEditor({
 
           <p className="helper">
             Build a structured writeup, add sessions, attach R2 media, embed runnable code and create
-            an interactive object-to-object workflow before publishing it to <code>/ctf-blog/&lt;slug&gt;</code>.
+            an interactive object-to-object workflow before publishing it to <code>/ctf_blog/&lt;slug&gt;</code>.
           </p>
 
           {loading ? (
@@ -2119,7 +2119,7 @@ function WriteupsEditor({
             <div>
               <small>WRITEUP / {activeWriteup.status || 'DRAFT'}</small>
               <h2>{activeWriteup.title || 'Untitled CTF writeup'}</h2>
-              <span>/ctf-blog/{activeWriteup.slug || 'writeup-slug'}</span>
+              <span>/ctf_blog/{activeWriteup.slug || 'writeup-slug'}</span>
               <small className="writeup-publish-status">
                 GitHub App:{' '}
                 {githubStatus?.ok
@@ -3163,12 +3163,12 @@ function WriteupPreviewData({ writeup }) {
     <div className="writeup-preview-data">
       <div className="preview-json-card">
         <small>PUBLIC ROUTE</small>
-        <strong>/ctf-blog/{writeup.slug}</strong>
-        <p>Published data will be written to client/public/ctf-blog/{writeup.slug}.json.</p>
+        <strong>/ctf_blog/{writeup.slug}</strong>
+        <p>Published data will be written to client/public/ctf_blog/{writeup.slug}.json.</p>
       </div>
       <div className="preview-json-card">
         <small>PUBLIC DISCUSSION TERM</small>
-        <strong>ctf-blog:{writeup.slug}</strong>
+        <strong>ctf_blog:{writeup.slug}</strong>
         <p>Anonymous + GitHub discussion is attached to the bottom of the public writeup.</p>
       </div>
       <pre>{JSON.stringify(writeup, null, 2)}</pre>
