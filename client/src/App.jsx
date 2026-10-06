@@ -3092,7 +3092,7 @@ export default function App({ initialContent = null }) {
         </div>
 
         <div className="site-nav-extra-links">
-          <a href="#explore" onClick={() => setMobileNavOpen(false)}>
+          <a href={(import.meta.env.BASE_URL || '/') + 'exploration/'} onClick={() => setMobileNavOpen(false)}>
             Explore{' '}
             <Sparkles size={13} />
           </a>
@@ -3464,6 +3464,32 @@ export default function App({ initialContent = null }) {
         </section>
 
         {/* =================================================
+            SKILLS
+        ================================================= */}
+
+        <section id="skills">
+          <small>07 / TOOLKIT</small>
+          <h2>Skills</h2>
+          <div className="skill-groups">
+            {[
+              ['Technical skills', content.skills?.technical],
+              ['Soft skills', content.skills?.soft],
+              ['Languages', content.skills?.languages],
+              ['Programming languages', content.skills?.programming],
+            ].map(([label, items]) => (
+              <div className="skill-group" key={label}>
+                <small>{label}</small>
+                <div className="skill-tags">
+                  {(items?.length ? items : ['Not published yet']).map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* =================================================
             SUPPORT / BUY-FIRST
         ================================================= */}
 
@@ -3511,6 +3537,19 @@ export default function App({ initialContent = null }) {
               )
             )}
           </div>
+          <div className="resume-qr-card">
+            <small>RESUME / LIVE LINK</small>
+            <img
+              src={"https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(content.profile.resumeUrl || (import.meta.env.BASE_URL || '/'))}
+              alt="Dynamic QR code linking to Zulfaqar Jamal's resume"
+              loading="lazy"
+            />
+            <strong>Scan for my resume</strong>
+            <a href={content.profile.resumeUrl || (import.meta.env.BASE_URL || '/')} target="_blank" rel="noreferrer">
+              Open resume <ArrowUpRight size={14} />
+            </a>
+          </div>
+
         </section>
       </main>
 
