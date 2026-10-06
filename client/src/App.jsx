@@ -3614,7 +3614,7 @@ function BlogShelf({
   items,
   type,
   fallbackImage,
-  emptyCount = 4,
+  emptyCount = 6,
   onOpenComic,
 }) {
   const cards = [
@@ -3912,24 +3912,15 @@ function CTFBlogIndexView() {
   const recentCards =
     recent.length
       ? recent
-      : [
-          {
+      : Array.from(
+          { length: 6 },
+          (_, index) => ({
             __placeholder: true,
-            id: 'recent-empty-1',
-          },
-          {
-            __placeholder: true,
-            id: 'recent-empty-2',
-          },
-          {
-            __placeholder: true,
-            id: 'recent-empty-3',
-          },
-          {
-            __placeholder: true,
-            id: 'recent-empty-4',
-          },
-        ];
+            id:
+              'recent-empty-' +
+              (index + 1),
+          })
+        );
 
   return (
     <>
@@ -4060,7 +4051,7 @@ function CTFBlogIndexView() {
           items={ctfItems}
           type="CTF"
           fallbackImage={heroImage}
-          emptyCount={4}
+          emptyCount={6}
         />
 
         <BlogShelf
@@ -4071,7 +4062,7 @@ function CTFBlogIndexView() {
           items={systemNotes}
           type="BLOG"
           fallbackImage={catImage}
-          emptyCount={4}
+          emptyCount={6}
         />
 
         <BlogShelf
@@ -4082,7 +4073,7 @@ function CTFBlogIndexView() {
           items={comics}
           type="WEBCOMIC"
           fallbackImage={catImage}
-          emptyCount={4}
+          emptyCount={6}
           onOpenComic={setOpenComic}
         />
 
