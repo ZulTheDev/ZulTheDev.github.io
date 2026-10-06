@@ -741,8 +741,40 @@ async function getDriveMetadata(token, fileId) {
 }
 
 async function discoverMediaFolderId(token) {
+  const rootFolderId = config.drive.folderId;
+
+  if (!rootFolderId) {
+    return '';
+  }
+
   if (config.drive.mediaFolderId) {
-    return config.drive.mediaFolderId;
+    const candidate =
+      await getDriveMetadata(
+        token,
+        config.drive.mediaFolderId
+      );
+
+    const candidateAllowed =
+      config.drive.mediaFolderId ===
+        rootFolderId ||
+      (
+        candidate.mimeType ===
+          'application/vnd.google-apps.folder' &&
+        !candidate.trashed &&
+        await fileIsWithinFolder(
+          token,
+          candidate,
+          rootFolderId
+        )
+      );
+
+    if (candidateAllowed) {
+      return config.drive.mediaFolderId;
+    }
+
+    console.warn(
+      'Ignoring GOOGLE_DRIVE_MEDIA_FOLDER_ID because it is outside the approved portfolio Drive scope.'
+    );
   }
 
   if (
@@ -752,8 +784,6 @@ async function discoverMediaFolderId(token) {
   ) {
     return discoveredMediaFolderId;
   }
-
-  const rootFolderId = config.drive.folderId;
 
   if (!rootFolderId) {
     return '';
