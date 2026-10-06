@@ -1221,7 +1221,7 @@ function HiringPortfolioView({
       <nav className="hiring-portfolio-nav">
         <a
           className="hiring-nav-brand"
-          href="/"
+          href={basePath}
         >
           ZULFAQAR JAMAL
         </a>
@@ -2473,7 +2473,7 @@ function CTFBlogIndexView() {
     useState([]);
 
   useEffect(() => {
-    fetch('/ctf-blog/index.json')
+    fetch(basePath + 'ctf-blog/index.json')
       .then((response) =>
         response.ok
           ? response.json()
@@ -2499,7 +2499,7 @@ function CTFBlogIndexView() {
             ZUL<span>/</span>JAMAL
           </b>
         </a>
-        <a href="/ctf-blog/">
+        <a href={basePath + "ctf-blog/"}>
           CTF Blog
         </a>
       </nav>
@@ -2567,7 +2567,7 @@ function CTFWriteupView({ slug }) {
     let mounted = true;
 
     fetch(
-      '/ctf-blog/' +
+      basePath + 'ctf-blog/' +
         encodeURIComponent(slug) +
         '.json'
     )
@@ -2758,13 +2758,23 @@ export default function App({ initialContent = null }) {
       ? window.location
       : { pathname: '', hash: '', search: '' };
 
+  const basePath = import.meta.env.BASE_URL || '/';
+  const pathnameWithoutBase =
+    currentLocation.pathname.startsWith(basePath)
+      ? '/' + currentLocation.pathname.slice(basePath.length).replace(/^\/+/, '')
+      : currentLocation.pathname;
+
   const ctfPath =
-    currentLocation.pathname.replace(/\/+$/, '');
+    pathnameWithoutBase.replace(/\/+$/, '');
 
   const isCtfRoute =
     ctfPath === '/ctf-blog' ||
     ctfPath === '/ctf-blog/' ||
     ctfPath.startsWith('/ctf-blog/');
+
+  const isExplorationRoute =
+    pathnameWithoutBase === '/exploration' ||
+    pathnameWithoutBase === '/exploration/';
 
   // Keep the first render deterministic for Astro SSR.
   // The real hash is applied immediately after hydration.
@@ -2966,7 +2976,7 @@ export default function App({ initialContent = null }) {
      EXPLORE PAGE
   ======================================================= */
 
-  if (page === 'explore') {
+  if (page === 'explore' || isExplorationRoute) {
     return (
       <>
         <nav>
