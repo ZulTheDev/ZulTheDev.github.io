@@ -90,11 +90,25 @@ jobs:
           set -e
 
           # GitHub Pages serves 404.html for unknown SPA deep links.
-          # Keep that fallback, and also publish a real /port_resume/
-          # entry point so direct hiring links return HTTP 200.
+          # Keep the fallback, plus real entry points for the resume,
+          # blog index and every currently published CTF writeup.
           cp "client/dist/index.html" "client/dist/404.html"
+
           mkdir -p "client/dist/port_resume"
           cp "client/dist/index.html" "client/dist/port_resume/index.html"
+
+          mkdir -p "client/dist/blog"
+          cp "client/dist/index.html" "client/dist/blog/index.html"
+
+          if [ -d "client/dist/ctf_blog" ]; then
+            for writeup in client/dist/ctf_blog/*.json; do
+              [ -e "$writeup" ] || continue
+              slug="$(basename "$writeup" .json)"
+              [ "$slug" = "index" ] && continue
+              mkdir -p "client/dist/ctf_blog/$slug"
+              cp "client/dist/index.html" "client/dist/ctf_blog/$slug/index.html"
+            done
+          fi
 
           if [ -f "client/dist/index.html" ]; then
             echo "FOUND: client/dist/index.html"
@@ -117,10 +131,10 @@ jobs:
             exit 1
           fi
 
-          if [ -f "client/dist/ctf-blog/index.json" ]; then
-            echo "FOUND: client/dist/ctf-blog/index.json"
+          if [ -f "client/dist/ctf_blog/index.json" ]; then
+            echo "FOUND: client/dist/ctf_blog/index.json"
           else
-            echo "ERROR: client/dist/ctf-blog/index.json is missing"
+            echo "ERROR: client/dist/ctf_blog/index.json is missing"
             exit 1
           fi
 
