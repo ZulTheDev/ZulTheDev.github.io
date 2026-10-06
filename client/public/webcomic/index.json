@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "comics": [
+    {
+      "slug": "clueless-cat-preview",
+      "title": "Clueless Cat is thinking… probably",
+      "excerpt": "A tiny webcomic corner for side quests, odd observations, and the occasional cat-shaped system error.",
+      "image": "/images/blog-clueless-cat.webp",
+      "tags": [
+        "webcomic",
+        "chibi",
+        "side quest"
+      ],
+      "updatedAt": "2026-10-06T00:00:00.000Z"
+    }
+  ]
+}
