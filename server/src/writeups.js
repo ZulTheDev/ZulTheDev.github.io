@@ -20,6 +20,50 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 export const writeupDraftDir = path.join(repoRoot, 'server', 'writeups');
 export const writeupPublishDir = path.join(repoRoot, 'client', 'public', 'ctf_blog');
+export const blogPublishDir = path.join(repoRoot, 'client', 'public', 'blog');
+export const webcomicPublishDir = path.join(repoRoot, 'client', 'public', 'webcomic');
+
+function normalizeContentKind(value) {
+  const kind = String(value || 'ctf').trim().toLowerCase();
+
+  if (kind === 'blog' || kind === 'webcomic') {
+    return kind;
+  }
+
+  return 'ctf';
+}
+
+function publishTarget(kind) {
+  const normalized = normalizeContentKind(kind);
+
+  if (normalized === 'blog') {
+    return {
+      kind: normalized,
+      dir: blogPublishDir,
+      publicFolder: 'blog',
+      indexField: 'posts',
+      routeBase: '/blog/',
+    };
+  }
+
+  if (normalized === 'webcomic') {
+    return {
+      kind: normalized,
+      dir: webcomicPublishDir,
+      publicFolder: 'webcomic',
+      indexField: 'comics',
+      routeBase: '/webcomic/',
+    };
+  }
+
+  return {
+    kind: 'ctf',
+    dir: writeupPublishDir,
+    publicFolder: 'ctf_blog',
+    indexField: 'writeups',
+    routeBase: '/ctf_blog/',
+  };
+}
 
 export function slugify(value) {
   return String(value || '')
@@ -39,6 +83,8 @@ export function safeSlug(value) {
 export async function ensureWriteupDirs() {
   await fs.mkdir(writeupDraftDir, { recursive: true });
   await fs.mkdir(writeupPublishDir, { recursive: true });
+  await fs.mkdir(blogPublishDir, { recursive: true });
+  await fs.mkdir(webcomicPublishDir, { recursive: true });
 }
 
 export async function saveDraft(writeup) {
@@ -75,12 +121,23 @@ export async function deleteDraft(slug) {
   await fs.rm(path.join(writeupDraftDir, safeSlug(slug) + '.json'), { force: true });
 }
 
-async function readPublishedIndex() {
+async function readPublishedIndex(kind) {
   await ensureWriteupDirs();
+
+  const target = publishTarget(kind);
+
   try {
-    return JSON.parse(await fs.readFile(path.join(writeupPublishDir, 'index.json'), 'utf8'));
+    return JSON.parse(
+      await fs.readFile(
+        path.join(target.dir, 'index.json'),
+        'utf8'
+      )
+    );
   } catch {
-    return { version: 1, writeups: [] };
+    return {
+      version: 1,
+      [target.indexField]: [],
+    };
   }
 }
 
@@ -134,6 +191,7 @@ export async function publishWriteup(writeup) {
   await ensureWriteupDirs();
 
   const slug = safeSlug(writeup.slug || writeup.title);
+  const target = publishTarget(writeup.kind);
   const publicBase =
     String(process.env.R2_PUBLIC_BASE_URL || '')
       .trim()
@@ -141,6 +199,7 @@ export async function publishWriteup(writeup) {
 
   const next = {
     ...writeup,
+    kind: target.kind,
     slug,
     status: 'published',
     publishedAt: writeup.publishedAt || new Date().toISOString(),
@@ -159,9 +218,7 @@ export async function publishWriteup(writeup) {
       }
 
       if (!publicBase) {
-        throw new Error(
-          'r2_public_base_url_required'
-        );
+        throw new Error('r2_public_base_url_required');
       }
 
       return {
@@ -174,45 +231,67 @@ export async function publishWriteup(writeup) {
     });
   }
 
-  const publishedWriteupPath =
-    'client/public/ctf_blog/' +
+  const publishedPath =
+    'client/public/' +
+    target.publicFolder +
+    '/' +
     slug +
     '.json';
 
-  const publishedWriteupContent =
+  const publishedContent =
     JSON.stringify(next, null, 2) + '\n';
 
   await fs.writeFile(
-    path.join(writeupPublishDir, slug + '.json'),
-    publishedWriteupContent,
+    path.join(target.dir, slug + '.json'),
+    publishedContent,
     'utf8'
   );
 
-  const index = await readPublishedIndex();
-  const existing = Array.isArray(index.writeups) ? index.writeups : [];
+  const index = await readPublishedIndex(target.kind);
+  const existing =
+    Array.isArray(index[target.indexField])
+      ? index[target.indexField]
+      : [];
+
+  const firstMedia =
+    Array.isArray(next.blocks)
+      ? next.blocks.find(
+          (block) =>
+            block?.type === 'media' &&
+            block.media?.url
+        )?.media
+      : null;
+
   const summary = {
     slug,
     title: next.title || slug,
     excerpt: next.excerpt || '',
     tags: Array.isArray(next.tags) ? next.tags : [],
+    banner: next.banner || firstMedia?.url || '',
     updatedAt: next.updatedAt,
     publishedAt: next.publishedAt,
+    kind: target.kind,
   };
 
   const filtered = existing.filter((item) => item.slug !== slug);
   filtered.push(summary);
-  filtered.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  filtered.sort((a, b) =>
+    String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+  );
 
-  const publishedIndexContent =
+  const indexContent =
     JSON.stringify(
-      { version: 1, writeups: filtered },
+      {
+        version: 1,
+        [target.indexField]: filtered,
+      },
       null,
       2
     ) + '\n';
 
   await fs.writeFile(
-    path.join(writeupPublishDir, 'index.json'),
-    publishedIndexContent,
+    path.join(target.dir, 'index.json'),
+    indexContent,
     'utf8'
   );
 
@@ -220,18 +299,22 @@ export async function publishWriteup(writeup) {
     next.title,
     [
       {
-        path: publishedWriteupPath,
-        content: publishedWriteupContent,
+        path: publishedPath,
+        content: publishedContent,
       },
       {
-        path: 'client/public/ctf_blog/index.json',
-        content: publishedIndexContent,
+        path:
+          'client/public/' +
+          target.publicFolder +
+          '/index.json',
+        content: indexContent,
       },
     ]
   );
 
   return {
     ...next,
+    url: target.routeBase + slug,
     deploy,
   };
 }
@@ -259,14 +342,25 @@ function r2Client() {
 }
 
 export function safeR2Key(value) {
-  const key = String(value || '').trim().replace(/^\/+/, '');
-  const isCurrent = key.startsWith('ctf_blog/');
-  const isLegacy = key.startsWith('ctf-blog/');
+  const key =
+    String(value || '')
+      .trim()
+      .replace(/^\/+/, '');
+
+  const allowed =
+    [
+      'ctf_blog/',
+      'ctf-blog/',
+      'blog/',
+      'webcomic/',
+    ].some((prefix) =>
+      key.startsWith(prefix)
+    );
 
   if (
     !key ||
     key.includes('..') ||
-    (!isCurrent && !isLegacy)
+    !allowed
   ) {
     throw new Error('invalid_r2_key');
   }
@@ -274,19 +368,30 @@ export function safeR2Key(value) {
   return key;
 }
 
-export function safeR2Prefix(value = 'ctf_blog/') {
-  const prefix = String(value || '').trim().replace(/^\/+/, '');
-  const isCurrent =
-    prefix === 'ctf_blog/' ||
-    prefix.startsWith('ctf_blog/');
-  const isLegacy =
-    prefix === 'ctf-blog/' ||
-    prefix.startsWith('ctf-blog/');
+export function safeR2Prefix(
+  value = 'ctf_blog/'
+) {
+  const prefix =
+    String(value || '')
+      .trim()
+      .replace(/^\/+/, '');
+
+  const allowed =
+    [
+      'ctf_blog/',
+      'ctf-blog/',
+      'blog/',
+      'webcomic/',
+    ].some(
+      (candidate) =>
+        prefix === candidate ||
+        prefix.startsWith(candidate)
+    );
 
   if (
     !prefix ||
     prefix.includes('..') ||
-    (!isCurrent && !isLegacy)
+    !allowed
   ) {
     throw new Error('invalid_r2_prefix');
   }

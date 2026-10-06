@@ -8,8 +8,13 @@ function normalizeApiBase(value) {
     .replace(/\/+$/, '');
 }
 
+const PRIVATE_API = normalizeApiBase(
+  import.meta.env.VITE_PRIVATE_API_URL ||
+    'https://system32.tail39684d.ts.net:8787'
+);
 const API = normalizeApiBase(
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787'
+  import.meta.env.VITE_API_BASE_URL ||
+    PRIVATE_API
 );
 const ONLINE_API = normalizeApiBase(
   import.meta.env.VITE_ONLINE_API_URL ||
@@ -18,6 +23,7 @@ const ONLINE_API = normalizeApiBase(
 );
 const PUBLIC_SITE = 'https://zulthedev.github.io/';
 const HIRING_ROUTE = PUBLIC_SITE + 'port_resume?type_of_work_hiring=technical_officer';
+const DRIVE_ROOT_ID = '10XU8zeRpx9Ladh501vWjZepzm0j7ZOq6';
 const LOCAL_DRAFT_KEY = 'zul-admin-local-draft-v1';
 
 const SECTION_META = {
@@ -34,7 +40,7 @@ const SECTION_META = {
   explore: 'Explore',
   appearance: 'Appearance',
   media: 'Media library',
-  'ctf-writeups': 'CTF writeups',
+  'ctf-writeups': 'Blog / writeup studio',
   comments: 'Comments & moderation',
   system: 'System & AI',
   raw: 'Raw JSON',
@@ -284,6 +290,7 @@ const WRITEUP_BLOCK_TYPES = [
   ['quote', 'Quote'],
   ['list', 'List'],
   ['table', 'Table'],
+  ['reference', 'Reference'],
   ['code', 'Code'],
   ['media', 'Media'],
   ['workflow', 'Interactive workflow'],
@@ -307,9 +314,11 @@ function newWriteup() {
 
   return {
     version: 1,
+    kind: 'ctf',
     title: 'Untitled CTF Writeup',
     slug: 'untitled-ctf-writeup',
     excerpt: '',
+    banner: '',
     author: 'Zulfaqar Jamal',
     tags: [],
     ctf: {
@@ -332,6 +341,8 @@ function newWriteup() {
     workspace: {
       id: makeId('workspace'),
       title: 'Interactive workflow',
+      width: 1200,
+      height: 720,
       nodes: [],
       edges: [],
     },
@@ -440,6 +451,8 @@ function AdminShell() {
       workspace: {
         ...newWriteup().workspace,
         ...(base.workspace || {}),
+        width: Number(base.workspace?.width || 1200),
+        height: Number(base.workspace?.height || 720),
         nodes: Array.isArray(base.workspace?.nodes) ? base.workspace.nodes : [],
         edges: Array.isArray(base.workspace?.edges) ? base.workspace.edges : [],
       },
@@ -609,7 +622,16 @@ function AdminShell() {
 
       setNotice(
         'Published: ' +
-          (data.url || '/ctf_blog/' + slug) +
+          (
+            data.url ||
+            (
+              saved.kind === 'blog'
+                ? '/blog/' + slug
+                : saved.kind === 'webcomic'
+                  ? '/webcomic/' + slug
+                  : '/ctf_blog/' + slug
+            )
+          ) +
           deployMessage
       );
     } catch (error) {
@@ -737,7 +759,7 @@ function AdminShell() {
     }
   }
 
-  async function uploadWriteupFile(file, slug) {
+  async function uploadWriteupFile(file, slug, contentKind = 'ctf') {
     if (!file) return null;
 
     const response = await authFetch(
@@ -751,6 +773,7 @@ function AdminShell() {
           filename: file.name,
           contentType: file.type || 'application/octet-stream',
           writeupSlug: slug,
+          contentKind,
         }),
       }
     );
@@ -878,7 +901,7 @@ function AdminShell() {
     };
   }
 
-  async function loadR2Objects(slug = '') {
+  async function loadR2Objects(slug = '', contentKind = 'ctf') {
     setR2Loading(true);
 
     try {
@@ -887,10 +910,22 @@ function AdminShell() {
         ? safeWriteupSlug(prefixValue) + '/'
         : '';
 
-      const prefixes = [
-        'ctf_blog/' + suffix,
-        'ctf-blog/' + suffix,
-      ];
+      const normalizedKind =
+        ['blog', 'webcomic'].includes(
+          String(contentKind || '').toLowerCase()
+        )
+          ? String(contentKind).toLowerCase()
+          : 'ctf';
+
+      const prefixes =
+        normalizedKind === 'blog'
+          ? ['blog/' + suffix]
+          : normalizedKind === 'webcomic'
+            ? ['webcomic/' + suffix]
+            : [
+                'ctf_blog/' + suffix,
+                'ctf-blog/' + suffix,
+              ];
 
       let rows = [];
       let lastError = null;
@@ -1206,9 +1241,10 @@ function AdminShell() {
     };
 
     const checks = [
-      probe('Local API', API + '/api/health'),
-      probe('Online API', ONLINE_API + '/api/health'),
-      probe('R2', API + '/api/r2/status'),
+      probe('Private Tailscale API', API + '/api/health'),
+      probe('Online Vercel API', ONLINE_API + '/api/health'),
+      probe('Google Drive', API + '/api/drive/folders?parentId=' + encodeURIComponent(DRIVE_ROOT_ID)),
+      probe('Cloudflare R2', API + '/api/r2/status'),
       probe('GitHub App', API + '/api/github-app/status'),
       probe('Local AI', API + '/api/ai-status'),
     ];
@@ -1216,14 +1252,16 @@ function AdminShell() {
     const results = await Promise.all(checks);
     const local = results[0];
     const online = results[1];
-    const r2 = results[2];
-    const github = results[3];
-    const ai = results[4];
+    const drive = results[2];
+    const r2 = results[3];
+    const github = results[4];
+    const ai = results[5];
 
     setServiceStatus({
       local,
       ai,
       online,
+      drive,
       r2,
       github,
       checkedAt: new Date().toISOString(),
@@ -1235,21 +1273,35 @@ function AdminShell() {
     setDriveLoading(true);
 
     const candidates = [
-      API,
-      ONLINE_API,
+      {
+        base: API,
+        path: '/api/drive/files?parentId=' +
+          encodeURIComponent(DRIVE_ROOT_ID),
+      },
+      {
+        base: ONLINE_API,
+        path: '/api/drive/media',
+      },
     ].filter(
-      (value, index, list) =>
-        value &&
-        list.indexOf(value) === index
+      (item, index, list) =>
+        item.base &&
+        list.findIndex(
+          (candidate) =>
+            candidate.base === item.base &&
+            candidate.path === item.path
+        ) === index
     );
 
     let lastError = null;
 
     try {
-      for (const base of candidates) {
+      for (const candidate of candidates) {
         try {
+          const base =
+            candidate.base;
+
           const response = await authFetch(
-            base + '/api/drive/media'
+            base + candidate.path
           );
           const data = await response.json();
 
@@ -1557,6 +1609,7 @@ function AdminShell() {
               loadDriveMedia={loadDriveMedia}
               content={content}
               updateImage={updateImage}
+              setNotice={setNotice}
             />
           )}
 
@@ -2087,6 +2140,9 @@ function WriteupsEditor({
   r2Objects,
   r2Loading,
   loadR2Objects,
+  openR2Object,
+  deleteR2Object,
+  githubStatus,
 }) {
   return (
     <div className="writeup-admin-shell">
@@ -2094,15 +2150,15 @@ function WriteupsEditor({
         <section className="panel">
           <div className="panel-head">
             <div>
-              <small>CTF BLOG</small>
-              <h2>Writeup workspace</h2>
+              <small>CONTENT STUDIO</small>
+              <h2>Blog & writeup workspace</h2>
             </div>
             <button className="accent-button" onClick={startNew}>+ New writeup</button>
           </div>
 
           <p className="helper">
-            Build a structured writeup, add sessions, attach R2 media, embed runnable code and create
-            an interactive object-to-object workflow before publishing it to <code>/ctf_blog/&lt;slug&gt;</code>.
+            Build CTF writeups, blog posts or webcomic cards. Add sessions, references, tables, R2 media,
+            runnable Judge0 code and an interactive vector workspace before publishing through the GitHub App.
           </p>
 
           {loading ? (
@@ -2122,7 +2178,7 @@ function WriteupsEditor({
                     onClick={() => openWriteup(item.slug)}
                   >
                     <div>
-                      <small>{item.status || 'draft'} · {item.slug}</small>
+                      <small>{String(item.kind || 'ctf').toUpperCase()} · {item.status || 'draft'} · {item.slug}</small>
                       <strong>{item.title || 'Untitled writeup'}</strong>
                       <span>{item.excerpt || 'No excerpt yet.'}</span>
                     </div>
@@ -2144,9 +2200,15 @@ function WriteupsEditor({
         <section className="panel writeup-editor-panel">
           <div className="writeup-editor-head">
             <div>
-              <small>WRITEUP / {activeWriteup.status || 'DRAFT'}</small>
-              <h2>{activeWriteup.title || 'Untitled CTF writeup'}</h2>
-              <span>/ctf_blog/{activeWriteup.slug || 'writeup-slug'}</span>
+              <small>{String(activeWriteup.kind || 'ctf').toUpperCase()} / {activeWriteup.status || 'DRAFT'}</small>
+              <h2>{activeWriteup.title || 'Untitled document'}</h2>
+              <span>{
+                activeWriteup.kind === 'blog'
+                  ? '/blog/' + (activeWriteup.slug || 'article-slug')
+                  : activeWriteup.kind === 'webcomic'
+                    ? '/webcomic/' + (activeWriteup.slug || 'comic-slug')
+                    : '/ctf_blog/' + (activeWriteup.slug || 'writeup-slug')
+              }</span>
               <small className="writeup-publish-status">
                 GitHub App:{' '}
                 {githubStatus?.ok
@@ -2212,6 +2274,9 @@ function WriteupsEditor({
               r2Objects={r2Objects}
               r2Loading={r2Loading}
               loadR2Objects={loadR2Objects}
+              openR2Object={openR2Object}
+              deleteR2Object={deleteR2Object}
+              githubStatus={githubStatus}
             />
           )}
 
@@ -2294,6 +2359,7 @@ function WriteupDocumentEditor({
       if (type === 'heading') base.html = '<strong>New section</strong>';
       else if (type === 'code') Object.assign(base, { languageId: 71, code: '', stdin: '' });
       else if (type === 'table') Object.assign(base, { headers: ['Column 1', 'Column 2'], rows: [['', ''], ['', '']] });
+      else if (type === 'reference') Object.assign(base, { reference: { label: '', url: '', note: '' } });
       else if (type === 'list') base.html = '<ul><li>List item</li></ul>';
       else if (type === 'quote') base.html = '<p>Quote</p>';
       else if (type === 'media') Object.assign(base, { media: null });
@@ -2337,6 +2403,19 @@ function WriteupDocumentEditor({
       <aside className="writeup-session-rail">
         <div className="writeup-meta-card">
           <label className="field">
+            <span>Document type</span>
+            <select
+              value={writeup.kind || 'ctf'}
+              onChange={(event) =>
+                updateField('kind', event.target.value)
+              }
+            >
+              <option value="ctf">CTF writeup</option>
+              <option value="blog">Blog / field note</option>
+              <option value="webcomic">Webcomic wild card</option>
+            </select>
+          </label>
+          <label className="field">
             <span>Title</span>
             <input value={writeup.title || ''} onChange={(e) => updateField('title', e.target.value)} />
           </label>
@@ -2349,6 +2428,14 @@ function WriteupDocumentEditor({
             <textarea rows={4} value={writeup.excerpt || ''} onChange={(e) => updateField('excerpt', e.target.value)} />
           </label>
           <label className="field">
+            <span>Banner image URL</span>
+            <input
+              value={writeup.banner || ''}
+              onChange={(e) => updateField('banner', e.target.value)}
+              placeholder="R2/public image URL"
+            />
+          </label>
+          <label className="field">
             <span>Tags, comma separated</span>
             <input
               value={Array.isArray(writeup.tags) ? writeup.tags.join(', ') : ''}
@@ -2356,13 +2443,15 @@ function WriteupDocumentEditor({
             />
           </label>
 
-          <div className="writeup-ctf-meta-grid">
-            <Field label="Event / CTF" value={writeup.ctf?.event || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), event: v })} />
-            <Field label="Category" value={writeup.ctf?.category || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), category: v })} />
-            <Field label="Difficulty" value={writeup.ctf?.difficulty || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), difficulty: v })} />
-            <Field label="Points" value={writeup.ctf?.points || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), points: v })} />
-            <Field wide label="Flag (optional)" value={writeup.ctf?.flag || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), flag: v })} />
-          </div>
+          {(writeup.kind || 'ctf') === 'ctf' && (
+            <div className="writeup-ctf-meta-grid">
+              <Field label="Event / CTF" value={writeup.ctf?.event || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), event: v })} />
+              <Field label="Category" value={writeup.ctf?.category || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), category: v })} />
+              <Field label="Difficulty" value={writeup.ctf?.difficulty || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), difficulty: v })} />
+              <Field label="Points" value={writeup.ctf?.points || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), points: v })} />
+              <Field wide label="Flag (optional)" value={writeup.ctf?.flag || ''} onChange={(v) => updateField('ctf', { ...(writeup.ctf || {}), flag: v })} />
+            </div>
+          )}
         </div>
 
         <div className="writeup-session-list">
@@ -2431,6 +2520,7 @@ function WriteupDocumentEditor({
               uploadFile={uploadFile}
               addBlock={addBlock}
               writeupSlug={writeup.slug || writeup.title}
+              contentKind={writeup.kind || 'ctf'}
             />
           ))}
 
@@ -2461,6 +2551,7 @@ function WriteupBlockEditor({
   moveDown,
   uploadFile,
   writeupSlug,
+  contentKind,
 }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
@@ -2519,7 +2610,11 @@ function WriteupBlockEditor({
     if (!file) return;
 
     try {
-      const media = await uploadFile(file, writeupSlug || 'writeup-media');
+      const media = await uploadFile(
+        file,
+        writeupSlug || 'writeup-media',
+        contentKind || 'ctf'
+      );
       update({
         ...block,
         media,
@@ -2573,6 +2668,43 @@ function WriteupBlockEditor({
           block={block}
           update={update}
         />
+      )}
+
+      {block.type === 'reference' && (
+        <div className="writeup-reference-editor">
+          <Field
+            label="Reference label"
+            value={block.reference?.label || ''}
+            onChange={(value) =>
+              updateField('reference', {
+                ...(block.reference || {}),
+                label: value,
+              })
+            }
+          />
+          <Field
+            label="URL / DOI / source"
+            value={block.reference?.url || ''}
+            onChange={(value) =>
+              updateField('reference', {
+                ...(block.reference || {}),
+                url: value,
+              })
+            }
+          />
+          <Field
+            wide
+            multiline
+            label="Reference note"
+            value={block.reference?.note || ''}
+            onChange={(value) =>
+              updateField('reference', {
+                ...(block.reference || {}),
+                note: value,
+              })
+            }
+          />
+        </div>
       )}
 
       {block.type === 'code' && (
@@ -2890,6 +3022,50 @@ function WriteupWorkspaceTab({ writeup, updateWriteup }) {
           <p>Compose system and cybersecurity diagrams as connected vector objects. Drag document blocks into the canvas, classify nodes such as host, firewall, process or packet, then connect them into an interactive workflow.</p>
         </div>
         <div className="writeup-workspace-actions">
+          <label className="workspace-size-field">
+            <span>W</span>
+            <input
+              type="number"
+              min="480"
+              max="3200"
+              step="40"
+              value={Number(workspace.width || 1200)}
+              onChange={(event) =>
+                updateWorkspace((current) => ({
+                  ...current,
+                  width: Math.max(
+                    480,
+                    Math.min(
+                      3200,
+                      Number(event.target.value || 1200)
+                    )
+                  ),
+                }))
+              }
+            />
+          </label>
+          <label className="workspace-size-field">
+            <span>H</span>
+            <input
+              type="number"
+              min="320"
+              max="2200"
+              step="40"
+              value={Number(workspace.height || 720)}
+              onChange={(event) =>
+                updateWorkspace((current) => ({
+                  ...current,
+                  height: Math.max(
+                    320,
+                    Math.min(
+                      2200,
+                      Number(event.target.value || 720)
+                    )
+                  ),
+                }))
+              }
+            />
+          </label>
           <button className={connectMode ? 'accent-button small' : 'ghost small'} onClick={() => { setConnectMode(!connectMode); setConnectFrom(null); }}>
             {connectMode ? 'Connecting...' : 'Connect objects'}
           </button>
@@ -2919,11 +3095,16 @@ function WriteupWorkspaceTab({ writeup, updateWriteup }) {
           </div>
         </aside>
 
-        <div
-          className={connectMode ? 'workspace-canvas connecting' : 'workspace-canvas'}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={onCanvasDrop}
-        >
+        <div className="workspace-canvas-shell">
+          <div
+            className={connectMode ? 'workspace-canvas connecting' : 'workspace-canvas'}
+            style={{
+              width: Number(workspace.width || 1200),
+              minHeight: Number(workspace.height || 720),
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={onCanvasDrop}
+          >
           <svg className="workspace-edges">
             {edges.map((edge) => {
               const from = nodes.find((node) => node.id === edge.from);
@@ -2968,6 +3149,7 @@ function WriteupWorkspaceTab({ writeup, updateWriteup }) {
               Drag any document block here to create the first interactive object.
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
@@ -3100,9 +3282,12 @@ function WriteupR2MediaTab({
 
   useEffect(() => {
     if (writeup?.slug) {
-      loadR2Objects(writeup.slug);
+      loadR2Objects(
+        writeup.slug,
+        writeup.kind || 'ctf'
+      );
     }
-  }, [writeup?.slug]);
+  }, [writeup?.slug, writeup?.kind]);
 
   async function upload(event) {
     const file = event.target.files?.[0];
@@ -3116,7 +3301,8 @@ function WriteupR2MediaTab({
     try {
       const media = await uploadFile(
         file,
-        writeup.slug || writeup.title
+        writeup.slug || writeup.title,
+        writeup.kind || 'ctf'
       );
 
       setUploaded(media);
@@ -3157,7 +3343,12 @@ function WriteupR2MediaTab({
           </label>
           <button
             className="ghost"
-            onClick={() => loadR2Objects(writeup.slug || writeup.title)}
+            onClick={() =>
+              loadR2Objects(
+                writeup.slug || writeup.title,
+                writeup.kind || 'ctf'
+              )
+            }
             disabled={r2Loading}
           >
             {r2Loading ? 'Loading...' : 'Refresh R2'}
@@ -3211,13 +3402,27 @@ function WriteupPreviewData({ writeup }) {
     <div className="writeup-preview-data">
       <div className="preview-json-card">
         <small>PUBLIC ROUTE</small>
-        <strong>/ctf_blog/{writeup.slug}</strong>
-        <p>Published data will be written to client/public/ctf_blog/{writeup.slug}.json.</p>
+        <strong>{
+          writeup.kind === 'blog'
+            ? '/blog/' + writeup.slug
+            : writeup.kind === 'webcomic'
+              ? '/webcomic/' + writeup.slug
+              : '/ctf_blog/' + writeup.slug
+        }</strong>
+        <p>{
+          writeup.kind === 'blog'
+            ? 'Published data will be written to client/public/blog/' + writeup.slug + '.json.'
+            : writeup.kind === 'webcomic'
+              ? 'Published data will be written to client/public/webcomic/' + writeup.slug + '.json and surfaced as a wild card.'
+              : 'Published data will be written to client/public/ctf_blog/' + writeup.slug + '.json.'
+        }</p>
       </div>
       <div className="preview-json-card">
         <small>PUBLIC DISCUSSION TERM</small>
-        <strong>ctf_blog:{writeup.slug}</strong>
-        <p>Anonymous + GitHub discussion is attached to the bottom of the public writeup.</p>
+        <strong>{
+          (writeup.kind || 'ctf') + ':' + writeup.slug
+        }</strong>
+        <p>Blog and CTF documents can attach the public discussion layer. Webcomic cards currently open as a wild-card modal.</p>
       </div>
       <pre>{JSON.stringify(writeup, null, 2)}</pre>
     </div>
@@ -3599,26 +3804,489 @@ function ServiceRow({ label, item }) {
   );
 }
 
-function MediaLibraryEditor({ driveMedia, driveLoading, loadDriveMedia, content, updateImage }) {
+function MediaLibraryEditor({
+  driveMedia,
+  driveLoading,
+  loadDriveMedia,
+  content,
+  updateImage,
+  setNotice,
+}) {
+  const [folders, setFolders] =
+    useState([]);
+  const [targetFolderId, setTargetFolderId] =
+    useState(DRIVE_ROOT_ID);
+  const [folderName, setFolderName] =
+    useState('');
+  const [driveBusy, setDriveBusy] =
+    useState(false);
+
+  useEffect(() => {
+    loadFolders();
+  }, []);
+
+  async function loadFolders() {
+    try {
+      const response = await fetch(
+        API +
+          '/api/drive/folders?recursive=true&parentId=' +
+          encodeURIComponent(
+            DRIVE_ROOT_ID
+          )
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          'Folder list failed'
+        );
+      }
+
+      setFolders(
+        Array.isArray(data.folders)
+          ? data.folders
+          : []
+      );
+    } catch (error) {
+      setFolders([]);
+      setNotice?.(
+        'Drive folders unavailable: ' +
+          error.message
+      );
+    }
+  }
+
+  async function createFolder() {
+    const name =
+      folderName.trim();
+
+    if (!name) {
+      return;
+    }
+
+    setDriveBusy(true);
+
+    try {
+      const response = await fetch(
+        API + '/api/drive/folders',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            name,
+            parentId:
+              targetFolderId ||
+              DRIVE_ROOT_ID,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          'Drive folder creation failed'
+        );
+      }
+
+      setFolderName('');
+      setNotice?.(
+        'Created Drive folder: ' +
+          (data.folder?.name || name)
+      );
+      await loadFolders();
+      await loadDriveMedia();
+    } catch (error) {
+      setNotice?.(
+        'Drive folder creation failed: ' +
+          error.message
+      );
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  async function fileToBase64(file) {
+    return new Promise(
+      (resolve, reject) => {
+        const reader =
+          new FileReader();
+
+        reader.onload = () => {
+          const raw =
+            String(
+              reader.result || ''
+            );
+          const comma =
+            raw.indexOf(',');
+
+          resolve(
+            comma >= 0
+              ? raw.slice(comma + 1)
+              : ''
+          );
+        };
+
+        reader.onerror = () =>
+          reject(
+            new Error(
+              'Could not read file.'
+            )
+          );
+
+        reader.readAsDataURL(file);
+      }
+    );
+  }
+
+  async function uploadDriveFile(
+    event
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setNotice?.(
+        'Drive upload must be 15 MB or smaller in this admin build.'
+      );
+      return;
+    }
+
+    setDriveBusy(true);
+
+    try {
+      const contentBase64 =
+        await fileToBase64(file);
+
+      const response = await fetch(
+        API + '/api/drive/upload',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            name: file.name,
+            mimeType:
+              file.type ||
+              'application/octet-stream',
+            parentId:
+              targetFolderId ||
+              DRIVE_ROOT_ID,
+            contentBase64,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          'Drive upload failed'
+        );
+      }
+
+      setNotice?.(
+        'Uploaded to Google Drive: ' +
+          (data.file?.name ||
+            file.name)
+      );
+
+      await loadDriveMedia();
+    } catch (error) {
+      setNotice?.(
+        'Drive upload failed: ' +
+          error.message
+      );
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  async function updateDriveFile(
+    item,
+    payload
+  ) {
+    setDriveBusy(true);
+
+    try {
+      const response = await fetch(
+        API +
+          '/api/drive/files/' +
+          encodeURIComponent(item.id),
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          'Drive update failed'
+        );
+      }
+
+      setNotice?.(
+        'Updated Drive file: ' +
+          (data.file?.name ||
+            item.name)
+      );
+
+      await loadDriveMedia();
+    } catch (error) {
+      setNotice?.(
+        'Drive update failed: ' +
+          error.message
+      );
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
   return (
     <section className="panel">
-      <PanelHeader eyebrow="GOOGLE DRIVE" title="Media library" />
+      <PanelHeader
+        eyebrow="GOOGLE DRIVE"
+        title="Media & file manager"
+      />
+
       <div className="media-library-toolbar">
-        <p className="helper">Browse the Google Drive Media folder (including nested folders) in read-only mode. The admin tries the local Drive API first, then the hosted portfolio API. Copy a file ID into any media item or attach it to the profile image.</p>
-        <button className="accent-button" onClick={loadDriveMedia} disabled={driveLoading}>{driveLoading ? 'Loading...' : 'Refresh Drive'}</button>
+        <div>
+          <p className="helper">
+            This admin talks to the private Tailscale API first. It can create folders, upload files, rename and move items inside the approved portfolio Drive root. The Vercel chatbot remains read-only.
+          </p>
+          <code className="drive-root-chip">
+            root: {DRIVE_ROOT_ID}
+          </code>
+        </div>
+
+        <button
+          className="accent-button"
+          onClick={loadDriveMedia}
+          disabled={
+            driveLoading ||
+            driveBusy
+          }
+        >
+          {driveLoading
+            ? 'Loading...'
+            : 'Refresh Drive'}
+        </button>
       </div>
+
+      <div className="drive-manager-actions">
+        <label className="field">
+          <span>
+            Target folder
+          </span>
+          <select
+            value={targetFolderId}
+            onChange={(event) =>
+              setTargetFolderId(
+                event.target.value
+              )
+            }
+          >
+            <option value={DRIVE_ROOT_ID}>
+              Portfolio root
+            </option>
+            {folders.map(
+              (folder) => (
+                <option
+                  key={folder.id}
+                  value={folder.id}
+                >
+                  {folder.fullPath || folder.name}
+                </option>
+              )
+            )}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>
+            New folder
+          </span>
+          <input
+            value={folderName}
+            onChange={(event) =>
+              setFolderName(
+                event.target.value
+              )
+            }
+            placeholder="e.g. Media / Certificates"
+          />
+        </label>
+
+        <button
+          className="ghost"
+          type="button"
+          onClick={createFolder}
+          disabled={
+            driveBusy ||
+            !folderName.trim()
+          }
+        >
+          Create folder
+        </button>
+
+        <label className="accent-button file-button">
+          {driveBusy
+            ? 'Working...'
+            : 'Upload to Drive'}
+          <input
+            type="file"
+            disabled={driveBusy}
+            onChange={uploadDriveFile}
+          />
+        </label>
+      </div>
+
       <div className="profile-drive-row">
-        <Field label="Profile Drive file ID" value={content.profile.image?.driveId || ''} onChange={(v) => updateImage('driveId', v)} />
+        <Field
+          label="Profile Drive file ID"
+          value={
+            content.profile.image
+              ?.driveId || ''
+          }
+          onChange={(value) =>
+            updateImage(
+              'driveId',
+              value
+            )
+          }
+        />
       </div>
-      {!driveMedia.length ? <div className="media-empty">No Drive media loaded yet.</div> : (
+
+      {!driveMedia.length ? (
+        <div className="media-empty">
+          No Drive media loaded yet.
+        </div>
+      ) : (
         <div className="drive-grid">
           {driveMedia.map((item) => (
-            <article className="drive-card" key={item.id}>
-              {(item.proxyUrl || item.thumbnailLink) ? <img src={item.proxyUrl || item.thumbnailLink} alt={item.name || 'Drive media'} /> : <div className="drive-thumb">FILE</div>}
-              <div><strong title={item.name}>{item.name}</strong><small>{item.mimeType || 'Unknown type'}</small><code>{item.id}</code></div>
+            <article
+              className="drive-card"
+              key={item.id}
+            >
+              {(item.proxyUrl ||
+                item.thumbnailLink) ? (
+                <img
+                  src={
+                    item.proxyUrl ||
+                    item.thumbnailLink
+                  }
+                  alt={
+                    item.name ||
+                    'Drive media'
+                  }
+                />
+              ) : (
+                <div className="drive-thumb">
+                  FILE
+                </div>
+              )}
+
+              <div>
+                <strong title={item.name}>
+                  {item.name}
+                </strong>
+                <small>
+                  {item.mimeType ||
+                    'Unknown type'}
+                </small>
+                <code>{item.id}</code>
+              </div>
+
               <div className="drive-actions">
-                <button className="ghost small" onClick={() => navigator.clipboard?.writeText(item.id)}>Copy ID</button>
-                <button className="accent-button small" onClick={() => updateImage('driveId', item.id)}>Use for profile</button>
+                <button
+                  className="ghost small"
+                  onClick={() =>
+                    navigator.clipboard?.writeText(
+                      item.id
+                    )
+                  }
+                >
+                  Copy ID
+                </button>
+
+                <button
+                  className="accent-button small"
+                  onClick={() =>
+                    updateImage(
+                      'driveId',
+                      item.id
+                    )
+                  }
+                >
+                  Use for profile
+                </button>
+
+                <button
+                  className="ghost small"
+                  disabled={driveBusy}
+                  onClick={() =>
+                    updateDriveFile(
+                      item,
+                      {
+                        parentId:
+                          targetFolderId,
+                      }
+                    )
+                  }
+                >
+                  Move here
+                </button>
+
+                <button
+                  className="ghost small"
+                  disabled={driveBusy}
+                  onClick={() => {
+                    const name =
+                      window.prompt(
+                        'Rename Drive file',
+                        item.name || ''
+                      );
+
+                    if (
+                      name &&
+                      name.trim()
+                    ) {
+                      updateDriveFile(
+                        item,
+                        {
+                          name:
+                            name.trim(),
+                        }
+                      );
+                    }
+                  }}
+                >
+                  Rename
+                </button>
               </div>
             </article>
           ))}
@@ -3673,7 +4341,8 @@ function SystemEditor({
     <div className="system-grid">
       <section className="panel">
         <PanelHeader eyebrow="RUNTIME" title="Service diagnostics" />
-        <div className="service-list">{[['local', 'Local API'], ['r2', 'Cloudflare R2'], ['github', 'GitHub App'], ['ai', 'Local AI'], ['online', 'Online API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
+        <p className="helper">Primary admin API: <code>{PRIVATE_API}</code>. Content changes flow through the private API, then Google Drive / Cloudflare R2 / GitHub App as needed. Vercel is checked separately as the public online service.</p>
+        <div className="service-list">{[['local', 'Private Tailscale API'], ['drive', 'Google Drive'], ['r2', 'Cloudflare R2'], ['github', 'GitHub App'], ['ai', 'Local AI'], ['online', 'Online Vercel API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
         <button className="accent-button" onClick={refreshSystem} disabled={serviceLoading}>{serviceLoading ? 'Checking...' : 'Run diagnostic'}</button>
         {serviceStatus.checkedAt && <small className="system-note">Checked {new Date(serviceStatus.checkedAt).toLocaleString()}</small>}
       </section>

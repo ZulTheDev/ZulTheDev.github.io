@@ -1091,8 +1091,8 @@ function Chat({ content }) {
       }));
 
     const endpoints = [
-      ONLINE_API,
       API,
+      ONLINE_API,
     ].filter(
       (value, index, list) =>
         value &&
@@ -2670,6 +2670,7 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
   }
 
   const width = Math.max(
+    Number(workspace?.width || 0),
     760,
     ...nodes.map((node) =>
       Number(node.x || 0) + 220
@@ -2677,6 +2678,7 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
   );
 
   const height = Math.max(
+    Number(workspace?.height || 0),
     470,
     ...nodes.map((node) =>
       Number(node.y || 0) + 150
@@ -3033,6 +3035,35 @@ function CTFWriteupBlock({
           </tbody>
         </table>
       </div>
+    );
+  }
+
+  if (block.type === 'reference') {
+    const reference =
+      block.reference || {};
+
+    return (
+      <aside className="writeup-reference-view">
+        <small>REFERENCE</small>
+        <strong>
+          {reference.label ||
+            'Untitled source'}
+        </strong>
+
+        {reference.note && (
+          <p>{reference.note}</p>
+        )}
+
+        {reference.url && (
+          <a
+            href={reference.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open source ↗
+          </a>
+        )}
+      </aside>
     );
   }
 
@@ -3439,19 +3470,322 @@ function PolymathVectorSystem({
   );
 }
 
+function blogAsset(path) {
+  return (
+    BASE_PATH +
+    String(path || '')
+      .replace(/^\/+/, '')
+  );
+}
+
+function BlogSectionCard({
+  item,
+  type,
+  fallbackImage,
+  placeholder = false,
+  onOpenComic,
+}) {
+  const image =
+    item?.banner ||
+    item?.image ||
+    fallbackImage ||
+    '';
+
+  const title =
+    item?.title ||
+    (placeholder
+      ? 'Empty slot'
+      : 'Untitled');
+
+  const excerpt =
+    item?.excerpt ||
+    item?.description ||
+    (
+      placeholder
+        ? 'Reserved for the next thing I make.'
+        : ''
+    );
+
+  const date =
+    item?.updatedAt ||
+    item?.publishedAt ||
+    item?.date ||
+    '';
+
+  const tags =
+    Array.isArray(item?.tags)
+      ? item.tags.slice(0, 4)
+      : [];
+
+  const cardBody = (
+    <>
+      <div className="blog-card-banner">
+        {image ? (
+          <img
+            src={image}
+            alt=""
+            loading="lazy"
+          />
+        ) : (
+          <div className="blog-card-placeholder-art">
+            <span>ฅ^•ﻌ•^ฅ</span>
+            <small>waiting for a banner</small>
+          </div>
+        )}
+
+        <span className="blog-card-kind">
+          {type}
+        </span>
+      </div>
+
+      <div className="blog-card-copy">
+        <small>
+          {date
+            ? writeupDate(date)
+            : 'COMING SOON'}
+        </small>
+
+        <h3>{title}</h3>
+        <p>{excerpt}</p>
+
+        {tags.length > 0 && (
+          <div className="blog-card-tags">
+            {tags.map((tag) => (
+              <span key={tag}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <b>
+          {placeholder
+            ? 'Reserved card'
+            : type === 'WEBCOMIC'
+              ? 'Open wild card ↗'
+              : 'Read entry →'}
+        </b>
+      </div>
+    </>
+  );
+
+  if (placeholder) {
+    return (
+      <article className="blog-card blog-card-empty">
+        {cardBody}
+      </article>
+    );
+  }
+
+  if (type === 'WEBCOMIC') {
+    return (
+      <button
+        type="button"
+        className="blog-card"
+        onClick={() =>
+          onOpenComic?.(item)
+        }
+      >
+        {cardBody}
+      </button>
+    );
+  }
+
+  const href =
+    type === 'CTF'
+      ? '/ctf_blog/' + item.slug
+      : '/blog/' + item.slug;
+
+  return (
+    <a
+      className="blog-card"
+      href={href}
+    >
+      {cardBody}
+    </a>
+  );
+}
+
+function BlogShelf({
+  id,
+  eyebrow,
+  title,
+  description,
+  items,
+  type,
+  fallbackImage,
+  emptyCount = 6,
+  onOpenComic,
+}) {
+  const cards = [
+    ...(Array.isArray(items) ? items : []),
+  ];
+
+  while (cards.length < emptyCount) {
+    cards.push({
+      __placeholder: true,
+      id:
+        id +
+        '-placeholder-' +
+        cards.length,
+    });
+  }
+
+  return (
+    <section
+      id={id}
+      className="blog-shelf"
+    >
+      <div className="blog-shelf-head">
+        <div>
+          <small>{eyebrow}</small>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+
+        <span>
+          {Array.isArray(items)
+            ? items.length
+            : 0}{' '}
+          published
+        </span>
+      </div>
+
+      <div className="blog-card-grid">
+        {cards.map((item, index) => (
+          <BlogSectionCard
+            key={
+              item.slug ||
+              item.id ||
+              index
+            }
+            item={item}
+            type={type}
+            fallbackImage={
+              item.__placeholder
+                ? ''
+                : fallbackImage
+            }
+            placeholder={
+              Boolean(
+                item.__placeholder
+              )
+            }
+            onOpenComic={onOpenComic}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WebcomicWildCard({
+  comic,
+  onClose,
+}) {
+  if (!comic) {
+    return null;
+  }
+
+  const image =
+    comic.banner ||
+    comic.image ||
+    blogAsset(
+      'images/blog-clueless-cat.webp'
+    );
+
+  return (
+    <div
+      className="webcomic-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label={
+        comic.title ||
+        'Webcomic preview'
+      }
+      onClick={onClose}
+    >
+      <article
+        className="webcomic-wild-card"
+        onClick={(event) =>
+          event.stopPropagation()
+        }
+      >
+        <button
+          type="button"
+          className="webcomic-close"
+          onClick={onClose}
+          aria-label="Close webcomic preview"
+        >
+          ×
+        </button>
+
+        <img
+          src={image}
+          alt=""
+        />
+
+        <div>
+          <small>
+            WEBCOMIC / WILD CARD
+          </small>
+
+          <h2>
+            {comic.title ||
+              'A very confused cat'}
+          </h2>
+
+          <p>
+            {comic.excerpt ||
+              comic.description ||
+              'A little corner for illustrated stories, side quests and strange cat-shaped thoughts.'}
+          </p>
+
+          {Array.isArray(comic.tags) &&
+            comic.tags.length > 0 && (
+              <div className="blog-card-tags">
+                {comic.tags.map(
+                  (tag) => (
+                    <span key={tag}>
+                      {tag}
+                    </span>
+                  )
+                )}
+              </div>
+            )}
+
+          {comic.link && (
+            <a
+              href={comic.link}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Read more ↗
+            </a>
+          )}
+        </div>
+      </article>
+    </div>
+  );
+}
+
 function CTFBlogIndexView() {
-  const [items, setItems] =
+  const [ctfItems, setCtfItems] =
     useState([]);
+  const [blogItems, setBlogItems] =
+    useState([]);
+  const [comics, setComics] =
+    useState([]);
+  const [openComic, setOpenComic] =
+    useState(null);
 
   useEffect(() => {
     let active = true;
 
-    async function loadIndex() {
-      const candidates = [
-        BASE_PATH + 'ctf_blog/index.json',
-        BASE_PATH + 'ctf-blog/index.json',
-      ];
-
+    async function loadJson(
+      candidates,
+      field
+    ) {
       for (const url of candidates) {
         try {
           const response =
@@ -3464,150 +3798,453 @@ function CTFBlogIndexView() {
           const data =
             await response.json();
 
-          if (active) {
-            setItems(
-              Array.isArray(
-                data?.writeups
-              )
-                ? data.writeups
-                : []
-            );
-          }
-
-          return;
+          return Array.isArray(
+            data?.[field]
+          )
+            ? data[field]
+            : [];
         } catch {
-          // Try the legacy path next.
+          // Try the next source.
         }
       }
 
-      if (active) {
-        setItems([]);
-      }
+      return [];
     }
 
-    loadIndex();
+    Promise.all([
+      loadJson(
+        [
+          BASE_PATH +
+            'ctf_blog/index.json',
+          BASE_PATH +
+            'ctf-blog/index.json',
+        ],
+        'writeups'
+      ),
+      loadJson(
+        [
+          BASE_PATH +
+            'blog/index.json',
+        ],
+        'posts'
+      ),
+      loadJson(
+        [
+          BASE_PATH +
+            'webcomic/index.json',
+        ],
+        'comics'
+      ),
+    ]).then(
+      ([
+        nextCtf,
+        nextBlog,
+        nextComics,
+      ]) => {
+        if (!active) {
+          return;
+        }
+
+        setCtfItems(nextCtf);
+        setBlogItems(nextBlog);
+        setComics(nextComics);
+      }
+    );
 
     return () => {
       active = false;
     };
   }, []);
 
+  const recent = [
+    ...ctfItems.map((item) => ({
+      ...item,
+      __type: 'CTF',
+    })),
+    ...blogItems.map((item) => ({
+      ...item,
+      __type: 'BLOG',
+    })),
+  ]
+    .sort((a, b) =>
+      String(
+        b.updatedAt ||
+        b.publishedAt ||
+        ''
+      ).localeCompare(
+        String(
+          a.updatedAt ||
+          a.publishedAt ||
+          ''
+        )
+      )
+    )
+    .slice(0, 6);
+
+  const systemNotes =
+    blogItems.filter((item) => {
+      const haystack =
+        (
+          String(item.title || '') +
+          ' ' +
+          String(item.excerpt || '') +
+          ' ' +
+          (
+            Array.isArray(item.tags)
+              ? item.tags.join(' ')
+              : ''
+          )
+        ).toLowerCase();
+
+      return /system|security|cyber|network|linux|forensic|dfir|code|software|hardware/.test(
+        haystack
+      );
+    });
+
+  const heroImage = blogAsset(
+    'images/blog-hero-sakura-catgirl.webp'
+  );
+
+  const catImage = blogAsset(
+    'images/blog-clueless-cat.webp'
+  );
+
+  const recentCards =
+    recent.length
+      ? recent
+      : Array.from(
+          { length: 6 },
+          (_, index) => ({
+            __placeholder: true,
+            id:
+              'recent-empty-' +
+              (index + 1),
+          })
+        );
+
   return (
     <>
-      <nav className="writeup-site-nav">
-        <a href="/">
+      <nav className="blog-top-nav">
+        <a
+          href="/"
+          className="blog-brand"
+        >
           <b>
             ZUL<span>/</span>JAMAL
           </b>
         </a>
 
-        <a href="/blog">
-          Blog
-        </a>
+        <div>
+          <a href="/">
+            Home
+          </a>
+          <a href="#recently-added">
+            Recently added
+          </a>
+          <a href="#ctf-writeups">
+            CTF writeup
+          </a>
+          <a href="#webcomic">
+            Webcomic
+          </a>
+        </div>
       </nav>
 
-      <main className="writeup-index">
-        <section className="writeup-index-hero">
-          <div className="writeup-index-copy">
+      <main className="blog-home">
+        <section className="blog-hero">
+          <img
+            src={heroImage}
+            alt=""
+            className="blog-hero-image"
+          />
+
+          <div className="blog-hero-shade" />
+
+          <div className="blog-hero-copy">
             <small>
-              BLOG / CTF LAB
+              ZUL / FIELD NOTES
             </small>
 
             <h1>
-              Systems, security,
+              Curiosity grows
               <br />
-              <i>workflows & proof.</i>
+              <i>
+                where systems bloom.
+              </i>
             </h1>
 
             <p>
-              Interactive cybersecurity writeups
-              with runnable experiments, system
-              maps and evidence-driven notes.
+              CTF writeups, experiments,
+              systems notes, code, little
+              stories and whatever the cat
+              wandered into this week.
             </p>
 
-            <div className="writeup-engine-strip">
-              <span>Cloudflare R2 media</span>
-              <span>Judge0 code runner</span>
-              <span>Pure SVG vector systems</span>
+            <div className="blog-engine-strip">
+              <span>
+                R2 media
+              </span>
+              <span>
+                Judge0 labs
+              </span>
+              <span>
+                Polymath vectors
+              </span>
             </div>
+          </div>
+        </section>
+
+        <section
+          id="recently-added"
+          className="blog-shelf"
+        >
+          <div className="blog-shelf-head">
+            <div>
+              <small>
+                01 / FRESH SIGNALS
+              </small>
+              <h2>
+                Recently added
+              </h2>
+              <p>
+                The newest things pushed
+                into the notebook.
+              </p>
+            </div>
+          </div>
+
+          <div className="blog-card-grid">
+            {recentCards.map(
+              (item, index) => (
+                <BlogSectionCard
+                  key={
+                    item.slug ||
+                    item.id ||
+                    index
+                  }
+                  item={item}
+                  type={
+                    item.__type ||
+                    'RECENT'
+                  }
+                  fallbackImage={
+                    index === 0
+                      ? catImage
+                      : heroImage
+                  }
+                  placeholder={
+                    Boolean(
+                      item.__placeholder
+                    )
+                  }
+                />
+              )
+            )}
+          </div>
+        </section>
+
+        <BlogShelf
+          id="ctf-writeups"
+          eyebrow="02 / OFFENSIVE + DEFENSIVE"
+          title="CTF writeups"
+          description="Challenge notes with evidence, runnable code, packet trails and interactive system maps."
+          items={ctfItems}
+          type="CTF"
+          fallbackImage={heroImage}
+          emptyCount={6}
+        />
+
+        <BlogShelf
+          id="systems-notes"
+          eyebrow="03 / POLYMATH NOTEBOOK"
+          title="Systems & field notes"
+          description="Computer systems, cybersecurity, software experiments and the little technical rabbit holes worth documenting."
+          items={systemNotes}
+          type="BLOG"
+          fallbackImage={catImage}
+          emptyCount={6}
+        />
+
+        <BlogShelf
+          id="webcomic"
+          eyebrow="04 / SIDE QUEST"
+          title="Webcomic"
+          description="Small illustrated stories and deliberately unserious cat-shaped observations."
+          items={comics}
+          type="WEBCOMIC"
+          fallbackImage={catImage}
+          emptyCount={6}
+          onOpenComic={setOpenComic}
+        />
+
+        <section className="blog-vector-footer">
+          <div>
+            <small>
+              INTERACTIVE SYSTEM MAP
+            </small>
+            <h2>
+              Follow the signal.
+            </h2>
+            <p>
+              Hover, focus or tap the nodes.
+              The visual layer stays pure SVG
+              so it remains sharp and interactive.
+            </p>
           </div>
 
           <PolymathVectorSystem />
         </section>
+      </main>
 
-        {!items.length ? (
-          <div className="writeup-index-empty">
-            <strong>
-              No public writeups yet.
-            </strong>
-            <span>
-              Published CTF notes will appear
-              here as interactive lab entries.
-            </span>
-          </div>
-        ) : (
-          <div className="writeup-index-grid">
-            {items.map((item, index) => (
-              <a
-                key={item.slug}
-                href={
-                  '/ctf_blog/' +
-                  item.slug
-                }
-                className="writeup-index-card"
-              >
-                <div className="writeup-card-vector">
-                  <span>
-                    {String(index + 1).padStart(
-                      2,
-                      '0'
-                    )}
-                  </span>
-                  <svg
-                    viewBox="0 0 160 60"
-                    aria-hidden="true"
-                  >
-                    <path d="M4 48L38 18L72 39L108 10L156 36" />
-                    <circle cx="38" cy="18" r="4" />
-                    <circle cx="72" cy="39" r="4" />
-                    <circle cx="108" cy="10" r="4" />
-                  </svg>
-                </div>
+      <WebcomicWildCard
+        comic={openComic}
+        onClose={() =>
+          setOpenComic(null)
+        }
+      />
+    </>
+  );
+}
 
-                <small>
-                  {writeupDate(
-                    item.updatedAt
-                  )}
-                </small>
+function BlogArticleView({ slug }) {
+  const [post, setPost] =
+    useState(null);
+  const [error, setError] =
+    useState('');
+  const [loading, setLoading] =
+    useState(true);
 
-                <h2>
-                  {item.title}
-                </h2>
+  useEffect(() => {
+    let active = true;
 
-                <p>
-                  {item.excerpt}
-                </p>
+    fetch(
+      BASE_PATH +
+        'blog/' +
+        encodeURIComponent(slug) +
+        '.json'
+    )
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(
+            'Article not found'
+          );
+        }
 
-                {Array.isArray(item.tags) &&
-                  item.tags.length > 0 && (
-                    <div className="writeup-index-tags">
-                      {item.tags
-                        .slice(0, 4)
-                        .map((tag) => (
-                          <span key={tag}>
-                            {tag}
-                          </span>
-                        ))}
-                    </div>
-                  )}
+        return response.json();
+      })
+      .then((data) => {
+        if (!active) return;
+        setPost(data);
+        setLoading(false);
+      })
+      .catch((fetchError) => {
+        if (!active) return;
+        setError(
+          fetchError.message ||
+          'Article not found'
+        );
+        setLoading(false);
+      });
 
-                <b>
-                  Open lab writeup →
-                </b>
-              </a>
-            ))}
-          </div>
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="writeup-loading">
+        Loading field note...
+      </div>
+    );
+  }
+
+  if (!post) {
+    return (
+      <main className="writeup-error">
+        <small>BLOG</small>
+        <h1>{error}</h1>
+        <a href="/blog">
+          Back to blog
+        </a>
+      </main>
+    );
+  }
+
+  return (
+    <>
+      <nav className="blog-top-nav">
+        <a
+          href="/"
+          className="blog-brand"
+        >
+          <b>
+            ZUL<span>/</span>JAMAL
+          </b>
+        </a>
+
+        <div>
+          <a href="/">
+            Home
+          </a>
+          <a href="/blog">
+            Blog
+          </a>
+        </div>
+      </nav>
+
+      <main className="writeup-page blog-article-page">
+        {post.banner && (
+          <img
+            className="blog-article-banner"
+            src={post.banner}
+            alt=""
+          />
         )}
+
+        <header className="writeup-header">
+          <small>
+            FIELD NOTE
+          </small>
+
+          <h1>
+            {post.title}
+          </h1>
+
+          {post.excerpt && (
+            <p>
+              {post.excerpt}
+            </p>
+          )}
+
+          <div className="writeup-meta">
+            <span>
+              {post.author ||
+                'Zulfaqar Jamal'}
+            </span>
+
+            {post.updatedAt && (
+              <span>
+                Updated{' '}
+                {writeupDate(
+                  post.updatedAt
+                )}
+              </span>
+            )}
+          </div>
+        </header>
+
+        <CTFWriteupDocument
+          writeup={post}
+        />
+
+        <section className="writeup-discussion">
+          <GiscusComments
+            discussionTerm={
+              'blog:' + slug
+            }
+          />
+        </section>
       </main>
     </>
   );
@@ -3868,6 +4505,7 @@ export default function App({ initialContent = null }) {
 
   const isCtfRoute =
     ctfPath === '/blog' ||
+    ctfPath.startsWith('/blog/') ||
     ctfPath === '/ctf_blog' ||
     ctfPath === '/ctf-blog' ||
     ctfPath.startsWith('/ctf_blog/') ||
@@ -4058,6 +4696,19 @@ export default function App({ initialContent = null }) {
     ctfPath === '/ctf-blog'
   ) {
     return <CTFBlogIndexView />;
+  }
+
+  if (
+    ctfPath.startsWith('/blog/')
+  ) {
+    const slug =
+      decodeURIComponent(
+        ctfPath.slice('/blog/'.length)
+      );
+
+    if (slug) {
+      return <BlogArticleView slug={slug} />;
+    }
   }
 
   if (

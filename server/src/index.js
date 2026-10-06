@@ -1933,8 +1933,14 @@ app.post(
         ok: true,
         writeup: published,
         url:
-          '/ctf_blog/' +
-          published.slug,
+          published.url ||
+          (
+            published.kind === 'blog'
+              ? '/blog/' + published.slug
+              : published.kind === 'webcomic'
+                ? '/webcomic/' + published.slug
+                : '/ctf_blog/' + published.slug
+          ),
         deploy: published.deploy || null,
       });
     } catch (error) {
@@ -2061,10 +2067,19 @@ app.post(
       'general'
     ).trim();
 
+    const contentKind =
+      String(
+        request.body?.contentKind ||
+          'ctf'
+      )
+        .trim()
+        .toLowerCase();
+
     if (
       !filename ||
       filename.length > 180 ||
-      contentType.length > 120
+      contentType.length > 120 ||
+      !['ctf', 'blog', 'webcomic'].includes(contentKind)
     ) {
       return response.status(400).json({
         error: 'invalid_upload_request',
@@ -2095,8 +2110,15 @@ app.post(
         });
       }
 
+      const prefix =
+        contentKind === 'blog'
+          ? 'blog/'
+          : contentKind === 'webcomic'
+            ? 'webcomic/'
+            : 'ctf_blog/';
+
       const key =
-        'ctf_blog/' +
+        prefix +
         slug +
         '/' +
         Date.now() +
@@ -2322,7 +2344,7 @@ function drive() {
         ),
       },
       scopes: [
-        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/drive',
       ],
     });
 
@@ -2339,9 +2361,27 @@ function drive() {
 app.get('/api/health', (request, response) => {
   response.json({
     ok: true,
+    service: 'portfolio-private-admin-api',
     contentFile: content,
     commentsFile: commentsFile,
     allowedOrigins,
+    integrations: {
+      googleDrive: Boolean(
+        process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
+        process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY &&
+        APPROVED_DRIVE_ROOT_ID
+      ),
+      driveRootId:
+        APPROVED_DRIVE_ROOT_ID,
+      cloudflareR2:
+        r2Configured(),
+      githubApp:
+        githubAppConfigured(),
+      deepseek:
+        Boolean(
+          process.env.DEEPSEEK_API_KEY
+        ),
+    },
   });
 });
 
@@ -2452,6 +2492,698 @@ app.put(
   }
 );
 
+const APPROVED_DRIVE_ROOT_ID =
+  String(
+    process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID ||
+      '10XU8zeRpx9Ladh501vWjZepzm0j7ZOq6'
+  ).trim();
+
+async function getDriveFileMeta(d, fileId) {
+  const result = await d.files.get({
+    fileId,
+    fields:
+      'id,name,mimeType,parents,trashed',
+    supportsAllDrives: true,
+  });
+
+  return result.data || {};
+}
+
+async function driveItemWithinRoot(
+  d,
+  fileId,
+  rootFolderId =
+    APPROVED_DRIVE_ROOT_ID
+) {
+  if (!fileId || !rootFolderId) {
+    return false;
+  }
+
+  if (fileId === rootFolderId) {
+    return true;
+  }
+
+  const queue = [fileId];
+  const visited = new Set();
+
+  while (
+    queue.length &&
+    visited.size < 80
+  ) {
+    const currentId = queue.shift();
+
+    if (
+      !currentId ||
+      visited.has(currentId)
+    ) {
+      continue;
+    }
+
+    if (currentId === rootFolderId) {
+      return true;
+    }
+
+    visited.add(currentId);
+
+    let item;
+
+    try {
+      item =
+        await getDriveFileMeta(
+          d,
+          currentId
+        );
+    } catch {
+      continue;
+    }
+
+    for (const parentId of
+      item.parents || []) {
+      if (
+        parentId === rootFolderId
+      ) {
+        return true;
+      }
+
+      if (!visited.has(parentId)) {
+        queue.push(parentId);
+      }
+    }
+  }
+
+  return false;
+}
+
+async function requireDriveParent(
+  d,
+  candidateId
+) {
+  const parentId =
+    String(
+      candidateId ||
+        APPROVED_DRIVE_ROOT_ID
+    ).trim();
+
+  const allowed =
+    await driveItemWithinRoot(
+      d,
+      parentId
+    );
+
+  if (!allowed) {
+    const error =
+      new Error(
+        'drive_parent_outside_approved_root'
+      );
+    error.status = 403;
+    throw error;
+  }
+
+  const meta =
+    await getDriveFileMeta(
+      d,
+      parentId
+    );
+
+  if (
+    meta.trashed ||
+    meta.mimeType !==
+      'application/vnd.google-apps.folder'
+  ) {
+    const error =
+      new Error(
+        'drive_parent_not_folder'
+      );
+    error.status = 400;
+    throw error;
+  }
+
+  return parentId;
+}
+
+async function listDriveTree(
+  d,
+  startFolderId,
+  {
+    maxFiles = 1000,
+    maxFolders = 300,
+  } = {}
+) {
+  const startMeta =
+    await getDriveFileMeta(
+      d,
+      startFolderId
+    );
+
+  const queue = [
+    {
+      id: startFolderId,
+      path:
+        startMeta.name ||
+        'Portfolio',
+    },
+  ];
+
+  const visited = new Set();
+  const folders = [];
+  const files = [];
+
+  while (
+    queue.length &&
+    visited.size < maxFolders &&
+    files.length < maxFiles
+  ) {
+    const current =
+      queue.shift();
+
+    if (
+      !current?.id ||
+      visited.has(current.id)
+    ) {
+      continue;
+    }
+
+    visited.add(current.id);
+
+    let pageToken;
+
+    do {
+      const result =
+        await d.files.list({
+          q:
+            `'${current.id}' in parents and trashed=false`,
+          fields:
+            'nextPageToken,files(id,name,mimeType,parents,size,webViewLink,thumbnailLink,modifiedTime)',
+          pageSize: 100,
+          orderBy: 'name',
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true,
+          pageToken,
+        });
+
+      for (
+        const item of
+        result.data.files || []
+      ) {
+        const fullPath =
+          current.path +
+          '/' +
+          item.name;
+
+        if (
+          item.mimeType ===
+          'application/vnd.google-apps.folder'
+        ) {
+          folders.push({
+            ...item,
+            folderPath:
+              current.path,
+            fullPath,
+          });
+
+          if (
+            visited.size +
+              queue.length <
+            maxFolders
+          ) {
+            queue.push({
+              id: item.id,
+              path: fullPath,
+            });
+          }
+
+          continue;
+        }
+
+        files.push({
+          ...item,
+          folderPath:
+            current.path,
+          fullPath,
+        });
+
+        if (
+          files.length >=
+          maxFiles
+        ) {
+          break;
+        }
+      }
+
+      pageToken =
+        result.data.nextPageToken ||
+        undefined;
+    } while (
+      pageToken &&
+      files.length < maxFiles
+    );
+  }
+
+  return {
+    folders,
+    files,
+    truncated:
+      queue.length > 0 ||
+      visited.size >= maxFolders ||
+      files.length >= maxFiles,
+  };
+}
+
+app.get(
+  '/api/drive/folders',
+  async (request, response) => {
+    const d = drive();
+
+    if (!d || !APPROVED_DRIVE_ROOT_ID) {
+      return response.status(503).json({
+        error: 'drive_not_configured',
+      });
+    }
+
+    try {
+      const parentId =
+        await requireDriveParent(
+          d,
+          request.query.parentId
+        );
+
+      const recursive =
+        String(
+          request.query.recursive ||
+            ''
+        ) === 'true';
+
+      if (recursive) {
+        const tree =
+          await listDriveTree(
+            d,
+            parentId,
+            {
+              maxFiles: 1,
+              maxFolders: 300,
+            }
+          );
+
+        return response.json({
+          rootId:
+            APPROVED_DRIVE_ROOT_ID,
+          parentId,
+          folders:
+            tree.folders,
+          truncated:
+            tree.truncated,
+        });
+      }
+
+      const result =
+        await d.files.list({
+          q:
+            `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+          fields:
+            'files(id,name,mimeType,parents,modifiedTime)',
+          pageSize: 100,
+          orderBy: 'name',
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true,
+        });
+
+      return response.json({
+        rootId:
+          APPROVED_DRIVE_ROOT_ID,
+        parentId,
+        folders:
+          result.data.files || [],
+        truncated: false,
+      });
+    } catch (error) {
+      return response.status(
+        Number(error?.status) || 500
+      ).json({
+        error:
+          error?.message ||
+          'drive_folder_list_failed',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/drive/folders',
+  async (request, response) => {
+    const d = drive();
+
+    if (!d || !APPROVED_DRIVE_ROOT_ID) {
+      return response.status(503).json({
+        error: 'drive_not_configured',
+      });
+    }
+
+    const name =
+      String(
+        request.body?.name || ''
+      ).trim();
+
+    if (
+      !name ||
+      name.length > 160
+    ) {
+      return response.status(400).json({
+        error: 'invalid_folder_name',
+      });
+    }
+
+    try {
+      const parentId =
+        await requireDriveParent(
+          d,
+          request.body?.parentId
+        );
+
+      const result =
+        await d.files.create({
+          requestBody: {
+            name,
+            mimeType:
+              'application/vnd.google-apps.folder',
+            parents: [parentId],
+          },
+          fields:
+            'id,name,mimeType,parents,webViewLink',
+          supportsAllDrives: true,
+        });
+
+      return response
+        .status(201)
+        .json({
+          ok: true,
+          folder: result.data,
+        });
+    } catch (error) {
+      return response.status(
+        Number(error?.status) || 500
+      ).json({
+        error:
+          error?.message ||
+          'drive_folder_create_failed',
+      });
+    }
+  }
+);
+
+app.get(
+  '/api/drive/files',
+  async (request, response) => {
+    const d = drive();
+
+    if (!d || !APPROVED_DRIVE_ROOT_ID) {
+      return response.status(503).json({
+        error: 'drive_not_configured',
+      });
+    }
+
+    try {
+      const parentId =
+        await requireDriveParent(
+          d,
+          request.query.parentId
+        );
+
+      const tree =
+        await listDriveTree(
+          d,
+          parentId,
+          {
+            maxFiles: 1000,
+            maxFolders: 300,
+          }
+        );
+
+      const files =
+        tree.files.map((item) => {
+          const mime =
+            String(
+              item.mimeType || ''
+            ).toLowerCase();
+
+          const previewable =
+            mime.startsWith('image/') ||
+            mime.startsWith('video/') ||
+            mime.startsWith('audio/') ||
+            mime ===
+              'application/pdf';
+
+          return {
+            ...item,
+            proxyUrl:
+              previewable
+                ? '/api/drive/image/' +
+                  encodeURIComponent(
+                    item.id
+                  )
+                : '',
+          };
+        });
+
+      return response.json({
+        rootId:
+          APPROVED_DRIVE_ROOT_ID,
+        parentId,
+        files,
+        folders:
+          tree.folders,
+        truncated:
+          tree.truncated,
+      });
+    } catch (error) {
+      return response.status(
+        Number(error?.status) || 500
+      ).json({
+        error:
+          error?.message ||
+          'drive_file_list_failed',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/drive/upload',
+  async (request, response) => {
+    const d = drive();
+
+    if (!d || !APPROVED_DRIVE_ROOT_ID) {
+      return response.status(503).json({
+        error: 'drive_not_configured',
+      });
+    }
+
+    const name =
+      String(
+        request.body?.name || ''
+      ).trim();
+
+    const mimeType =
+      String(
+        request.body?.mimeType ||
+          'application/octet-stream'
+      ).trim();
+
+    const contentBase64 =
+      String(
+        request.body?.contentBase64 ||
+          ''
+      ).trim();
+
+    if (
+      !name ||
+      !contentBase64
+    ) {
+      return response.status(400).json({
+        error: 'drive_upload_missing_data',
+      });
+    }
+
+    let buffer;
+
+    try {
+      buffer =
+        Buffer.from(
+          contentBase64,
+          'base64'
+        );
+    } catch {
+      return response.status(400).json({
+        error: 'drive_upload_invalid_base64',
+      });
+    }
+
+    if (
+      !buffer.length ||
+      buffer.length >
+        15 * 1024 * 1024
+    ) {
+      return response.status(413).json({
+        error: 'drive_upload_too_large',
+      });
+    }
+
+    try {
+      const parentId =
+        await requireDriveParent(
+          d,
+          request.body?.parentId
+        );
+
+      const {
+        Readable,
+      } =
+        await import('node:stream');
+
+      const result =
+        await d.files.create({
+          requestBody: {
+            name,
+            parents: [parentId],
+          },
+          media: {
+            mimeType,
+            body:
+              Readable.from(buffer),
+          },
+          fields:
+            'id,name,mimeType,parents,size,webViewLink,thumbnailLink,modifiedTime',
+          supportsAllDrives: true,
+        });
+
+      return response
+        .status(201)
+        .json({
+          ok: true,
+          file: result.data,
+        });
+    } catch (error) {
+      return response.status(
+        Number(error?.status) || 500
+      ).json({
+        error:
+          error?.message ||
+          'drive_upload_failed',
+      });
+    }
+  }
+);
+
+app.patch(
+  '/api/drive/files/:id',
+  async (request, response) => {
+    const d = drive();
+    const fileId =
+      String(
+        request.params.id || ''
+      ).trim();
+
+    if (!d || !APPROVED_DRIVE_ROOT_ID) {
+      return response.status(503).json({
+        error: 'drive_not_configured',
+      });
+    }
+
+    if (
+      !/^[a-zA-Z0-9_-]{10,200}$/.test(
+        fileId
+      )
+    ) {
+      return response.status(400).json({
+        error: 'invalid_drive_file_id',
+      });
+    }
+
+    try {
+      const inside =
+        await driveItemWithinRoot(
+          d,
+          fileId
+        );
+
+      if (!inside) {
+        return response.status(403).json({
+          error:
+            'drive_file_outside_approved_root',
+        });
+      }
+
+      const current =
+        await getDriveFileMeta(
+          d,
+          fileId
+        );
+
+      const nextName =
+        String(
+          request.body?.name || ''
+        ).trim();
+
+      const requestedParent =
+        String(
+          request.body?.parentId || ''
+        ).trim();
+
+      const updateOptions = {
+        fileId,
+        supportsAllDrives: true,
+        fields:
+          'id,name,mimeType,parents,webViewLink,thumbnailLink,modifiedTime',
+      };
+
+      if (nextName) {
+        updateOptions.requestBody = {
+          name:
+            nextName.slice(0, 180),
+        };
+      }
+
+      if (requestedParent) {
+        const parentId =
+          await requireDriveParent(
+            d,
+            requestedParent
+          );
+
+        updateOptions.addParents =
+          parentId;
+
+        if (
+          Array.isArray(
+            current.parents
+          ) &&
+          current.parents.length
+        ) {
+          updateOptions.removeParents =
+            current.parents.join(',');
+        }
+      }
+
+      const result =
+        await d.files.update(
+          updateOptions
+        );
+
+      return response.json({
+        ok: true,
+        file: result.data,
+      });
+    } catch (error) {
+      return response.status(
+        Number(error?.status) || 500
+      ).json({
+        error:
+          error?.message ||
+          'drive_file_update_failed',
+      });
+    }
+  }
+);
+
 /* =========================================================
    GOOGLE DRIVE MEDIA
 ========================================================= */
@@ -2464,7 +3196,41 @@ async function resolveDriveMediaFolder(d, rootFolderId) {
     ).trim();
 
   if (configured) {
-    return configured;
+    try {
+      const allowed =
+        await driveItemWithinRoot(
+          d,
+          configured,
+          rootFolderId
+        );
+
+      const meta =
+        allowed
+          ? await getDriveFileMeta(
+              d,
+              configured
+            )
+          : null;
+
+      if (
+        allowed &&
+        meta &&
+        !meta.trashed &&
+        meta.mimeType ===
+          'application/vnd.google-apps.folder'
+      ) {
+        return configured;
+      }
+
+      console.warn(
+        'Ignoring GOOGLE_DRIVE_MEDIA_FOLDER_ID because it is outside the approved Drive root or is not a folder.'
+      );
+    } catch (error) {
+      console.warn(
+        'Ignoring invalid GOOGLE_DRIVE_MEDIA_FOLDER_ID:',
+        error?.message || error
+      );
+    }
   }
 
   const result = await d.files.list({
@@ -2553,7 +3319,7 @@ app.get(
     const d = drive();
 
     const rootFolderId =
-      process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
+      APPROVED_DRIVE_ROOT_ID;
 
     if (!d || !rootFolderId) {
       return response.status(503).json({
@@ -2609,10 +3375,23 @@ app.get(
     }
 
     try {
+      const allowed =
+        await driveItemWithinRoot(
+          d,
+          fileId,
+          APPROVED_DRIVE_ROOT_ID
+        );
+
+      if (!allowed) {
+        return response.status(404).json({
+          error: 'drive_media_not_found',
+        });
+      }
+
       const metadata = await d.files.get({
         fileId,
         fields:
-          'id,name,mimeType,size,trashed',
+          'id,name,mimeType,size,trashed,parents',
         supportsAllDrives: true,
       });
 

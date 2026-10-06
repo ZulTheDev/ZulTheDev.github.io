@@ -100,6 +100,16 @@ jobs:
           mkdir -p "client/dist/blog"
           cp "client/dist/index.html" "client/dist/blog/index.html"
 
+          if [ -d "client/dist/blog" ]; then
+            for article in client/dist/blog/*.json; do
+              [ -e "$article" ] || continue
+              slug="$(basename "$article" .json)"
+              [ "$slug" = "index" ] && continue
+              mkdir -p "client/dist/blog/$slug"
+              cp "client/dist/index.html" "client/dist/blog/$slug/index.html"
+            done
+          fi
+
           mkdir -p "client/dist/ctf_blog"
           cp "client/dist/index.html" "client/dist/ctf_blog/index.html"
 
@@ -134,10 +144,38 @@ jobs:
             exit 1
           fi
 
+          if [ -f "client/dist/images/blog-hero-sakura-catgirl.webp" ]; then
+            echo "FOUND: client/dist/images/blog-hero-sakura-catgirl.webp"
+          else
+            echo "ERROR: generated blog hero image is missing"
+            exit 1
+          fi
+
+          if [ -f "client/dist/images/blog-clueless-cat.webp" ]; then
+            echo "FOUND: client/dist/images/blog-clueless-cat.webp"
+          else
+            echo "ERROR: generated clueless cat image is missing"
+            exit 1
+          fi
+
           if [ -f "client/dist/ctf_blog/index.json" ]; then
             echo "FOUND: client/dist/ctf_blog/index.json"
           else
             echo "ERROR: client/dist/ctf_blog/index.json is missing"
+            exit 1
+          fi
+
+          if [ -f "client/dist/blog/index.json" ]; then
+            echo "FOUND: client/dist/blog/index.json"
+          else
+            echo "ERROR: client/dist/blog/index.json is missing"
+            exit 1
+          fi
+
+          if [ -f "client/dist/webcomic/index.json" ]; then
+            echo "FOUND: client/dist/webcomic/index.json"
+          else
+            echo "ERROR: client/dist/webcomic/index.json is missing"
             exit 1
           fi
 
