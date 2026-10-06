@@ -79,6 +79,11 @@ function normalizeAssetPath(value) {
     normalized = `/${normalized}`;
   }
 
+  const base = import.meta.env.BASE_URL || '/';
+  if (base !== '/' && !normalized.startsWith(base)) {
+    normalized = base.replace(/\/$/, '') + normalized;
+  }
+
   return normalized;
 }
 
@@ -149,6 +154,7 @@ function normalizeContent(data) {
     research: Array.isArray(source.research) ? source.research : [],
     experience: Array.isArray(source.experience) ? source.experience : [],
     education: Array.isArray(source.education) ? source.education : [],
+    skills: source.skills && typeof source.skills === 'object' ? source.skills : {},
     buyFirst: Array.isArray(source.buyFirst) ? source.buyFirst : [],
   };
 }
@@ -2783,7 +2789,7 @@ export default function App({ initialContent = null }) {
 
         const response = initialContent
           ? null
-          : await fetch('/content.json');
+          : await fetch((import.meta.env.BASE_URL || '/') + 'content.json');
 
         if (!initialContent) {
           if (!response.ok) {
