@@ -3707,6 +3707,7 @@ export default function App({ initialContent = null }) {
 
   const isCtfRoute =
     ctfPath === '/blog' ||
+    ctfPath === '/ctf_blog' ||
     ctfPath === '/ctf-blog' ||
     ctfPath.startsWith('/ctf_blog/') ||
     ctfPath.startsWith('/ctf-blog/');
@@ -3892,6 +3893,7 @@ export default function App({ initialContent = null }) {
 
   if (
     ctfPath === '/blog' ||
+    ctfPath === '/ctf_blog' ||
     ctfPath === '/ctf-blog'
   ) {
     return <CTFBlogIndexView />;
