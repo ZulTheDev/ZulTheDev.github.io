@@ -1,10 +1,12 @@
 import { createSign } from 'node:crypto';
 import { config } from './config.js';
 
-const MAX_FILES = 80;
-const MAX_TOTAL_CHARS = 70000;
-const FILE_MAX_CHARS = 16000;
-const MAX_KNOWLEDGE_READS = 5;
+const MAX_FILES = 2000;
+const MAX_FOLDERS = 500;
+const MAX_TOTAL_CHARS = 120000;
+const FILE_MAX_CHARS = 24000;
+const MAX_KNOWLEDGE_READS = 12;
+const KNOWLEDGE_INDEX_TTL_MS = 5 * 60 * 1000;
 const MAX_MEDIA_FILES = 250;
 const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
@@ -14,6 +16,14 @@ let discoveredMediaFolderId = '';
 let discoveredMediaFolderAt = 0;
 
 const folderCache = new Map();
+
+let knowledgeIndexCache = {
+  folderId: '',
+  files: [],
+  scannedFolders: 0,
+  truncated: false,
+  expiresAt: 0,
+};
 
 function base64url(value) {
   return Buffer.from(value)
@@ -178,20 +188,64 @@ export async function getAccessToken() {
 }
 
 async function listDriveFiles(token, rootFolderId) {
-  const discovered = [];
-  const queue = [rootFolderId];
-
-  while (
-    queue.length &&
-    discovered.length < MAX_FILES
+  if (
+    knowledgeIndexCache.folderId === rootFolderId &&
+    Date.now() < knowledgeIndexCache.expiresAt
   ) {
-    const parentId = queue.shift();
+    return knowledgeIndexCache;
+  }
+
+  const root = await getDriveMetadata(
+    token,
+    rootFolderId
+  );
+
+  if (
+    root.trashed ||
+    root.mimeType !==
+      'application/vnd.google-apps.folder'
+  ) {
+    throw new Error(
+      'Configured Google Drive scope is not an accessible folder.'
+    );
+  }
+
+  const discovered = [];
+  const queue = [
+    {
+      id: rootFolderId,
+      path: cleanText(root.name || 'Portfolio', 300),
+    },
+  ];
+  const visitedFolders = new Set();
+  let truncated = false;
+
+  while (queue.length) {
+    if (
+      discovered.length >= MAX_FILES ||
+      visitedFolders.size >= MAX_FOLDERS
+    ) {
+      truncated = true;
+      break;
+    }
+
+    const current = queue.shift();
+
+    if (
+      !current?.id ||
+      visitedFolders.has(current.id)
+    ) {
+      continue;
+    }
+
+    visitedFolders.add(current.id);
+
     let pageToken = '';
 
     do {
       const params = new URLSearchParams({
         q:
-          `'${parentId}' in parents and trashed = false`,
+          `'${current.id}' in parents and trashed = false`,
         pageSize: '100',
         fields:
           'nextPageToken,files(id,name,mimeType,modifiedTime,description,parents,size)',
@@ -214,17 +268,38 @@ async function listDriveFiles(token, rootFolderId) {
       );
 
       for (const file of data.files || []) {
+        const filePath =
+          current.path +
+          '/' +
+          cleanText(file.name, 300);
+
         if (
           file.mimeType ===
           'application/vnd.google-apps.folder'
         ) {
-          queue.push(file.id);
+          if (
+            visitedFolders.size + queue.length <
+            MAX_FOLDERS
+          ) {
+            queue.push({
+              id: file.id,
+              path: filePath,
+            });
+          } else {
+            truncated = true;
+          }
+
           continue;
         }
 
-        discovered.push(file);
+        discovered.push({
+          ...file,
+          folderPath: current.path,
+          fullPath: filePath,
+        });
 
         if (discovered.length >= MAX_FILES) {
+          truncated = true;
           break;
         }
       }
@@ -236,7 +311,17 @@ async function listDriveFiles(token, rootFolderId) {
     );
   }
 
-  return discovered;
+  knowledgeIndexCache = {
+    folderId: rootFolderId,
+    files: discovered,
+    scannedFolders: visitedFolders.size,
+    truncated,
+    expiresAt:
+      Date.now() +
+      KNOWLEDGE_INDEX_TTL_MS,
+  };
+
+  return knowledgeIndexCache;
 }
 
 function isReadableKnowledgeMime(mimeType) {
