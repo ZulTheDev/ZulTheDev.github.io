@@ -38,10 +38,6 @@ jobs:
         working-directory: client
         run: npm install
 
-      - name: Reconstruct generated blog assets
-        working-directory: client
-        run: npm run assets:blog
-
       - name: Verify client assets
         shell: bash
         run: |
