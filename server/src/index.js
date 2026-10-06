@@ -3196,7 +3196,41 @@ async function resolveDriveMediaFolder(d, rootFolderId) {
     ).trim();
 
   if (configured) {
-    return configured;
+    try {
+      const allowed =
+        await driveItemWithinRoot(
+          d,
+          configured,
+          rootFolderId
+        );
+
+      const meta =
+        allowed
+          ? await getDriveFileMeta(
+              d,
+              configured
+            )
+          : null;
+
+      if (
+        allowed &&
+        meta &&
+        !meta.trashed &&
+        meta.mimeType ===
+          'application/vnd.google-apps.folder'
+      ) {
+        return configured;
+      }
+
+      console.warn(
+        'Ignoring GOOGLE_DRIVE_MEDIA_FOLDER_ID because it is outside the approved Drive root or is not a folder.'
+      );
+    } catch (error) {
+      console.warn(
+        'Ignoring invalid GOOGLE_DRIVE_MEDIA_FOLDER_ID:',
+        error?.message || error
+      );
+    }
   }
 
   const result = await d.files.list({
@@ -3341,10 +3375,23 @@ app.get(
     }
 
     try {
+      const allowed =
+        await driveItemWithinRoot(
+          d,
+          fileId,
+          APPROVED_DRIVE_ROOT_ID
+        );
+
+      if (!allowed) {
+        return response.status(404).json({
+          error: 'drive_media_not_found',
+        });
+      }
+
       const metadata = await d.files.get({
         fileId,
         fields:
-          'id,name,mimeType,size,trashed',
+          'id,name,mimeType,size,trashed,parents',
         supportsAllDrives: true,
       });
 
