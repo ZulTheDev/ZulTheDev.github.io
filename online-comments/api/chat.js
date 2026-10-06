@@ -142,32 +142,68 @@ async function loadSiteContext() {
 }
 
 function rankDocuments(documents, message) {
+  const stop = new Set([
+    'about',
+    'and',
+    'are',
+    'can',
+    'for',
+    'from',
+    'have',
+    'information',
+    'me',
+    'my',
+    'say',
+    'tell',
+    'the',
+    'this',
+    'what',
+    'who',
+    'with',
+    'you',
+  ]);
+
   const terms = String(message)
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((term) => term.length >= 3);
+    .filter(
+      (term) =>
+        term.length >= 3 &&
+        !stop.has(term)
+    );
 
   return documents
-    .map((document) => {
+    .map((document, index) => {
       const haystack =
-        `${document.name} ${document.content}`
+        `${document.name} ${document.sourcePath || ''} ${document.content}`
           .toLowerCase();
 
-      const score = terms.reduce(
+      const textScore = terms.reduce(
         (total, term) =>
           total +
           (haystack.includes(term) ? 1 : 0),
         0
       );
 
-      return { document, score };
+      // loadDriveKnowledge already ranks the complete approved
+      // folder. Preserve that relevance order for broad prompts,
+      // while still allowing explicit visitor terms to dominate.
+      const prior =
+        Math.max(
+          0,
+          documents.length - index
+        );
+
+      return {
+        document,
+        score:
+          textScore * 100 +
+          prior,
+      };
     })
     .sort(
       (a, b) =>
-        b.score - a.score ||
-        a.document.name.localeCompare(
-          b.document.name
-        )
+        b.score - a.score
     )
     .slice(0, 8);
 }
