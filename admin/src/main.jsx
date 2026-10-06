@@ -1273,21 +1273,35 @@ function AdminShell() {
     setDriveLoading(true);
 
     const candidates = [
-      API,
-      ONLINE_API,
+      {
+        base: API,
+        path: '/api/drive/files?parentId=' +
+          encodeURIComponent(DRIVE_ROOT_ID),
+      },
+      {
+        base: ONLINE_API,
+        path: '/api/drive/media',
+      },
     ].filter(
-      (value, index, list) =>
-        value &&
-        list.indexOf(value) === index
+      (item, index, list) =>
+        item.base &&
+        list.findIndex(
+          (candidate) =>
+            candidate.base === item.base &&
+            candidate.path === item.path
+        ) === index
     );
 
     let lastError = null;
 
     try {
-      for (const base of candidates) {
+      for (const candidate of candidates) {
         try {
+          const base =
+            candidate.base;
+
           const response = await authFetch(
-            base + '/api/drive/media'
+            base + candidate.path
           );
           const data = await response.json();
 
@@ -3815,7 +3829,7 @@ function MediaLibraryEditor({
     try {
       const response = await fetch(
         API +
-          '/api/drive/folders?parentId=' +
+          '/api/drive/folders?recursive=true&parentId=' +
           encodeURIComponent(
             DRIVE_ROOT_ID
           )
@@ -4105,7 +4119,7 @@ function MediaLibraryEditor({
                   key={folder.id}
                   value={folder.id}
                 >
-                  {folder.name}
+                  {folder.fullPath || folder.name}
                 </option>
               )
             )}
