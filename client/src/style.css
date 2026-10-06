@@ -4032,3 +4032,23 @@ html::before{
 .modal-file-preview{display:grid;gap:12px;place-items:center;text-align:center;padding:30px}
 .modal-file-link{border:1px solid var(--l);padding:10px 14px;border-radius:9px;color:var(--p);text-decoration:none;background:#1b1521}
 .modal-file-link:hover{background:#251b2b}
+
+
+/* =========================================================
+   RESTORED PORTFOLIO SKILLS / RESUME
+========================================================= */
+.skill-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:28px}
+.skill-group{border:1px solid var(--l);background:linear-gradient(145deg,#19131f,#110e15);border-radius:16px;padding:20px}
+.skill-group>small{display:block;color:var(--p);text-transform:uppercase;letter-spacing:.12em;font-weight:800;margin-bottom:14px}
+.skill-tags{display:flex;flex-wrap:wrap;gap:8px}
+.skill-tags span{display:inline-flex;align-items:center;border:1px solid #49384d;border-radius:999px;padding:8px 11px;color:#eee5f0;background:#151018;font-size:11px}
+.resume-qr-card{display:grid;justify-items:center;gap:9px;margin-top:28px;padding:20px;border:1px solid var(--l);border-radius:16px;background:linear-gradient(145deg,#19131f,#110e15);text-align:center}
+.resume-qr-card small{color:var(--p);letter-spacing:.12em;font-weight:800}
+.resume-qr-card img{width:170px;height:170px;image-rendering:auto;background:#fff;padding:8px;border-radius:10px}
+.resume-qr-card strong{font-size:13px}
+.resume-qr-card a{display:inline-flex;align-items:center;gap:6px;color:var(--p);text-decoration:none;font-size:11px;font-weight:800}
+.resume-qr-card a:hover{color:var(--t)}
+footer{display:flex;justify-content:space-between;align-items:center;gap:16px}
+footer a{color:var(--p);text-decoration:none}
+footer a:hover{text-decoration:underline}
+@media(max-width:700px){.skill-groups{grid-template-columns:1fr}.resume-qr-card img{width:150px;height:150px}footer{align-items:flex-start;flex-direction:column}}
