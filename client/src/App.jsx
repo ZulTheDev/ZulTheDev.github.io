@@ -208,29 +208,42 @@ function inferDriveMediaForItem(item, files) {
     return null;
   }
 
-  const keys = [
+  const primaryKeys = [
     item.id,
     item.title,
     item.role,
-    item.company,
-    item.issuer,
   ]
     .map(mediaMatchKey)
     .filter((value) => value.length >= 5);
 
-  if (!keys.length) {
+  const secondaryKeys = [
+    item.company,
+    item.issuer,
+  ]
+    .map(mediaMatchKey)
+    .filter((value) => value.length >= 8);
+
+  if (!primaryKeys.length && !secondaryKeys.length) {
     return null;
   }
 
   const match = files.find((file) => {
     const fileKey = mediaMatchKey(file.name);
 
-    return keys.some(
+    const primaryMatch = primaryKeys.some(
       (key) =>
         fileKey === key ||
         fileKey.startsWith(key) ||
         fileKey.includes(key)
     );
+
+    const secondaryMatch = secondaryKeys.some(
+      (key) =>
+        fileKey === key ||
+        fileKey.startsWith(key)
+    );
+
+    return primaryMatch || secondaryMatch;
   });
 
   if (!match) {
