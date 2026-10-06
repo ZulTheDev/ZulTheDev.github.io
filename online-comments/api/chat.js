@@ -194,8 +194,12 @@ function buildContext({
     context +=
       '\n\nGOOGLE DRIVE DOCUMENT: ' +
       entry.document.name +
+      '\nPATH: ' +
+      (entry.document.sourcePath || entry.document.name) +
       '\nTYPE: ' +
       entry.document.mimeType +
+      '\nEVIDENCE MODE: ' +
+      (entry.document.evidenceMode || 'content') +
       '\nCONTENT:\n' +
       entry.document.content;
   }
@@ -222,6 +226,9 @@ function buildSystemPrompt() {
     '',
     'EVIDENCE RULE',
     '- Use the public portfolio and approved Google Drive knowledge as sources of truth.',
+    '- Google Drive retrieval is strictly limited to the single approved portfolio folder and its descendants. Never imply access to any other Drive folder or file.',
+    '- For open-ended questions about Zul, actively synthesize useful facts from the supplied Drive evidence instead of relying only on the static portfolio.',
+    '- If a Drive item is marked EVIDENCE MODE: metadata, use only its filename, path, MIME type and explicit Drive description. Do not infer the unseen file contents.',
     '- Distinguish facts from inference.',
     '- When evidence is missing, say the portfolio does not currently provide enough information.',
     '',
@@ -321,6 +328,9 @@ export default async function handler(
       configured:
         driveKnowledgeConfigured(),
       documents: [],
+      scannedFiles: 0,
+      scannedFolders: 0,
+      truncated: false,
     };
 
     try {
@@ -374,6 +384,18 @@ export default async function handler(
           ),
         driveDocuments:
           selectedDrive.length,
+        scannedFiles:
+          Number(
+            driveResult.scannedFiles || 0
+          ),
+        scannedFolders:
+          Number(
+            driveResult.scannedFolders || 0
+          ),
+        truncated:
+          Boolean(
+            driveResult.truncated
+          ),
       },
       persistentStorage: false,
     });
