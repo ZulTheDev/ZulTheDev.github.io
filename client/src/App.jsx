@@ -19,6 +19,12 @@ const BASE_PATH = import.meta.env.BASE_URL || '/';
 const API = normalizeApiBase(
   import.meta.env.VITE_API_BASE_URL
 );
+const ONLINE_API_BASE = normalizeApiBase(
+  import.meta.env.VITE_ONLINE_API_URL ||
+    import.meta.env.VITE_COMMENTS_BACKUP_URL ||
+    'https://zul-portfolio-api.vercel.app'
+);
+const MEDIA_API = API || ONLINE_API_BASE;
 const CONTENT_API_ENABLED =
   import.meta.env.VITE_ENABLE_CONTENT_API === 'true';
 
@@ -120,9 +126,9 @@ function resolvePortfolioMediaSrc(media) {
     media.googleDriveId ||
     '';
 
-  if (driveId && API) {
+  if (driveId && MEDIA_API) {
     return (
-      API +
+      MEDIA_API +
       '/api/drive/image/' +
       encodeURIComponent(driveId)
     );
@@ -155,6 +161,20 @@ function resolveCardImage(item) {
     if (resolved) {
       return resolved;
     }
+  }
+
+  const directDriveId =
+    item.imageDriveId ||
+    item.thumbnailDriveId ||
+    item.driveId ||
+    '';
+
+  if (directDriveId && MEDIA_API) {
+    return (
+      MEDIA_API +
+      '/api/drive/image/' +
+      encodeURIComponent(directDriveId)
+    );
   }
 
   const imageMedia = Array.isArray(item.media)
@@ -453,7 +473,25 @@ function ExpModal({ x, close }) {
         --------------------------------------------- */}
 
         <div className="expmedia">
-          ฅ^•ﻌ•^ฅ
+          {(() => {
+            const media = Array.isArray(x.media)
+              ? x.media.find(
+                  (item) =>
+                    String(item?.type || '').toLowerCase() === 'image' &&
+                    resolvePortfolioMediaSrc(item)
+                )
+              : null;
+
+            return media ? (
+              <img
+                src={resolvePortfolioMediaSrc(media)}
+                alt={media.alt || media.title || x.role || 'Experience media'}
+                loading="lazy"
+              />
+            ) : (
+              'ฅ^•ﻌ•^ฅ'
+            );
+          })()}
         </div>
 
         {/* ---------------------------------------------
@@ -629,11 +667,7 @@ function writeChatSession(messages) {
   }
 }
 
-const ONLINE_API = normalizeApiBase(
-  import.meta.env.VITE_ONLINE_API_URL ||
-    import.meta.env.VITE_COMMENTS_BACKUP_URL ||
-    'https://zul-portfolio-api.vercel.app'
-);
+const ONLINE_API = ONLINE_API_BASE;
 
 function Chat({ content }) {
   const [open, setOpen] = useState(false);
@@ -851,8 +885,8 @@ function ProfilePhoto({ profile }) {
     '';
 
   const driveProxySrc =
-    API && driveId
-      ? `${API}/api/drive/image/${encodeURIComponent(driveId)}`
+    MEDIA_API && driveId
+      ? `${MEDIA_API}/api/drive/image/${encodeURIComponent(driveId)}`
       : '';
 
   const driveDirectSrc =
@@ -1265,8 +1299,14 @@ function HiringPortfolioView({
           .filter(
             (media) =>
               media &&
-              media.type === 'image' &&
-              (media.src || media.url || media.local)
+              String(media.type || '').toLowerCase() === 'image' &&
+              (
+                media.src ||
+                media.url ||
+                media.local ||
+                media.driveId ||
+                media.googleDriveId
+              )
           )
           .map((media) => ({
             ...media,
