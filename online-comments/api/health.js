@@ -25,6 +25,8 @@ export default function handler(
       config.deepseek.model,
     driveKnowledge:
       integrationStatus.driveKnowledge,
+    driveScope: 'single-folder-recursive',
+    driveScopeLocked: true,
     commentStorage: 'redis',
     chatStorage: 'browser-session-only',
   });
