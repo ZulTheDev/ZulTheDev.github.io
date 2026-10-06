@@ -191,6 +191,7 @@ export async function publishWriteup(writeup) {
   await ensureWriteupDirs();
 
   const slug = safeSlug(writeup.slug || writeup.title);
+  const target = publishTarget(writeup.kind);
   const publicBase =
     String(process.env.R2_PUBLIC_BASE_URL || '')
       .trim()
@@ -198,6 +199,7 @@ export async function publishWriteup(writeup) {
 
   const next = {
     ...writeup,
+    kind: target.kind,
     slug,
     status: 'published',
     publishedAt: writeup.publishedAt || new Date().toISOString(),
@@ -216,9 +218,7 @@ export async function publishWriteup(writeup) {
       }
 
       if (!publicBase) {
-        throw new Error(
-          'r2_public_base_url_required'
-        );
+        throw new Error('r2_public_base_url_required');
       }
 
       return {
@@ -231,45 +231,67 @@ export async function publishWriteup(writeup) {
     });
   }
 
-  const publishedWriteupPath =
-    'client/public/ctf_blog/' +
+  const publishedPath =
+    'client/public/' +
+    target.publicFolder +
+    '/' +
     slug +
     '.json';
 
-  const publishedWriteupContent =
+  const publishedContent =
     JSON.stringify(next, null, 2) + '\n';
 
   await fs.writeFile(
-    path.join(writeupPublishDir, slug + '.json'),
-    publishedWriteupContent,
+    path.join(target.dir, slug + '.json'),
+    publishedContent,
     'utf8'
   );
 
-  const index = await readPublishedIndex();
-  const existing = Array.isArray(index.writeups) ? index.writeups : [];
+  const index = await readPublishedIndex(target.kind);
+  const existing =
+    Array.isArray(index[target.indexField])
+      ? index[target.indexField]
+      : [];
+
+  const firstMedia =
+    Array.isArray(next.blocks)
+      ? next.blocks.find(
+          (block) =>
+            block?.type === 'media' &&
+            block.media?.url
+        )?.media
+      : null;
+
   const summary = {
     slug,
     title: next.title || slug,
     excerpt: next.excerpt || '',
     tags: Array.isArray(next.tags) ? next.tags : [],
+    banner: next.banner || firstMedia?.url || '',
     updatedAt: next.updatedAt,
     publishedAt: next.publishedAt,
+    kind: target.kind,
   };
 
   const filtered = existing.filter((item) => item.slug !== slug);
   filtered.push(summary);
-  filtered.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  filtered.sort((a, b) =>
+    String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+  );
 
-  const publishedIndexContent =
+  const indexContent =
     JSON.stringify(
-      { version: 1, writeups: filtered },
+      {
+        version: 1,
+        [target.indexField]: filtered,
+      },
       null,
       2
     ) + '\n';
 
   await fs.writeFile(
-    path.join(writeupPublishDir, 'index.json'),
-    publishedIndexContent,
+    path.join(target.dir, 'index.json'),
+    indexContent,
     'utf8'
   );
 
@@ -277,18 +299,22 @@ export async function publishWriteup(writeup) {
     next.title,
     [
       {
-        path: publishedWriteupPath,
-        content: publishedWriteupContent,
+        path: publishedPath,
+        content: publishedContent,
       },
       {
-        path: 'client/public/ctf_blog/index.json',
-        content: publishedIndexContent,
+        path:
+          'client/public/' +
+          target.publicFolder +
+          '/index.json',
+        content: indexContent,
       },
     ]
   );
 
   return {
     ...next,
+    url: target.routeBase + slug,
     deploy,
   };
 }
