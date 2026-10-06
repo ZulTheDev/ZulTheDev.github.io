@@ -14,7 +14,7 @@ const API = normalizeApiBase(
 const ONLINE_API = normalizeApiBase(
   import.meta.env.VITE_ONLINE_API_URL ||
     import.meta.env.VITE_COMMENTS_BACKUP_URL ||
-    'https://zulthedevs-projects.vercel.app'
+    'https://zul-portfolio-api.vercel.app'
 );
 const PUBLIC_SITE = 'https://zulthedev.github.io/';
 const HIRING_ROUTE = PUBLIC_SITE + 'port_resume?type_of_work_hiring=technical_officer';
