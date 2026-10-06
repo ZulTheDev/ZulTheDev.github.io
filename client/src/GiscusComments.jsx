@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import Giscus from '@giscus/react';
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
-const COMMENTS_BACKUP_API =
-  import.meta.env.VITE_COMMENTS_BACKUP_URL || '';
+function normalizeApiBase(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\/+$/, '');
+}
+
+const API = normalizeApiBase(
+  import.meta.env.VITE_API_BASE_URL
+);
+const COMMENTS_BACKUP_API = normalizeApiBase(
+  import.meta.env.VITE_COMMENTS_BACKUP_URL
+);
 
 function commentApiCandidates() {
   return [
