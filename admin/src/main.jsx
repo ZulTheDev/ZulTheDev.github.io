@@ -2126,6 +2126,9 @@ function WriteupsEditor({
   r2Objects,
   r2Loading,
   loadR2Objects,
+  openR2Object,
+  deleteR2Object,
+  githubStatus,
 }) {
   return (
     <div className="writeup-admin-shell">
@@ -2257,6 +2260,9 @@ function WriteupsEditor({
               r2Objects={r2Objects}
               r2Loading={r2Loading}
               loadR2Objects={loadR2Objects}
+              openR2Object={openR2Object}
+              deleteR2Object={deleteR2Object}
+              githubStatus={githubStatus}
             />
           )}
 
