@@ -2670,6 +2670,7 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
   }
 
   const width = Math.max(
+    Number(workspace?.width || 0),
     760,
     ...nodes.map((node) =>
       Number(node.x || 0) + 220
@@ -2677,6 +2678,7 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
   );
 
   const height = Math.max(
+    Number(workspace?.height || 0),
     470,
     ...nodes.map((node) =>
       Number(node.y || 0) + 150
@@ -3033,6 +3035,35 @@ function CTFWriteupBlock({
           </tbody>
         </table>
       </div>
+    );
+  }
+
+  if (block.type === 'reference') {
+    const reference =
+      block.reference || {};
+
+    return (
+      <aside className="writeup-reference-view">
+        <small>REFERENCE</small>
+        <strong>
+          {reference.label ||
+            'Untitled source'}
+        </strong>
+
+        {reference.note && (
+          <p>{reference.note}</p>
+        )}
+
+        {reference.url && (
+          <a
+            href={reference.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open source ↗
+          </a>
+        )}
+      </aside>
     );
   }
 
