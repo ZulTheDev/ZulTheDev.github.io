@@ -2608,7 +2608,9 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
       : [];
 
   const [selectedNode, setSelectedNode] =
-    useState(null);
+    useState(
+      nodes[0]?.id || null
+    );
 
   function openNode(node) {
     setSelectedNode(node.id);
@@ -2654,31 +2656,41 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
     )
   );
 
+  const selected =
+    nodes.find(
+      (node) =>
+        node.id === selectedNode
+    ) || nodes[0];
+
+  const selectedBlock =
+    blocks.find(
+      (item) =>
+        item.id ===
+        selected?.refBlockId
+    ) || null;
+
   return (
     <section className="writeup-workflow">
       <div className="writeup-workflow-header">
         <div>
-          <small>INTERACTIVE WORKFLOW</small>
+          <small>
+            INTERACTIVE POLYMATH VECTOR
+          </small>
           <h3>
             {workspace.title ||
               'Challenge workflow'}
           </h3>
         </div>
+
         <span>
           {nodes.length} objects ·{' '}
           {edges.length} connections
         </span>
       </div>
 
-      <div
-        className="writeup-workflow-canvas"
-        style={{
-          minWidth: width,
-          minHeight: height,
-        }}
-      >
+      <div className="writeup-vector-scroll">
         <svg
-          className="writeup-workflow-lines"
+          className="writeup-vector-map"
           width={width}
           height={height}
           viewBox={
@@ -2687,8 +2699,22 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
             ' ' +
             height
           }
+          role="img"
+          aria-label="Interactive vector workflow diagram"
         >
           <defs>
+            <pattern
+              id="writeup-vector-grid"
+              width="22"
+              height="22"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M22 0H0V22"
+                className="writeup-vector-grid-line"
+              />
+            </pattern>
+
             <marker
               id="writeup-workflow-arrow"
               markerWidth="8"
@@ -2698,95 +2724,203 @@ function WriteupWorkflowViewer({ workspace, blocks }) {
               orient="auto"
             >
               <path
-                d="M0,0 L0,6 L8,3 z"
+                d="M0 0L8 3L0 6Z"
+                className="writeup-vector-arrow"
               />
             </marker>
           </defs>
 
-          {edges.map((edge) => {
-            const from =
-              nodes.find(
-                (node) =>
-                  node.id === edge.from
+          <rect
+            width={width}
+            height={height}
+            fill="url(#writeup-vector-grid)"
+            className="writeup-vector-background"
+          />
+
+          <g className="writeup-vector-edges">
+            {edges.map((edge) => {
+              const from =
+                nodes.find(
+                  (node) =>
+                    node.id === edge.from
+                );
+
+              const to =
+                nodes.find(
+                  (node) =>
+                    node.id === edge.to
+                );
+
+              if (!from || !to) {
+                return null;
+              }
+
+              return (
+                <line
+                  key={edge.id}
+                  x1={
+                    Number(from.x || 0) +
+                    85
+                  }
+                  y1={
+                    Number(from.y || 0) +
+                    42
+                  }
+                  x2={
+                    Number(to.x || 0) +
+                    85
+                  }
+                  y2={
+                    Number(to.y || 0) +
+                    42
+                  }
+                  markerEnd="url(#writeup-workflow-arrow)"
+                />
+              );
+            })}
+          </g>
+
+          {nodes.map((node, index) => {
+            const block =
+              blocks.find(
+                (item) =>
+                  item.id ===
+                  node.refBlockId
               );
 
-            const to =
-              nodes.find(
-                (node) =>
-                  node.id === edge.to
-              );
+            const active =
+              node.id === selectedNode;
 
-            if (!from || !to) {
-              return null;
-            }
+            const x =
+              Number(node.x || 0) + 85;
+            const y =
+              Number(node.y || 0) + 42;
+
+            const label =
+              String(
+                node.label || 'Object'
+              ).slice(0, 24);
 
             return (
-              <line
-                key={edge.id}
-                x1={
-                  Number(from.x || 0) +
-                  85
+              <g
+                key={node.id}
+                className={
+                  active
+                    ? 'writeup-vector-node active'
+                    : 'writeup-vector-node'
                 }
-                y1={
-                  Number(from.y || 0) +
-                  42
+                transform={
+                  'translate(' +
+                  x +
+                  ' ' +
+                  y +
+                  ')'
                 }
-                x2={
-                  Number(to.x || 0) + 85
+                tabIndex={0}
+                role="button"
+                aria-label={
+                  label +
+                  (block
+                    ? ', jump to ' +
+                      block.type
+                    : '')
                 }
-                y2={
-                  Number(to.y || 0) + 42
+                onClick={() =>
+                  openNode(node)
                 }
-                markerEnd="url(#writeup-workflow-arrow)"
-              />
+                onFocus={() =>
+                  setSelectedNode(node.id)
+                }
+                onMouseEnter={() =>
+                  setSelectedNode(node.id)
+                }
+              >
+                <polygon
+                  points="-76,-34 61,-34 76,-19 76,28 63,41 -70,41 -82,29 -82,-22"
+                />
+
+                <circle
+                  cx="-61"
+                  cy="-13"
+                  r="5"
+                />
+
+                <text
+                  className="writeup-vector-node-index"
+                  x="-48"
+                  y="-9"
+                >
+                  {String(index + 1).padStart(
+                    2,
+                    '0'
+                  )}
+                  {' / '}
+                  {String(
+                    node.type || 'object'
+                  ).toUpperCase()}
+                </text>
+
+                <text
+                  className="writeup-vector-node-label"
+                  x="-61"
+                  y="14"
+                >
+                  {label}
+                </text>
+
+                <text
+                  className="writeup-vector-node-link"
+                  x="-61"
+                  y="29"
+                >
+                  {block
+                    ? 'OPEN ' +
+                      String(
+                        block.type || 'block'
+                      ).toUpperCase()
+                    : 'VECTOR OBJECT'}
+                </text>
+              </g>
             );
           })}
         </svg>
+      </div>
 
-        {nodes.map((node) => {
-          const block =
-            blocks.find(
-              (item) =>
-                item.id ===
-                node.refBlockId
-            );
+      {selected && (
+        <div className="writeup-vector-inspector">
+          <div>
+            <small>
+              SELECTED OBJECT
+            </small>
+            <strong>
+              {selected.label ||
+                'Object'}
+            </strong>
+          </div>
 
-          return (
+          <span>
+            {selected.type ||
+              'object'}
+          </span>
+
+          {selectedBlock ? (
             <button
-              key={node.id}
-              className={
-                selectedNode === node.id
-                  ? 'writeup-workflow-node selected'
-                  : 'writeup-workflow-node'
-              }
-              style={{
-                left: node.x,
-                top: node.y,
-              }}
+              type="button"
               onClick={() =>
-                openNode(node)
+                openNode(selected)
               }
             >
-              <span>
-                {node.type ||
-                  'object'}
-              </span>
-
-              <strong>
-                {node.label ||
-                  'Object'}
-              </strong>
-
-              {block && (
-                <small>
-                  Jump to{' '}
-                  {block.type}
-                </small>
-              )}
+              Jump to{' '}
+              {selectedBlock.type}
+              {' '}block →
             </button>
-          );
-        })}
-      </div>
+          ) : (
+            <em>
+              No document block attached
+            </em>
+          )}
+        </div>
+      )}
     </section>
   );
 }
