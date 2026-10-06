@@ -20,6 +20,50 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 export const writeupDraftDir = path.join(repoRoot, 'server', 'writeups');
 export const writeupPublishDir = path.join(repoRoot, 'client', 'public', 'ctf_blog');
+export const blogPublishDir = path.join(repoRoot, 'client', 'public', 'blog');
+export const webcomicPublishDir = path.join(repoRoot, 'client', 'public', 'webcomic');
+
+function normalizeContentKind(value) {
+  const kind = String(value || 'ctf').trim().toLowerCase();
+
+  if (kind === 'blog' || kind === 'webcomic') {
+    return kind;
+  }
+
+  return 'ctf';
+}
+
+function publishTarget(kind) {
+  const normalized = normalizeContentKind(kind);
+
+  if (normalized === 'blog') {
+    return {
+      kind: normalized,
+      dir: blogPublishDir,
+      publicFolder: 'blog',
+      indexField: 'posts',
+      routeBase: '/blog/',
+    };
+  }
+
+  if (normalized === 'webcomic') {
+    return {
+      kind: normalized,
+      dir: webcomicPublishDir,
+      publicFolder: 'webcomic',
+      indexField: 'comics',
+      routeBase: '/webcomic/',
+    };
+  }
+
+  return {
+    kind: 'ctf',
+    dir: writeupPublishDir,
+    publicFolder: 'ctf_blog',
+    indexField: 'writeups',
+    routeBase: '/ctf_blog/',
+  };
+}
 
 export function slugify(value) {
   return String(value || '')
@@ -39,6 +83,8 @@ export function safeSlug(value) {
 export async function ensureWriteupDirs() {
   await fs.mkdir(writeupDraftDir, { recursive: true });
   await fs.mkdir(writeupPublishDir, { recursive: true });
+  await fs.mkdir(blogPublishDir, { recursive: true });
+  await fs.mkdir(webcomicPublishDir, { recursive: true });
 }
 
 export async function saveDraft(writeup) {
@@ -75,12 +121,23 @@ export async function deleteDraft(slug) {
   await fs.rm(path.join(writeupDraftDir, safeSlug(slug) + '.json'), { force: true });
 }
 
-async function readPublishedIndex() {
+async function readPublishedIndex(kind) {
   await ensureWriteupDirs();
+
+  const target = publishTarget(kind);
+
   try {
-    return JSON.parse(await fs.readFile(path.join(writeupPublishDir, 'index.json'), 'utf8'));
+    return JSON.parse(
+      await fs.readFile(
+        path.join(target.dir, 'index.json'),
+        'utf8'
+      )
+    );
   } catch {
-    return { version: 1, writeups: [] };
+    return {
+      version: 1,
+      [target.indexField]: [],
+    };
   }
 }
 
