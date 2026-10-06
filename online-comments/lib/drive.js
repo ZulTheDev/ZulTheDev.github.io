@@ -475,34 +475,60 @@ async function discoverMediaFolderId(token) {
     return '';
   }
 
-  const params = new URLSearchParams({
-    q:
-      `'${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-    pageSize: '100',
-    fields: 'files(id,name,mimeType)',
-    includeItemsFromAllDrives: 'true',
-    supportsAllDrives: 'true',
-  });
+  const queue = [rootFolderId];
+  const visited = new Set();
+  let mediaFolderId = '';
 
-  const data = await fetchJson(
-    'https://www.googleapis.com/drive/v3/files?' +
-      params.toString(),
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  while (
+    queue.length &&
+    visited.size < 50 &&
+    !mediaFolderId
+  ) {
+    const parentId = queue.shift();
+
+    if (!parentId || visited.has(parentId)) {
+      continue;
     }
-  );
 
-  const mediaFolder = (data.files || []).find(
-    (file) =>
-      String(file.name || '')
-        .trim()
-        .toLowerCase() === 'media'
-  );
+    visited.add(parentId);
+
+    const params = new URLSearchParams({
+      q:
+        `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+      pageSize: '100',
+      fields: 'files(id,name,mimeType)',
+      includeItemsFromAllDrives: 'true',
+      supportsAllDrives: 'true',
+    });
+
+    const data = await fetchJson(
+      'https://www.googleapis.com/drive/v3/files?' +
+        params.toString(),
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    for (const folder of data.files || []) {
+      if (
+        String(folder.name || '')
+          .trim()
+          .toLowerCase() === 'media'
+      ) {
+        mediaFolderId = folder.id;
+        break;
+      }
+
+      if (!visited.has(folder.id)) {
+        queue.push(folder.id);
+      }
+    }
+  }
 
   discoveredMediaFolderId =
-    mediaFolder?.id || rootFolderId;
+    mediaFolderId || rootFolderId;
   discoveredMediaFolderAt = Date.now();
 
   return discoveredMediaFolderId;
