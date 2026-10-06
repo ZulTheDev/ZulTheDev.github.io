@@ -4,7 +4,7 @@ import { config } from './config.js';
 const MAX_FILES = 80;
 const MAX_TOTAL_CHARS = 70000;
 const FILE_MAX_CHARS = 16000;
-const MAX_KNOWLEDGE_READS = 8;
+const MAX_KNOWLEDGE_READS = 5;
 const MAX_MEDIA_FILES = 250;
 const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
@@ -365,39 +365,50 @@ export async function loadDriveKnowledge(query = '') {
     )
     .slice(0, MAX_KNOWLEDGE_READS);
 
+  const loaded = await Promise.all(
+    scored.map(async ({ file }) => {
+      try {
+        const content = await readFile(
+          token,
+          file
+        );
+
+        if (!content) {
+          return null;
+        }
+
+        return {
+          name: cleanText(file.name, 300),
+          mimeType: cleanText(file.mimeType, 200),
+          modifiedTime:
+            file.modifiedTime || '',
+          content,
+        };
+      } catch (error) {
+        console.warn(
+          'Drive knowledge file skipped:',
+          file.name,
+          error?.message || error
+        );
+
+        return null;
+      }
+    })
+  );
+
   const documents = [];
   let totalChars = 0;
 
-  for (const { file } of scored) {
-    try {
-      const content = await readFile(
-        token,
-        file
-      );
+  for (const document of loaded) {
+    if (!document) {
+      continue;
+    }
 
-      if (!content) {
-        continue;
-      }
+    documents.push(document);
+    totalChars += document.content.length;
 
-      documents.push({
-        name: cleanText(file.name, 300),
-        mimeType: cleanText(file.mimeType, 200),
-        modifiedTime:
-          file.modifiedTime || '',
-        content,
-      });
-
-      totalChars += content.length;
-
-      if (totalChars >= MAX_TOTAL_CHARS) {
-        break;
-      }
-    } catch (error) {
-      console.warn(
-        'Drive knowledge file skipped:',
-        file.name,
-        error?.message || error
-      );
+    if (totalChars >= MAX_TOTAL_CHARS) {
+      break;
     }
   }
 
