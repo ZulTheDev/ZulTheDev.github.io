@@ -2339,9 +2339,27 @@ function drive() {
 app.get('/api/health', (request, response) => {
   response.json({
     ok: true,
+    service: 'portfolio-private-admin-api',
     contentFile: content,
     commentsFile: commentsFile,
     allowedOrigins,
+    integrations: {
+      googleDrive: Boolean(
+        process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
+        process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY &&
+        APPROVED_DRIVE_ROOT_ID
+      ),
+      driveRootId:
+        APPROVED_DRIVE_ROOT_ID,
+      cloudflareR2:
+        r2Configured(),
+      githubApp:
+        githubAppConfigured(),
+      deepseek:
+        Boolean(
+          process.env.DEEPSEEK_API_KEY
+        ),
+    },
   });
 });
 
