@@ -100,6 +100,9 @@ jobs:
           mkdir -p "client/dist/blog"
           cp "client/dist/index.html" "client/dist/blog/index.html"
 
+          mkdir -p "client/dist/ctf_blog"
+          cp "client/dist/index.html" "client/dist/ctf_blog/index.html"
+
           if [ -d "client/dist/ctf_blog" ]; then
             for writeup in client/dist/ctf_blog/*.json; do
               [ -e "$writeup" ] || continue
