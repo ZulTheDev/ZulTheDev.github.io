@@ -8,7 +8,17 @@ import {
   Menu,
   Sparkles,
 } from 'lucide-react';
-const API = import.meta.env.VITE_API_BASE_URL || '';
+
+function normalizeApiBase(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\/+$/, '');
+}
+
+const BASE_PATH = import.meta.env.BASE_URL || '/';
+const API = normalizeApiBase(
+  import.meta.env.VITE_API_BASE_URL
+);
 const CONTENT_API_ENABLED =
   import.meta.env.VITE_ENABLE_CONTENT_API === 'true';
 
@@ -619,10 +629,11 @@ function writeChatSession(messages) {
   }
 }
 
-const ONLINE_API =
+const ONLINE_API = normalizeApiBase(
   import.meta.env.VITE_ONLINE_API_URL ||
-  import.meta.env.VITE_COMMENTS_BACKUP_URL ||
-  'https://zul-portfolio-api.vercel.app';
+    import.meta.env.VITE_COMMENTS_BACKUP_URL ||
+    'https://zul-portfolio-api.vercel.app'
+);
 
 function Chat({ content }) {
   const [open, setOpen] = useState(false);
@@ -1303,7 +1314,7 @@ function HiringPortfolioView({
       <nav className="hiring-portfolio-nav">
         <a
           className="hiring-nav-brand"
-          href={basePath}
+          href={BASE_PATH}
         >
           ZULFAQAR JAMAL
         </a>
@@ -2555,7 +2566,7 @@ function CTFBlogIndexView() {
     useState([]);
 
   useEffect(() => {
-    fetch(basePath + 'ctf-blog/index.json')
+    fetch(BASE_PATH + 'ctf-blog/index.json')
       .then((response) =>
         response.ok
           ? response.json()
@@ -2581,7 +2592,7 @@ function CTFBlogIndexView() {
             ZUL<span>/</span>JAMAL
           </b>
         </a>
-        <a href={basePath + "ctf-blog/"}>
+        <a href={BASE_PATH + "ctf-blog/"}>
           CTF Blog
         </a>
       </nav>
@@ -2649,7 +2660,7 @@ function CTFWriteupView({ slug }) {
     let mounted = true;
 
     fetch(
-      basePath + 'ctf-blog/' +
+      BASE_PATH + 'ctf-blog/' +
         encodeURIComponent(slug) +
         '.json'
     )
@@ -2840,10 +2851,9 @@ export default function App({ initialContent = null }) {
       ? window.location
       : { pathname: '', hash: '', search: '' };
 
-  const basePath = import.meta.env.BASE_URL || '/';
   const pathnameWithoutBase =
-    currentLocation.pathname.startsWith(basePath)
-      ? '/' + currentLocation.pathname.slice(basePath.length).replace(/^\/+/, '')
+    currentLocation.pathname.startsWith(BASE_PATH)
+      ? '/' + currentLocation.pathname.slice(BASE_PATH.length).replace(/^\/+/, '')
       : currentLocation.pathname;
 
   const ctfPath =
@@ -3016,7 +3026,9 @@ export default function App({ initialContent = null }) {
   if (hiringPath) {
     const params = new URLSearchParams(currentLocation.search);
     const rawTarget =
-      params.get('type_of_work_hiring') || '';
+      params.get('type_of_work_hiring') ||
+      params.get('hiring') ||
+      '';
 
     return (
       <HiringPortfolioView
@@ -3597,7 +3609,7 @@ export default function App({ initialContent = null }) {
         <MonetizationSection
           cards={content.buyFirst}
           kofiUrl={content.settings?.kofiUrl || ''}
-          apiBase={API || import.meta.env.VITE_COMMENTS_BACKUP_URL || ''}
+          apiBase={API || ONLINE_API}
         />
 
         {/* =================================================

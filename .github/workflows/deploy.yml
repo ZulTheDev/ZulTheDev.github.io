@@ -89,10 +89,12 @@ jobs:
         run: |
           set -e
 
-          # GitHub Pages serves 404.html for extensionless deep links.
-          # Copying the SPA entrypoint preserves /port_resume URLs so
-          # the React router can inspect location.pathname.
+          # GitHub Pages serves 404.html for unknown SPA deep links.
+          # Keep that fallback, and also publish a real /port_resume/
+          # entry point so direct hiring links return HTTP 200.
           cp "client/dist/index.html" "client/dist/404.html"
+          mkdir -p "client/dist/port_resume"
+          cp "client/dist/index.html" "client/dist/port_resume/index.html"
 
           if [ -f "client/dist/index.html" ]; then
             echo "FOUND: client/dist/index.html"

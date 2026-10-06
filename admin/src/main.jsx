@@ -2,8 +2,20 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 
-const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787';
-const ONLINE_API = import.meta.env.VITE_ONLINE_API_URL || import.meta.env.VITE_COMMENTS_BACKUP_URL || 'https://zulthedevs-projects.vercel.app';
+function normalizeApiBase(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\/+$/, '');
+}
+
+const API = normalizeApiBase(
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787'
+);
+const ONLINE_API = normalizeApiBase(
+  import.meta.env.VITE_ONLINE_API_URL ||
+    import.meta.env.VITE_COMMENTS_BACKUP_URL ||
+    'https://zul-portfolio-api.vercel.app'
+);
 const PUBLIC_SITE = 'https://zulthedev.github.io/';
 const HIRING_ROUTE = PUBLIC_SITE + 'port_resume?type_of_work_hiring=technical_officer';
 const LOCAL_DRAFT_KEY = 'zul-admin-local-draft-v1';
