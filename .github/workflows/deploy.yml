@@ -38,6 +38,10 @@ jobs:
         working-directory: client
         run: npm install
 
+      - name: Reconstruct generated blog assets
+        working-directory: client
+        run: npm run assets:blog
+
       - name: Verify client assets
         shell: bash
         run: |
@@ -141,6 +145,20 @@ jobs:
             echo "FOUND: client/dist/images/profile.png"
           else
             echo "ERROR: client/dist/images/profile.png is missing"
+            exit 1
+          fi
+
+          if [ -f "client/dist/images/blog-hero-sakura-catgirl.webp" ]; then
+            echo "FOUND: client/dist/images/blog-hero-sakura-catgirl.webp"
+          else
+            echo "ERROR: generated blog hero image is missing"
+            exit 1
+          fi
+
+          if [ -f "client/dist/images/blog-clueless-cat.webp" ]; then
+            echo "FOUND: client/dist/images/blog-clueless-cat.webp"
+          else
+            echo "ERROR: generated clueless cat image is missing"
             exit 1
           fi
 
