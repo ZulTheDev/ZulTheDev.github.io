@@ -324,6 +324,77 @@ async function listDriveFiles(token, rootFolderId) {
   return knowledgeIndexCache;
 }
 
+
+async function searchDriveIndexMatches(
+  token,
+  allowedFiles,
+  terms
+) {
+  const searchableTerms =
+    terms
+      .filter((term) =>
+        /^[a-z0-9_-]{3,40}$/.test(term)
+      )
+      .slice(0, 6);
+
+  if (!searchableTerms.length) {
+    return new Set();
+  }
+
+  const allowedById = new Map(
+    allowedFiles.map((file) => [
+      file.id,
+      file,
+    ])
+  );
+
+  const query =
+    'trashed = false and (' +
+    searchableTerms
+      .map(
+        (term) =>
+          `fullText contains '${term}'`
+      )
+      .join(' or ') +
+    ')';
+
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      pageSize: '100',
+      fields: 'files(id)',
+      includeItemsFromAllDrives: 'true',
+      supportsAllDrives: 'true',
+    });
+
+    const data = await fetchJson(
+      'https://www.googleapis.com/drive/v3/files?' +
+        params.toString(),
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      12000
+    );
+
+    return new Set(
+      (data.files || [])
+        .map((file) => file.id)
+        .filter((id) =>
+          allowedById.has(id)
+        )
+    );
+  } catch (error) {
+    console.warn(
+      'Google Drive full-text index search unavailable:',
+      error?.message || error
+    );
+
+    return new Set();
+  }
+}
+
 function isReadableKnowledgeMime(mimeType) {
   const type = String(mimeType || '');
 
@@ -570,6 +641,12 @@ export async function loadDriveKnowledge(query = '') {
       : [];
 
   const terms = knowledgeTerms(query);
+  const fullTextMatches =
+    await searchDriveIndexMatches(
+      token,
+      files,
+      terms
+    );
 
   const scored = files
     .map((file) => ({
@@ -578,7 +655,14 @@ export async function loadDriveKnowledge(query = '') {
         fileKnowledgeScore(
           file,
           terms
+        ) +
+        (
+          fullTextMatches.has(file.id)
+            ? 20
+            : 0
         ),
+      matchedByDriveIndex:
+        fullTextMatches.has(file.id),
     }))
     .sort(
       (a, b) =>
