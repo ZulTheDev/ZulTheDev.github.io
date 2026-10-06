@@ -11,7 +11,7 @@ export const config = Object.freeze({
     apiKey: text(process.env.DEEPSEEK_API_KEY),
     model:
       text(process.env.DEEPSEEK_MODEL) ||
-      'deepseek-flash',
+      'deepseek-chat',
     baseUrl:
       text(process.env.DEEPSEEK_BASE_URL) ||
       'https://api.deepseek.com',
@@ -21,6 +21,8 @@ export const config = Object.freeze({
     folderId:
       text(process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID) ||
       text(process.env.GOOGLE_DRIVE_CHATBOT_FOLDER_ID),
+    mediaFolderId:
+      text(process.env.GOOGLE_DRIVE_MEDIA_FOLDER_ID),
     serviceAccountEmail:
       text(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL),
     privateKey:
