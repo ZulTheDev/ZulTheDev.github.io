@@ -326,3 +326,110 @@ button{color:inherit}
 .media-repo-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .media-inline-preview{margin-top:12px;border:1px solid var(--line);border-radius:10px;background:#100d15;padding:8px;max-width:720px}
 .media-inline-preview img{display:block;width:auto;max-width:100%;max-height:360px;margin:0 auto;border-radius:7px}
+
+
+/* =========================================================
+   PRIVATE ADMIN STUDIO EXTENSIONS
+========================================================= */
+
+.drive-root-chip{
+  display:inline-block;
+  margin-top:7px;
+  padding:5px 8px;
+  border:1px solid var(--line);
+  border-radius:7px;
+  background:#0e0b12;
+  color:#9f92a6;
+  font:8px/1.4 monospace;
+  word-break:break-all;
+}
+
+.drive-manager-actions{
+  display:grid;
+  grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) auto auto;
+  gap:10px;
+  align-items:end;
+  margin:15px 0 18px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#100d14;
+}
+
+.drive-manager-actions .field{
+  margin:0;
+}
+
+.drive-manager-actions select{
+  width:100%;
+  padding:10px;
+  border:1px solid #342938;
+  border-radius:8px;
+  background:#0f0c13;
+  color:var(--text);
+}
+
+.workspace-size-field{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:4px 6px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#0f0c13;
+}
+
+.workspace-size-field span{
+  color:#7e7283;
+  font:700 8px/1 monospace;
+}
+
+.workspace-size-field input{
+  width:72px;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#e7dce9;
+  font:9px/1 monospace;
+}
+
+.workspace-canvas-shell{
+  min-width:0;
+  overflow:auto;
+  border-radius:12px;
+}
+
+.workspace-canvas-shell .workspace-canvas{
+  max-width:none;
+}
+
+.writeup-reference-editor{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  padding:13px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#0f0c13;
+}
+
+.writeup-reference-editor .field.wide{
+  grid-column:1 / -1;
+}
+
+@media(max-width:900px){
+  .drive-manager-actions{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media(max-width:620px){
+  .drive-manager-actions,
+  .writeup-reference-editor{
+    grid-template-columns:1fr;
+  }
+
+  .writeup-reference-editor .field.wide{
+    grid-column:auto;
+  }
+}
