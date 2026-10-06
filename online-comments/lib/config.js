@@ -1,5 +1,8 @@
 const text = (value) => String(value ?? '').trim();
 
+export const PORTFOLIO_DRIVE_SCOPE_ID =
+  '10XU8zeRpx9Ladh501vWjZepzm0j7ZOq6';
+
 export const config = Object.freeze({
   portfolioId: 'zulfaqar-jamal',
   portfolioName: 'Zulfaqar Jamal',
@@ -18,9 +21,9 @@ export const config = Object.freeze({
   },
 
   drive: {
-    folderId:
-      text(process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID) ||
-      text(process.env.GOOGLE_DRIVE_CHATBOT_FOLDER_ID),
+    // Deliberately fixed to one approved portfolio folder.
+    // Environment variables cannot widen the AI's Drive scope.
+    folderId: PORTFOLIO_DRIVE_SCOPE_ID,
     mediaFolderId:
       text(process.env.GOOGLE_DRIVE_MEDIA_FOLDER_ID),
     serviceAccountEmail:
