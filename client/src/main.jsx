@@ -154,6 +154,7 @@ function normalizeContent(data) {
     research: Array.isArray(source.research) ? source.research : [],
     experience: Array.isArray(source.experience) ? source.experience : [],
     education: Array.isArray(source.education) ? source.education : [],
+    skills: source.skills && typeof source.skills === 'object' ? source.skills : {},
   };
 }
 
@@ -2795,31 +2796,7 @@ function App() {
           setContent(normalizeContent(data));
         }
 
-        /*
-         * API is optional. Static content remains the fallback.
-         */
-        if (API) {
-          try {
-            const apiResponse = await fetch(
-              `${API}/api/content`
-            );
-
-            if (apiResponse.ok) {
-              const apiData = await apiResponse.json();
-
-              setLoadProgress(88);
-
-              if (
-                mounted &&
-                apiData?.profile
-              ) {
-                setContent(normalizeContent(apiData));
-              }
-            }
-          } catch {
-            // Keep using the static content.
-          }
-        }
+        // Static published content remains authoritative during page restoration.
 
         setLoadProgress(100);
       } catch (error) {
@@ -2941,7 +2918,11 @@ function App() {
      EXPLORE PAGE
   ======================================================= */
 
-  if (page === 'explore') {
+  const basePath = import.meta.env.BASE_URL || '/';
+  const normalizedPath = location.pathname.replace(/\/+$/, '');
+  const isExplorationRoute = normalizedPath.endsWith('/exploration');
+
+  if (page === 'explore' || isExplorationRoute) {
     return (
       <>
         <nav>
@@ -3046,7 +3027,7 @@ function App() {
           ))}
         </div>
 
-        <a href="#explore">
+        <a href={basePath + 'exploration/'}>
           Explore{' '}
           <Sparkles size={13} />
         </a>
@@ -3266,7 +3247,7 @@ function App() {
 
         <section id="projects">
           <small>
-            04 / LAB
+            05 / LAB
           </small>
 
           <h2>
@@ -3299,7 +3280,7 @@ function App() {
 
         <section id="experience">
           <small>
-            05 / TIMELINE
+            06 / TIMELINE
           </small>
 
           <h2>
@@ -3417,6 +3398,30 @@ function App() {
         </section>
 
         {/* =================================================
+            SKILLS
+        ================================================= */}
+
+        <section id="skills">
+          <small>07 / TOOLKIT</small>
+          <h2>Skills</h2>
+          <div className="skill-groups">
+            {[
+              ['Technical skills', content.skills?.technical],
+              ['Soft skills', content.skills?.soft],
+              ['Languages', content.skills?.languages],
+              ['Programming languages', content.skills?.programming],
+            ].map(([label, items]) => (
+              <div className="skill-group" key={label}>
+                <small>{label}</small>
+                <div className="skill-tags">
+                  {(items?.length ? items : ['Not published yet']).map((item) => <span key={item}>{item}</span>)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* =================================================
             CONTACT
         ================================================= */}
 
@@ -3426,7 +3431,7 @@ function App() {
         >
           <div>
             <small>
-              07 / OPEN CHANNEL
+              08 / OPEN CHANNEL
             </small>
 
             <h2>
@@ -3454,6 +3459,13 @@ function App() {
               )
             )}
           </div>
+          <div className="resume-qr-card">
+            <small>RESUME / LIVE LINK</small>
+            <img src={"https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(content.profile.resumeUrl || basePath)} alt="Dynamic QR code linking to Zulfaqar Jamal's resume" loading="lazy" />
+            <strong>Scan for my resume</strong>
+            <a href={content.profile.resumeUrl || basePath} target="_blank" rel="noreferrer">Open resume <ArrowUpRight size={14} /></a>
+          </div>
+
         </section>
       </main>
 
@@ -3462,8 +3474,8 @@ function App() {
       =================================================== */}
 
       <footer>
-        © {new Date().getFullYear()}{' '}
-        Zulfaqar Jamal
+        <span>© {new Date().getFullYear()} Zulfaqar Jamal</span>
+        <a href={basePath + 'exploration/'}>Exploration</a>
       </footer>
 
       {/* ===================================================
