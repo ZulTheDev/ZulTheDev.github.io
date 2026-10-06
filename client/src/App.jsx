@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import GiscusComments from './GiscusComments';
+import ChatWidget from './chat/ChatWidget';
 import {
   ArrowUpRight,
   ChevronRight,
@@ -491,233 +492,23 @@ function BotAvatar({ size = 28 }) {
   );
 }
 
-const CHAT_SESSION_KEY = 'portfolio-ai-chat-session';
-
-const DEFAULT_CHAT_MESSAGES = [
-  {
-    a: 1,
-    t: "Ask me about Zul's work, skills, projects or certifications.",
-  },
-];
-
-function readChatSession() {
-  try {
-    const saved = sessionStorage.getItem(CHAT_SESSION_KEY);
-
-    if (!saved) {
-      return DEFAULT_CHAT_MESSAGES;
-    }
-
-    const parsed = JSON.parse(saved);
-
-    return Array.isArray(parsed) && parsed.length
-      ? parsed.slice(-20)
-      : DEFAULT_CHAT_MESSAGES;
-  } catch {
-    return DEFAULT_CHAT_MESSAGES;
-  }
-}
-
-function writeChatSession(messages) {
-  try {
-    sessionStorage.setItem(
-      CHAT_SESSION_KEY,
-      JSON.stringify(messages.slice(-20))
-    );
-  } catch {
-    // Session storage may be disabled.
-  }
-}
-
 const ONLINE_API =
   import.meta.env.VITE_ONLINE_API_URL ||
   import.meta.env.VITE_COMMENTS_BACKUP_URL ||
   'https://zul-portfolio-api.vercel.app';
 
+// Chat logic lives in ./chat/ (resilient transport + offline fallback).
+const CHAT_BACKENDS = [ONLINE_API, API].filter(
+  (value, index, list) => value && list.indexOf(value) === index
+);
+
 function Chat({ content }) {
-  const [open, setOpen] = useState(false);
-  const [question, setQuestion] = useState('');
-  const [messages, setMessages] =
-    useState(DEFAULT_CHAT_MESSAGES);
-  const [chatSessionReady, setChatSessionReady] =
-    useState(false);
-
-  useEffect(() => {
-    setMessages(readChatSession());
-    setChatSessionReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (chatSessionReady) {
-      writeChatSession(messages);
-    }
-  }, [messages, chatSessionReady]);
-
-  async function send() {
-    const message = question.trim();
-
-    if (!message) {
-      return;
-    }
-
-    setQuestion('');
-
-    const nextMessages = [
-      ...messages,
-      {
-        t: message,
-      },
-    ];
-
-    setMessages(nextMessages);
-
-    const history = nextMessages
-      .slice(-12)
-      .map((item) => ({
-        role: item.a ? 'assistant' : 'user',
-        content: item.t,
-      }));
-
-    const endpoints = [
-      ONLINE_API,
-      API,
-    ].filter(
-      (value, index, list) =>
-        value &&
-        list.indexOf(value) === index
-    );
-
-    for (const base of endpoints) {
-      try {
-        const response = await fetch(
-          base + '/api/chat',
-          {
-            method: 'POST',
-            headers: {
-              // text/plain is a CORS-safelisted content type,
-              // so the browser can send the chat POST without
-              // an OPTIONS preflight to this public API.
-              'Content-Type': 'text/plain',
-            },
-            body: JSON.stringify({
-              portfolioId: 'zulfaqar-jamal',
-              page:
-                typeof window !== 'undefined'
-                  ? window.location.pathname + window.location.hash
-                  : '/',
-              message,
-              history,
-              context: content,
-            }),
-          }
-        );
-
-        const data =
-          await response.json()
-            .catch(() => ({}));
-
-        if (response.ok) {
-          setMessages((current) => [
-            ...current,
-            {
-              a: 1,
-              t:
-                data.reply ||
-                'No reply available.',
-            },
-          ]);
-
-          return;
-        }
-      } catch {
-        // Try the next backend.
-      }
-    }
-
-    setMessages((current) => [
-      ...current,
-      {
-        a: 1,
-        t: 'AI service is temporarily unavailable.',
-      },
-    ]);
-  }
-
   return (
-    <div className="chat">
-      {open && (
-        <div className="cw">
-          <header className="chat-header">
-            <div className="chat-title">
-              <BotAvatar size={22} />
-              <span>Zul's AI</span>
-            </div>
-
-            <button
-              onClick={() =>
-                setOpen(false)
-              }
-              aria-label="Close AI chat"
-            >
-              <X size={15} />
-            </button>
-          </header>
-
-          <div className="msgs">
-            {messages.map(
-              (message, index) => (
-                <div
-                  key={index}
-                  className={
-                    message.a
-                      ? 'bot'
-                      : 'usr'
-                  }
-                >
-                  {message.t}
-                </div>
-              )
-            )}
-          </div>
-
-          <footer>
-            <input
-              value={question}
-              onChange={(event) =>
-                setQuestion(
-                  event.target.value
-                )
-              }
-              onKeyDown={(event) => {
-                if (
-                  event.key === 'Enter'
-                ) {
-                  send();
-                }
-              }}
-              placeholder="Ask the portfolio..."
-            />
-
-            <button
-              onClick={send}
-              aria-label="Send message"
-            >
-              <ChevronRight />
-            </button>
-          </footer>
-        </div>
-      )}
-
-      <button
-        className="cat"
-        onClick={() =>
-          setOpen(!open)
-        }
-        aria-label="Open Zul's AI"
-      >
-        <BotAvatar size={36} />
-      </button>
-    </div>
+    <ChatWidget
+      content={content}
+      bases={CHAT_BACKENDS}
+      Avatar={BotAvatar}
+    />
   );
 }
 

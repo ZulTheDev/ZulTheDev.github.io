@@ -1,0 +1,729 @@
+diff --git a/client/src/App.jsx b/client/src/App.jsx
+index 42f288e..62603b6 100644
+--- a/client/src/App.jsx
++++ b/client/src/App.jsx
+@@ -1,5 +1,6 @@
+ import React, { useEffect, useState } from 'react';
+ import GiscusComments from './GiscusComments';
++import ChatWidget from './chat/ChatWidget';
+ import {
+   ArrowUpRight,
+   ChevronRight,
+@@ -491,233 +492,23 @@ function BotAvatar({ size = 28 }) {
+   );
+ }
+ 
+-const CHAT_SESSION_KEY = 'portfolio-ai-chat-session';
+-
+-const DEFAULT_CHAT_MESSAGES = [
+-  {
+-    a: 1,
+-    t: "Ask me about Zul's work, skills, projects or certifications.",
+-  },
+-];
+-
+-function readChatSession() {
+-  try {
+-    const saved = sessionStorage.getItem(CHAT_SESSION_KEY);
+-
+-    if (!saved) {
+-      return DEFAULT_CHAT_MESSAGES;
+-    }
+-
+-    const parsed = JSON.parse(saved);
+-
+-    return Array.isArray(parsed) && parsed.length
+-      ? parsed.slice(-20)
+-      : DEFAULT_CHAT_MESSAGES;
+-  } catch {
+-    return DEFAULT_CHAT_MESSAGES;
+-  }
+-}
+-
+-function writeChatSession(messages) {
+-  try {
+-    sessionStorage.setItem(
+-      CHAT_SESSION_KEY,
+-      JSON.stringify(messages.slice(-20))
+-    );
+-  } catch {
+-    // Session storage may be disabled.
+-  }
+-}
+-
+ const ONLINE_API =
+   import.meta.env.VITE_ONLINE_API_URL ||
+   import.meta.env.VITE_COMMENTS_BACKUP_URL ||
+   'https://zul-portfolio-api.vercel.app';
+ 
+-function Chat({ content }) {
+-  const [open, setOpen] = useState(false);
+-  const [question, setQuestion] = useState('');
+-  const [messages, setMessages] =
+-    useState(DEFAULT_CHAT_MESSAGES);
+-  const [chatSessionReady, setChatSessionReady] =
+-    useState(false);
+-
+-  useEffect(() => {
+-    setMessages(readChatSession());
+-    setChatSessionReady(true);
+-  }, []);
+-
+-  useEffect(() => {
+-    if (chatSessionReady) {
+-      writeChatSession(messages);
+-    }
+-  }, [messages, chatSessionReady]);
+-
+-  async function send() {
+-    const message = question.trim();
+-
+-    if (!message) {
+-      return;
+-    }
+-
+-    setQuestion('');
+-
+-    const nextMessages = [
+-      ...messages,
+-      {
+-        t: message,
+-      },
+-    ];
+-
+-    setMessages(nextMessages);
+-
+-    const history = nextMessages
+-      .slice(-12)
+-      .map((item) => ({
+-        role: item.a ? 'assistant' : 'user',
+-        content: item.t,
+-      }));
+-
+-    const endpoints = [
+-      ONLINE_API,
+-      API,
+-    ].filter(
+-      (value, index, list) =>
+-        value &&
+-        list.indexOf(value) === index
+-    );
+-
+-    for (const base of endpoints) {
+-      try {
+-        const response = await fetch(
+-          base + '/api/chat',
+-          {
+-            method: 'POST',
+-            headers: {
+-              // text/plain is a CORS-safelisted content type,
+-              // so the browser can send the chat POST without
+-              // an OPTIONS preflight to this public API.
+-              'Content-Type': 'text/plain',
+-            },
+-            body: JSON.stringify({
+-              portfolioId: 'zulfaqar-jamal',
+-              page:
+-                typeof window !== 'undefined'
+-                  ? window.location.pathname + window.location.hash
+-                  : '/',
+-              message,
+-              history,
+-              context: content,
+-            }),
+-          }
+-        );
+-
+-        const data =
+-          await response.json()
+-            .catch(() => ({}));
+-
+-        if (response.ok) {
+-          setMessages((current) => [
+-            ...current,
+-            {
+-              a: 1,
+-              t:
+-                data.reply ||
+-                'No reply available.',
+-            },
+-          ]);
+-
+-          return;
+-        }
+-      } catch {
+-        // Try the next backend.
+-      }
+-    }
+-
+-    setMessages((current) => [
+-      ...current,
+-      {
+-        a: 1,
+-        t: 'AI service is temporarily unavailable.',
+-      },
+-    ]);
+-  }
++// Chat logic lives in ./chat/ (resilient transport + offline fallback).
++const CHAT_BACKENDS = [ONLINE_API, API].filter(
++  (value, index, list) => value && list.indexOf(value) === index
++);
+ 
++function Chat({ content }) {
+   return (
+-    <div className="chat">
+-      {open && (
+-        <div className="cw">
+-          <header className="chat-header">
+-            <div className="chat-title">
+-              <BotAvatar size={22} />
+-              <span>Zul's AI</span>
+-            </div>
+-
+-            <button
+-              onClick={() =>
+-                setOpen(false)
+-              }
+-              aria-label="Close AI chat"
+-            >
+-              <X size={15} />
+-            </button>
+-          </header>
+-
+-          <div className="msgs">
+-            {messages.map(
+-              (message, index) => (
+-                <div
+-                  key={index}
+-                  className={
+-                    message.a
+-                      ? 'bot'
+-                      : 'usr'
+-                  }
+-                >
+-                  {message.t}
+-                </div>
+-              )
+-            )}
+-          </div>
+-
+-          <footer>
+-            <input
+-              value={question}
+-              onChange={(event) =>
+-                setQuestion(
+-                  event.target.value
+-                )
+-              }
+-              onKeyDown={(event) => {
+-                if (
+-                  event.key === 'Enter'
+-                ) {
+-                  send();
+-                }
+-              }}
+-              placeholder="Ask the portfolio..."
+-            />
+-
+-            <button
+-              onClick={send}
+-              aria-label="Send message"
+-            >
+-              <ChevronRight />
+-            </button>
+-          </footer>
+-        </div>
+-      )}
+-
+-      <button
+-        className="cat"
+-        onClick={() =>
+-          setOpen(!open)
+-        }
+-        aria-label="Open Zul's AI"
+-      >
+-        <BotAvatar size={36} />
+-      </button>
+-    </div>
++    <ChatWidget
++      content={content}
++      bases={CHAT_BACKENDS}
++      Avatar={BotAvatar}
++    />
+   );
+ }
+ 
+diff --git a/client/src/chat/ChatWidget.jsx b/client/src/chat/ChatWidget.jsx
+new file mode 100644
+index 0000000..72db5d7
+--- /dev/null
++++ b/client/src/chat/ChatWidget.jsx
+@@ -0,0 +1,196 @@
++import React, { useEffect, useRef, useState } from 'react';
++import { ChevronRight, X } from 'lucide-react';
++import { requestChatReply, allBackendsCoolingDown } from './chat-api';
++import { localAnswer } from './chat-fallback';
++
++const SESSION_KEY = 'portfolio-ai-chat-session';
++const MAX_CHARS = 2000; // matches the server's MAX_MESSAGE_CHARS
++
++const GREETING = [
++  { a: 1, t: "Ask me about Zul's work, skills, projects or certifications.", sys: 1 },
++];
++
++// Sanitise whatever is in sessionStorage: a malformed entry must never reach
++// the render (an object rendered as a React child would crash the whole page).
++function readSession() {
++  try {
++    const parsed = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
++    if (!Array.isArray(parsed)) return GREETING;
++    const clean = parsed
++      .filter((m) => m && typeof m.t === 'string' && m.t.trim())
++      .map((m) => ({ a: m.a ? 1 : undefined, t: m.t.slice(0, 6000), off: m.off ? 1 : undefined, sys: m.sys ? 1 : undefined }))
++      .slice(-20);
++    return clean.length ? clean : GREETING;
++  } catch {
++    return GREETING;
++  }
++}
++
++function writeSession(messages) {
++  try {
++    sessionStorage.setItem(SESSION_KEY, JSON.stringify(messages.slice(-20)));
++  } catch {
++    /* storage disabled */
++  }
++}
++
++function ChatInner({ content, bases, Avatar }) {
++  const [open, setOpen] = useState(false);
++  const [question, setQuestion] = useState('');
++  const [messages, setMessages] = useState(GREETING);
++  const [ready, setReady] = useState(false);
++  const [sending, setSending] = useState(false);
++  const [offline, setOffline] = useState(false);
++  const busy = useRef(false);
++  const abortRef = useRef(null);
++  const endRef = useRef(null);
++
++  useEffect(() => {
++    setMessages(readSession());
++    setReady(true);
++    return () => abortRef.current?.abort();
++  }, []);
++
++  useEffect(() => {
++    if (ready) writeSession(messages);
++  }, [messages, ready]);
++
++  useEffect(() => {
++    endRef.current?.scrollIntoView?.({ block: 'end' });
++  }, [messages, sending, open]);
++
++  const push = (entry) => setMessages((current) => [...current, entry]);
++
++  async function send() {
++    const message = question.trim().slice(0, MAX_CHARS);
++    if (!message || busy.current) return;
++
++    busy.current = true;
++    setSending(true);
++    setQuestion('');
++
++    // History = earlier turns only (the server appends `message` itself), and
++    // without our own notices/offline answers.
++    const history = messages
++      .filter((m) => !m.sys && !m.off)
++      .slice(-10)
++      .map((m) => ({ role: m.a ? 'assistant' : 'user', content: m.t }));
++
++    push({ t: message });
++
++    try {
++      let result;
++
++      if (allBackendsCoolingDown(bases)) {
++        result = { type: 'unavailable', reason: 'cooling_down' };
++      } else {
++        abortRef.current = new AbortController();
++        result = await requestChatReply({
++          bases,
++          signal: abortRef.current.signal,
++          payload: {
++            portfolioId: 'zulfaqar-jamal',
++            page: typeof window !== 'undefined' ? window.location.pathname + window.location.hash : '/',
++            message,
++            history,
++            context: content,
++          },
++        });
++      }
++
++      if (result.type === 'reply') {
++        setOffline(false);
++        push({ a: 1, t: result.reply });
++      } else if (result.type === 'rejected') {
++        push({ a: 1, t: result.message, sys: 1 });
++      } else if (result.reason !== 'aborted') {
++        // Live AI is down: answer from the portfolio itself instead of failing.
++        setOffline(true);
++        push({ a: 1, t: localAnswer(message, content), off: 1 });
++      }
++    } catch (error) {
++      // Defence in depth - requestChatReply never throws, but nothing here
++      // may ever escape into React.
++      console.error('Chat send failed:', error);
++      setOffline(true);
++      push({ a: 1, t: localAnswer(message, content), off: 1 });
++    } finally {
++      busy.current = false;
++      setSending(false);
++    }
++  }
++
++  return (
++    <div className="chat">
++      {open && (
++        <div className="cw">
++          <header className="chat-header">
++            <div className="chat-title">
++              <Avatar size={22} />
++              <span>Zul's AI</span>
++              {offline && <small className="chat-status">offline mode</small>}
++            </div>
++            <button onClick={() => setOpen(false)} aria-label="Close AI chat">
++              <X size={15} />
++            </button>
++          </header>
++
++          <div className="msgs" aria-live="polite">
++            {messages.map((m, i) => (
++              <div key={i} className={m.a ? 'bot' : 'usr'} style={{ whiteSpace: 'pre-line' }}>
++                {m.t}
++                {m.off ? <small className="chat-note">{'\n'}From the portfolio (live AI unavailable)</small> : null}
++              </div>
++            ))}
++            {sending && <div className="bot" style={{ opacity: 0.7 }}>Thinking…</div>}
++            <span ref={endRef} />
++          </div>
++
++          <footer>
++            <input
++              value={question}
++              maxLength={MAX_CHARS}
++              disabled={sending}
++              onChange={(event) => setQuestion(event.target.value)}
++              onKeyDown={(event) => {
++                if (event.key === 'Enter' && !event.nativeEvent?.isComposing) send();
++              }}
++              placeholder={sending ? 'Waiting for a reply…' : 'Ask the portfolio...'}
++            />
++            <button onClick={send} disabled={sending || !question.trim()} aria-label="Send message">
++              <ChevronRight />
++            </button>
++          </footer>
++        </div>
++      )}
++
++      <button className="cat" onClick={() => setOpen(!open)} aria-label="Open Zul's AI">
++        <Avatar size={36} />
++      </button>
++    </div>
++  );
++}
++
++// If anything in the chat ever throws while rendering, drop just the chat
++// bubble - never the portfolio page around it.
++class ChatBoundary extends React.Component {
++  state = { failed: false };
++  static getDerivedStateFromError() {
++    return { failed: true };
++  }
++  componentDidCatch(error) {
++    console.error('Chat widget crashed and was disabled:', error);
++    try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
++  }
++  render() {
++    return this.state.failed ? null : this.props.children;
++  }
++}
++
++export default function ChatWidget(props) {
++  return (
++    <ChatBoundary>
++      <ChatInner {...props} />
++    </ChatBoundary>
++  );
++}
+diff --git a/client/src/chat/chat-api.js b/client/src/chat/chat-api.js
+new file mode 100644
+index 0000000..8abfd26
+--- /dev/null
++++ b/client/src/chat/chat-api.js
+@@ -0,0 +1,104 @@
++/*
++ * Resilient chat transport.
++ *
++ * Tries each backend in order and NEVER throws. A backend that answers with a
++ * 5xx, times out or is unreachable is put on a short cool-down ("circuit
++ * breaker") so a broken API is not hammered on every message.
++ *
++ * Result shapes:
++ *   { type: 'reply', reply, base }       live AI answered
++ *   { type: 'rejected', message }        server refused THIS message (400/429);
++ *                                        retrying elsewhere would not help
++ *   { type: 'unavailable', reason }      every backend is down -> use fallback
++ */
++
++const COOL_DOWN_MS = 60_000;
++const TIMEOUT_MS = 25_000;
++const breaker = new Map(); // base -> timestamp until which it is skipped
++
++const REJECTION_TEXT = {
++  message_required: 'Please type a question first.',
++  message_too_long: 'That message is too long. Please keep it under 2000 characters.',
++  portfolio_identity_mismatch: 'The chat could not verify the portfolio data. Please refresh the page.',
++};
++
++export function isCoolingDown(base, now = Date.now()) {
++  return (breaker.get(base) || 0) > now;
++}
++
++export function resetBreaker() {
++  breaker.clear();
++}
++
++export function allBackendsCoolingDown(bases, now = Date.now()) {
++  return bases.length > 0 && bases.every((base) => isCoolingDown(base, now));
++}
++
++async function callBackend(base, payload, { fetchImpl, timeoutMs, signal }) {
++  const controller = new AbortController();
++  const timer = setTimeout(() => controller.abort(), timeoutMs);
++  const onAbort = () => controller.abort();
++  signal?.addEventListener('abort', onAbort);
++
++  try {
++    const response = await fetchImpl(base.replace(/\/+$/, '') + '/api/chat', {
++      method: 'POST',
++      // text/plain is CORS-safelisted: no preflight needed for this POST.
++      headers: { 'Content-Type': 'text/plain' },
++      body: JSON.stringify(payload),
++      signal: controller.signal,
++    });
++    const data = await response.json().catch(() => ({}));
++    return { status: response.status, ok: response.ok, data };
++  } finally {
++    clearTimeout(timer);
++    signal?.removeEventListener('abort', onAbort);
++  }
++}
++
++export async function requestChatReply({
++  bases,
++  payload,
++  fetchImpl = (...args) => fetch(...args),
++  timeoutMs = TIMEOUT_MS,
++  signal,
++  now = () => Date.now(),
++}) {
++  let lastReason = 'no_backend';
++
++  for (const base of bases) {
++    if (isCoolingDown(base, now())) {
++      lastReason = 'cooling_down';
++      continue;
++    }
++
++    try {
++      const { ok, status, data } = await callBackend(base, payload, { fetchImpl, timeoutMs, signal });
++
++      if (ok && typeof data?.reply === 'string' && data.reply.trim()) {
++        return { type: 'reply', reply: data.reply, base };
++      }
++
++      // The server understood the request and refused it: do not retry.
++      if (status === 429) {
++        return { type: 'rejected', message: 'Too many questions in a short time. Please wait a moment and try again.' };
++      }
++      if (status === 400 || status === 413) {
++        return { type: 'rejected', message: REJECTION_TEXT[data?.error] || 'The chat could not accept that message.' };
++      }
++
++      // 5xx, 404, empty reply, etc. -> this backend is unhealthy.
++      lastReason = `http_${status}`;
++      breaker.set(base, now() + COOL_DOWN_MS);
++    } catch (error) {
++      if (signal?.aborted) {
++        return { type: 'unavailable', reason: 'aborted' };
++      }
++      // Network error, CORS block or timeout.
++      lastReason = error?.name === 'AbortError' ? 'timeout' : 'network';
++      breaker.set(base, now() + COOL_DOWN_MS);
++    }
++  }
++
++  return { type: 'unavailable', reason: lastReason };
++}
+diff --git a/client/src/chat/chat-fallback.js b/client/src/chat/chat-fallback.js
+new file mode 100644
+index 0000000..6f88199
+--- /dev/null
++++ b/client/src/chat/chat-fallback.js
+@@ -0,0 +1,127 @@
++/*
++ * Offline answers built ONLY from the portfolio's own content.json.
++ * Nothing is invented: every sentence returned is copied from the content.
++ */
++
++const STOP = new Set(('a an and are as at be by can do does for from has have how i in is it its me my of on or ' +
++  'tell about what whats which who whom with you your zul he his him she her they their this that the to was were ' +
++  'will would please show give any some more').split(' '));
++
++const SECTIONS = [
++  ['certifications', 'Certification'],
++  ['projects', 'Project'],
++  ['achievements', 'Achievement'],
++  ['awards', 'Award'],
++  ['research', 'Research'],
++];
++
++const stem = (t) =>
++  t.length > 4 ? t.replace(/ies$/, 'y').replace(/(es|s)$/, '') : t;
++
++const tokens = (value) =>
++  String(value || '')
++    .toLowerCase()
++    .split(/[^a-z0-9+#.]+/)
++    .map((t) => t.replace(/^\.+|\.+$/g, ''))
++    .filter((t) => t.length >= 2 && !STOP.has(t))
++    .map(stem);
++
++// "what certifications ..." -> the person wants that whole section.
++const INTENTS = [
++  [/certif|credential|cert\b/, 'Certification'],
++  [/project|built|build|tool/, 'Project'],
++  [/award/, 'Award'],
++  [/achiev/, 'Achievement'],
++  [/research|paper|publication/, 'Research'],
++  [/experience|work|job|role|career|employ/, 'Experience'],
++  [/educat|stud|school|universit|degree|qualif|college/, 'Education'],
++];
++const INTENT_WORDS = new Set(
++  ['certification', 'certificate', 'credential', 'project', 'award', 'achievement', 'research', 'paper',
++   'publication', 'experience', 'work', 'job', 'role', 'career', 'education', 'study', 'school', 'university',
++   'degree', 'qualification', 'college', 'built', 'build', 'tool', 'have', 'has', 'had', 'did', 'done'].map(stem)
++);
++
++function buildEntries(content) {
++  const entries = [];
++  const add = (label, title, detail, ...fields) =>
++    entries.push({ label, title, detail, words: new Set(tokens(fields.flat().join(' '))) });
++
++  for (const [key, label] of SECTIONS) {
++    for (const item of content?.[key] || []) {
++      if (item?.title) {
++        add(label, item.title, [item.issuer, item.description].filter(Boolean).join(' - '),
++          item.title, item.issuer, item.category, item.description);
++      }
++    }
++  }
++  for (const item of content?.experience || []) {
++    if (item?.role || item?.company) {
++      add('Experience', [item.role, item.company].filter(Boolean).join(' @ '), item.summary || '',
++        item.role, item.company, item.summary, item.elaboration, Array.isArray(item.skills) ? item.skills.join(' ') : '');
++    }
++  }
++  for (const item of content?.education || []) {
++    if (item?.school || item?.qualification) {
++      add('Education', [item.qualification, item.school].filter(Boolean).join(' - '), item.description || '',
++        item.school, item.qualification, item.description);
++    }
++  }
++  return entries;
++}
++
++function contactAnswer(profile = {}) {
++  const lines = [
++    profile.email && `Email: ${profile.email}`,
++    profile.linkedin && `LinkedIn: ${profile.linkedin}`,
++    profile.github && `GitHub: ${profile.github}`,
++    profile.website && `Website: ${profile.website}`,
++  ].filter(Boolean);
++  return lines.length ? `You can reach ${profile.name || 'Zul'} here:\n${lines.join('\n')}` : null;
++}
++
++const format = (list) =>
++  list.map((e) => `${e.label}: ${e.title}${e.detail ? `\n${e.detail}` : ''}`).join('\n\n');
++
++export function localAnswer(question, content) {
++  const profile = content?.profile || {};
++  const raw = String(question || '').toLowerCase();
++  const asked = tokens(question);
++  const entries = buildEntries(content);
++
++  if (/\b(contact|e-?mail|reach|hire|linkedin|github|get in touch)\b/.test(raw)) {
++    const contact = contactAnswer(profile);
++    if (contact) return contact;
++  }
++
++  if (/\b(who is|who are|introduce|summary|overview|background)\b|about\s+(him|zul|zulfaqar|yourself|you)\s*[?.!]*$/.test(raw)
++      && profile.summary) {
++    return `${profile.name || 'Zul'} - ${profile.title || ''}\n${profile.summary}`.trim();
++  }
++
++  const intent = INTENTS.find(([re]) => re.test(raw))?.[1];
++  const topical = asked.filter((t) => !INTENT_WORDS.has(t)); // e.g. "ctf", "python"
++
++  const scored = (pool) =>
++    pool
++      .map((entry) => ({ entry, score: topical.reduce((n, t) => n + (entry.words.has(t) ? 1 : 0), 0) }))
++      .filter((r) => r.score > 0)
++      .sort((a, b) => b.score - a.score)
++      .map((r) => r.entry);
++
++  if (intent) {
++    const section = entries.filter((e) => e.label === intent);
++    const hits = topical.length ? scored(section) : section;
++    if (hits.length) return format(hits.slice(0, 4));
++    // Topic given but not found in that section: search everything.
++  }
++
++  const hits = scored(entries);
++  if (hits.length) return format(hits.slice(0, 3));
++
++  const contact = contactAnswer(profile);
++  return (
++    "I couldn't find that in the portfolio. Try asking about projects, certifications, experience or education." +
++    (contact ? `\n\n${contact}` : '')
++  );
++}
+diff --git a/client/src/style.css b/client/src/style.css
+index e23114a..6b8ce00 100644
+--- a/client/src/style.css
++++ b/client/src/style.css
+@@ -4032,3 +4032,24 @@ html::before{
+ .modal-file-preview{display:grid;gap:12px;place-items:center;text-align:center;padding:30px}
+ .modal-file-link{border:1px solid var(--l);padding:10px 14px;border-radius:9px;color:var(--p);text-decoration:none;background:#1b1521}
+ .modal-file-link:hover{background:#251b2b}
++
++/* Chat: offline-mode indicators */
++.chat-status{
++  margin-left:8px;
++  padding:1px 7px;
++  border:1px solid #70516d;
++  border-radius:99px;
++  font-size:10px;
++  color:#c9a8c4;
++}
++.chat-note{
++  display:block;
++  margin-top:6px;
++  font-size:10px;
++  opacity:.6;
++}
++.cw footer input:disabled,
++.cw footer button:disabled{
++  opacity:.5;
++  cursor:not-allowed;
++}

@@ -4032,3 +4032,24 @@ html::before{
 .modal-file-preview{display:grid;gap:12px;place-items:center;text-align:center;padding:30px}
 .modal-file-link{border:1px solid var(--l);padding:10px 14px;border-radius:9px;color:var(--p);text-decoration:none;background:#1b1521}
 .modal-file-link:hover{background:#251b2b}
+
+/* Chat: offline-mode indicators */
+.chat-status{
+  margin-left:8px;
+  padding:1px 7px;
+  border:1px solid #70516d;
+  border-radius:99px;
+  font-size:10px;
+  color:#c9a8c4;
+}
+.chat-note{
+  display:block;
+  margin-top:6px;
+  font-size:10px;
+  opacity:.6;
+}
+.cw footer input:disabled,
+.cw footer button:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
