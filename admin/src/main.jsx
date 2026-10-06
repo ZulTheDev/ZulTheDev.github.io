@@ -2885,9 +2885,9 @@ function WriteupWorkspaceTab({ writeup, updateWriteup }) {
     <div className="writeup-workspace">
       <div className="writeup-workspace-toolbar">
         <div>
-          <small>INTERACTIVE CANVAS</small>
+          <small>POLYMATH VECTOR CANVAS</small>
           <h2>{workspace.title || 'Interactive workflow'}</h2>
-          <p>Drag document blocks into the canvas. Turn on Connect, then click object A and object B to create a workflow edge.</p>
+          <p>Compose system and cybersecurity diagrams as connected vector objects. Drag document blocks into the canvas, classify nodes such as host, firewall, process or packet, then connect them into an interactive workflow.</p>
         </div>
         <div className="writeup-workspace-actions">
           <button className={connectMode ? 'accent-button small' : 'ghost small'} onClick={() => { setConnectMode(!connectMode); setConnectFrom(null); }}>
@@ -3038,6 +3038,27 @@ function WorkspaceNode({
         />
         <button className="delete-button compact" onClick={onRemove}>×</button>
       </div>
+      <select
+        value={node.type || 'object'}
+        onChange={(event) => onChange(node.id, 'type', event.target.value)}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <option value="object">Object</option>
+        <option value="document-block">Document block</option>
+        <option value="host">Host / endpoint</option>
+        <option value="server">Server</option>
+        <option value="router">Router</option>
+        <option value="firewall">Firewall</option>
+        <option value="network">Network</option>
+        <option value="packet">Packet</option>
+        <option value="process">Process</option>
+        <option value="memory">Memory</option>
+        <option value="disk">Disk / filesystem</option>
+        <option value="auth">Authentication</option>
+        <option value="dfir">DFIR evidence</option>
+        <option value="threat">Threat / IOC</option>
+      </select>
+
       <select
         value={node.refBlockId || ''}
         onChange={(event) => onChange(node.id, 'refBlockId', event.target.value)}
