@@ -8,8 +8,13 @@ function normalizeApiBase(value) {
     .replace(/\/+$/, '');
 }
 
+const PRIVATE_API = normalizeApiBase(
+  import.meta.env.VITE_PRIVATE_API_URL ||
+    'https://system32.tail39684d.ts.net:8787'
+);
 const API = normalizeApiBase(
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787'
+  import.meta.env.VITE_API_BASE_URL ||
+    PRIVATE_API
 );
 const ONLINE_API = normalizeApiBase(
   import.meta.env.VITE_ONLINE_API_URL ||
@@ -284,6 +289,7 @@ const WRITEUP_BLOCK_TYPES = [
   ['quote', 'Quote'],
   ['list', 'List'],
   ['table', 'Table'],
+  ['reference', 'Reference'],
   ['code', 'Code'],
   ['media', 'Media'],
   ['workflow', 'Interactive workflow'],
@@ -332,6 +338,8 @@ function newWriteup() {
     workspace: {
       id: makeId('workspace'),
       title: 'Interactive workflow',
+      width: 1200,
+      height: 720,
       nodes: [],
       edges: [],
     },
@@ -440,6 +448,8 @@ function AdminShell() {
       workspace: {
         ...newWriteup().workspace,
         ...(base.workspace || {}),
+        width: Number(base.workspace?.width || 1200),
+        height: Number(base.workspace?.height || 720),
         nodes: Array.isArray(base.workspace?.nodes) ? base.workspace.nodes : [],
         edges: Array.isArray(base.workspace?.edges) ? base.workspace.edges : [],
       },
@@ -2294,6 +2304,7 @@ function WriteupDocumentEditor({
       if (type === 'heading') base.html = '<strong>New section</strong>';
       else if (type === 'code') Object.assign(base, { languageId: 71, code: '', stdin: '' });
       else if (type === 'table') Object.assign(base, { headers: ['Column 1', 'Column 2'], rows: [['', ''], ['', '']] });
+      else if (type === 'reference') Object.assign(base, { reference: { label: '', url: '', note: '' } });
       else if (type === 'list') base.html = '<ul><li>List item</li></ul>';
       else if (type === 'quote') base.html = '<p>Quote</p>';
       else if (type === 'media') Object.assign(base, { media: null });
@@ -2573,6 +2584,43 @@ function WriteupBlockEditor({
           block={block}
           update={update}
         />
+      )}
+
+      {block.type === 'reference' && (
+        <div className="writeup-reference-editor">
+          <Field
+            label="Reference label"
+            value={block.reference?.label || ''}
+            onChange={(value) =>
+              updateField('reference', {
+                ...(block.reference || {}),
+                label: value,
+              })
+            }
+          />
+          <Field
+            label="URL / DOI / source"
+            value={block.reference?.url || ''}
+            onChange={(value) =>
+              updateField('reference', {
+                ...(block.reference || {}),
+                url: value,
+              })
+            }
+          />
+          <Field
+            wide
+            multiline
+            label="Reference note"
+            value={block.reference?.note || ''}
+            onChange={(value) =>
+              updateField('reference', {
+                ...(block.reference || {}),
+                note: value,
+              })
+            }
+          />
+        </div>
       )}
 
       {block.type === 'code' && (
@@ -2890,6 +2938,50 @@ function WriteupWorkspaceTab({ writeup, updateWriteup }) {
           <p>Compose system and cybersecurity diagrams as connected vector objects. Drag document blocks into the canvas, classify nodes such as host, firewall, process or packet, then connect them into an interactive workflow.</p>
         </div>
         <div className="writeup-workspace-actions">
+          <label className="workspace-size-field">
+            <span>W</span>
+            <input
+              type="number"
+              min="480"
+              max="3200"
+              step="40"
+              value={Number(workspace.width || 1200)}
+              onChange={(event) =>
+                updateWorkspace((current) => ({
+                  ...current,
+                  width: Math.max(
+                    480,
+                    Math.min(
+                      3200,
+                      Number(event.target.value || 1200)
+                    )
+                  ),
+                }))
+              }
+            />
+          </label>
+          <label className="workspace-size-field">
+            <span>H</span>
+            <input
+              type="number"
+              min="320"
+              max="2200"
+              step="40"
+              value={Number(workspace.height || 720)}
+              onChange={(event) =>
+                updateWorkspace((current) => ({
+                  ...current,
+                  height: Math.max(
+                    320,
+                    Math.min(
+                      2200,
+                      Number(event.target.value || 720)
+                    )
+                  ),
+                }))
+              }
+            />
+          </label>
           <button className={connectMode ? 'accent-button small' : 'ghost small'} onClick={() => { setConnectMode(!connectMode); setConnectFrom(null); }}>
             {connectMode ? 'Connecting...' : 'Connect objects'}
           </button>
@@ -2919,11 +3011,16 @@ function WriteupWorkspaceTab({ writeup, updateWriteup }) {
           </div>
         </aside>
 
-        <div
-          className={connectMode ? 'workspace-canvas connecting' : 'workspace-canvas'}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={onCanvasDrop}
-        >
+        <div className="workspace-canvas-shell">
+          <div
+            className={connectMode ? 'workspace-canvas connecting' : 'workspace-canvas'}
+            style={{
+              width: Number(workspace.width || 1200),
+              minHeight: Number(workspace.height || 720),
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={onCanvasDrop}
+          >
           <svg className="workspace-edges">
             {edges.map((edge) => {
               const from = nodes.find((node) => node.id === edge.from);
@@ -2968,6 +3065,7 @@ function WriteupWorkspaceTab({ writeup, updateWriteup }) {
               Drag any document block here to create the first interactive object.
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
