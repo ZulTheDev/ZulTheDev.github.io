@@ -1,10 +1,7 @@
 {
   "type": "module",
   "scripts": {
-    "assets:blog": "node build-blog-assets.mjs",
-    "predev": "npm run assets:blog",
     "dev": "vite",
-    "prebuild": "npm run assets:blog",
     "build": "vite build",
     "preview": "vite preview"
   },
