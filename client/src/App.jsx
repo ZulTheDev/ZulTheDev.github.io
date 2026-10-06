@@ -1091,8 +1091,8 @@ function Chat({ content }) {
       }));
 
     const endpoints = [
-      ONLINE_API,
       API,
+      ONLINE_API,
     ].filter(
       (value, index, list) =>
         value &&
