@@ -1399,7 +1399,7 @@ function ProfilePhoto({ profile }) {
         <img
           className="hero-photo"
           src={src}
-          alt={`${profile?.name || 'Zulfaqar Jamal'} profile`}
+          alt={`${profile?.preferredName || profile?.displayName || profile?.name || 'Fiya'} profile`}
           onError={() => {
             setSourceIndex((current) => {
               const next = current + 1;
