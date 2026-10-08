@@ -244,34 +244,6 @@ const hrefFor = (item, kind) => {
         </div>
       </section>
 
-      <section class="featured-section" aria-label="Explore blog topics">
-        <div class="featured-heading">
-          <span class="featured-kicker">WELCOME TO THE LAB</span>
-          <h2>Pick a rabbit hole.</h2>
-          <p>Security research, curious systems, and a little cat-shaped chaos. Start anywhere.</p>
-        </div>
-        <div class="featured-grid">
-          {featured.map((item) => (
-            <a class="featured-card" href={item.href}>
-              <span class="featured-icon" aria-hidden="true">{item.icon}</span>
-              <small>{item.category}</small>
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-              <span class="featured-link">Explore collection ↗</span>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      <section class="welcome-note" aria-label="Publishing status">
-        <span class="welcome-signal" aria-hidden="true"></span>
-        <div>
-          <strong>The notebook is open.</strong>
-          <p>Published writeups will appear here automatically after they're added through the content studio. Until then, explore the categories and the first webcomic preview below.</p>
-        </div>
-        <a href="#webcomic">Meet the cat ↗</a>
-      </section>
-
       <section
         id="recently-added"
         class="shelf"
@@ -317,13 +289,19 @@ const hrefFor = (item, kind) => {
                     <div class="card-image">
                       {
                         item.__placeholder ? (
-                          <div class="empty-art">
-                            <span>
-                              ฅ^•ﻌ•^ฅ
-                            </span>
-                            <small>
-                              awaiting signal
-                            </small>
+                          <div class="empty-art image-placeholder">
+                            <img
+                              src={image}
+                              alt=""
+                              width="960"
+                              height="540"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                            <div class="empty-caption">
+                              <span>ฅ^•ﻌ•^ฅ</span>
+                              <small>awaiting signal</small>
+                            </div>
                           </div>
                         ) : (
                           <img
@@ -406,13 +384,41 @@ const hrefFor = (item, kind) => {
         </div>
       </section>
 
+      <section class="featured-section" id="systems-lab" aria-label="Systems and security playground">
+        <div class="featured-heading">
+          <span class="featured-kicker">02 / SYSTEMS + SECURITY PLAYGROUND</span>
+          <h2>Pick a rabbit hole.</h2>
+          <p>Explore practical computer systems, cybersecurity, and creative side quests while the published notebook grows.</p>
+        </div>
+        <div class="featured-grid">
+          {featured.map((item) => (
+            <a class="featured-card" href={item.href}>
+              <span class="featured-icon" aria-hidden="true">{item.icon}</span>
+              <small>{item.category}</small>
+              <h3>{item.title}</h3>
+              <p>{item.description}</p>
+              <span class="featured-link">Explore collection ↗</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section class="welcome-note" aria-label="Publishing status">
+        <span class="welcome-signal" aria-hidden="true"></span>
+        <div>
+          <strong>The notebook is open.</strong>
+          <p>Published posts and writeups are still empty right now. New entries will appear automatically after they're published through the private content studio.</p>
+        </div>
+        <a href="#webcomic">Meet the cat ↗</a>
+      </section>
+
       <section
         id="ctf-writeups"
         class="shelf"
       >
         <header class="shelf-head">
           <div>
-            <small>02 / SECURITY LAB</small>
+            <small>03 / SECURITY LAB</small>
             <h2>CTF writeups</h2>
             <p>
               Challenge notes, evidence,
@@ -541,7 +547,7 @@ const hrefFor = (item, kind) => {
       >
         <header class="shelf-head">
           <div>
-            <small>03 / POLYMATH NOTEBOOK</small>
+            <small>04 / POLYMATH NOTEBOOK</small>
             <h2>Systems & field notes</h2>
             <p>
               Computer systems, software,
@@ -667,7 +673,7 @@ const hrefFor = (item, kind) => {
       >
         <header class="shelf-head">
           <div>
-            <small>04 / SIDE QUEST</small>
+            <small>05 / SIDE QUEST</small>
             <h2>Webcomic</h2>
             <p>
               Small illustrated stories,
