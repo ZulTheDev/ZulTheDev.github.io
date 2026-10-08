@@ -1,0 +1,26 @@
+---
+const {
+  items = [
+    { href: '/', label: 'Home', icon: '⌂' },
+    { href: '/blog/', label: 'Blog', icon: '✦' },
+    { href: '/ctf_blog/', label: 'CTF', icon: '⚑' },
+    { href: '/port_resume/', label: 'Resume', icon: '▤' },
+  ],
+  ariaLabel = 'Quick navigation',
+} = Astro.props;
+---
+
+<nav class="navigation-island" aria-label={ariaLabel}>
+  {
+    items.map((item) => (
+      <a
+        href={item.href}
+        class="navigation-island__item"
+        aria-label={item.label}
+      >
+        <span aria-hidden="true">{item.icon}</span>
+        <small>{item.label}</small>
+      </a>
+    ))
+  }
+</nav>
