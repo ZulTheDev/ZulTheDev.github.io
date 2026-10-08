@@ -7413,3 +7413,40 @@ samp{
     left:23px;
   }
 }
+
+
+/* Compact floating portfolio navigation.
+   Keep the dock content-sized; never let inherited nav styles turn it into a panel. */
+.portfolio-dock{
+  top:auto !important;
+  right:auto !important;
+  width:max-content !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:64px !important;
+  padding:6px !important;
+  border-radius:18px !important;
+}
+
+.portfolio-dock-brand{
+  min-width:54px !important;
+  min-height:40px !important;
+  padding:6px 9px !important;
+}
+
+.portfolio-dock-links a{
+  min-height:40px !important;
+  padding:6px 9px !important;
+}
+
+@media(max-width:760px){
+  .portfolio-dock{
+    width:calc(100vw - 18px) !important;
+    max-height:58px !important;
+    justify-content:flex-start;
+  }
+
+  .portfolio-dock-links{
+    flex:0 0 auto;
+  }
+}
