@@ -55,6 +55,33 @@ const months = (start, end) => {
   );
 };
 
+function cozyProjectBadges(item) {
+  const haystack = [
+    item?.title,
+    item?.category,
+    item?.description,
+    ...(Array.isArray(item?.skills) ? item.skills : []),
+    ...(Array.isArray(item?.tags) ? item.tags : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  const badges = [];
+
+  if (/python/.test(haystack)) badges.push('🐍 python princess');
+  if (/vapt|pentest|penetration|vulnerab/.test(haystack)) badges.push('🛡️ vapt automation');
+  if (/dfir|forensic|incident/.test(haystack)) badges.push('🔎 dfir detective');
+  if (/threat|cti|intelligence/.test(haystack)) badges.push('📡 cti signal scout');
+  if (/linux/.test(haystack)) badges.push('🐧 linux wizard');
+  if (/automation/.test(haystack)) badges.push('✨ cozy automation');
+  if (/software|development|indie/.test(haystack)) badges.push('🧸 indie dev');
+
+  if (!badges.length) badges.push('🌸 curious build');
+
+  return badges.slice(0, 3);
+}
+
 /* =========================================================
    CONTENT NORMALIZATION
    Keeps the client safe when the CMS/API has optional fields.
@@ -4768,6 +4795,17 @@ export default function App({ initialContent = null }) {
       ? window.location
       : { pathname: '', hash: '', search: '' };
 
+  const hiringQuery =
+    typeof URLSearchParams !== 'undefined'
+      ? new URLSearchParams(
+          currentLocation.search || ''
+        )
+      : null;
+
+  const isMentorHiring =
+    hiringQuery?.get('hiring') ===
+    'system_security_mentor';
+
   const pathnameWithoutBase =
     currentLocation.pathname.startsWith(BASE_PATH)
       ? '/' + currentLocation.pathname.slice(BASE_PATH.length).replace(/^\/+/, '')
@@ -5148,142 +5186,95 @@ export default function App({ initialContent = null }) {
   return (
     <>
       {/* ===================================================
-          NAVIGATION
+          COZY EXPLORATION DOCK
       =================================================== */}
 
-      <nav className={mobileNavOpen ? 'mobile-nav-open' : ''}>
-        <a
-          href="#home"
-          className="site-nav-brand"
-          onClick={() => setMobileNavOpen(false)}
-        >
-          <b>
-            ZUL<span>/</span>JAMAL
-          </b>
+      <nav className="cozy-dock" aria-label="Primary navigation">
+        <a href="#home" className="cozy-dock-brand">
+          <span className="cozy-dock-sparkle">✦</span>
+          <b>ZUL<span>/</span>JAMAL</b>
         </a>
 
-        <button
-          type="button"
-          className="mobile-nav-toggle"
-          aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
-          aria-expanded={mobileNavOpen}
-          aria-controls="mobile-site-navigation"
-          onClick={() => setMobileNavOpen((open) => !open)}
-        >
-          {mobileNavOpen ? <X size={25} /> : <Menu size={25} />}
-        </button>
-
-        <div
-          id="mobile-site-navigation"
-          className="site-nav-links"
-        >
-          {[
-            'home',
-            'recent',
-            'certifications',
-            'awards',
-            'projects',
-            'experience',
-            'buy-first',
-            'contact',
-          ].map((item) => (
-            <a
-              key={item}
-              href={`#${item}`}
-              onClick={() => setMobileNavOpen(false)}
-            >
-              {item}
-            </a>
-          ))}
+        <div className="cozy-dock-links">
+          <a href="#home">Home</a>
+          <a href="#tools">Tools</a>
+          <a href="#mentor-profile">Mentor profile</a>
+          <a href="/port_resume">Resume</a>
         </div>
 
-        <div className="site-nav-extra-links">
-          <a href="/port_resume" onClick={() => setMobileNavOpen(false)}>
-            Resume
-          </a>
-
-          <a href={(import.meta.env.BASE_URL || '/') + 'exploration/'} onClick={() => setMobileNavOpen(false)}>
-            Explore{' '}
-            <Sparkles size={13} />
-          </a>
-
-          <a href="#games" onClick={() => setMobileNavOpen(false)}>
-            Games
-          </a>
-
-          <a href="/blog" onClick={() => setMobileNavOpen(false)}>
-            Blog / CTF Labs
-          </a>
-        </div>
+        <a className="cozy-dock-blog" href="/blog">
+          blog 🌸
+        </a>
       </nav>
 
-      <main>
+      <main className="cozy-main">
         {/* =================================================
-            HERO
+            HERO / DIGITAL ARCHIVE
         ================================================= */}
 
         <section
           id="home"
-          className="hero"
+          className="hero cozy-hero"
         >
-          <div>
-            <div className="identity-lockup" aria-label="Zulfaqar Jamal identity">
-              <span
-                className="identity-name identity-zulfaqar"
-                data-hover="Zulfiya"
-              >
-                Zulfaqar
-              </span>{' '}
-              <span
-                className="identity-name identity-jamal"
-                data-hover="(Firebyte_1011 / Firesecurity)"
-              >
-                Jamal
-              </span>
+          <div className="cozy-hero-copy">
+            {isMentorHiring && (
+              <aside className="mentor-query-banner">
+                <span>MENTORSHIP ZONE ✦</span>
+                <strong>
+                  hey hiring team — i don't gatekeep security concepts.
+                </strong>
+                <p>
+                  I care about patient explanations, clean documentation,
+                  repeatable labs, and helping people understand the “why”
+                  before asking them to memorize the “how”.
+                </p>
+              </aside>
+            )}
+
+            <div className="cozy-eyebrow">
+              <span className="status-dot" />
+              local tech girlie · singapore
             </div>
 
             <h1>
-              Security minded.
+              hey, i'm zul!
               <br />
-              <i>
-                Builder heart.
-              </i>
+              <i>(she/her) ✨</i>
             </h1>
 
-            <p>
-              {content.profile.summary}
+            <p className="cozy-hero-lede">
+              just a local trans femme tech girlie automating system security,
+              writing cozy python scripts, and breaking into things securely.
+              welcome to my digital archive—take a look around! 🌸
             </p>
 
-            <a
-              className="btn"
-              href="#experience"
-            >
-              Explore experience
-              <ArrowUpRight />
-            </a>
+            <div className="cozy-hero-actions">
+              <a className="cozy-primary-button" href="#tools">
+                browse my toolbox
+                <ArrowUpRight size={15} />
+              </a>
+
+              <a className="cozy-secondary-button" href="/blog">
+                read the archive
+              </a>
+            </div>
+
+            <div className="cozy-mini-badges" aria-label="Focus areas">
+              <span>💗 security automation</span>
+              <span>🩵 dfir + cti</span>
+              <span>🐍 python things</span>
+              <span>🌙 soft systems energy</span>
+            </div>
           </div>
 
-          <div className="heroart">
+          <div className="heroart cozy-hero-art">
             <ProfilePhoto
               profile={content.profile}
             />
 
-            <div
-              className="hero-pronouns"
-              tabIndex={0}
-              title="Hover or focus to reveal"
-            >
-              <span className="pronoun-label">
-                pronouns
-              </span>
-
-              <span className="pronoun-value">
-                {content.profile.pronouns || 'not set'}
-              </span>
-
-              <span className="pronoun-hint">
-                hover
-              </span>
+            <div className="hero-pronouns cozy-pronouns">
+              <span>she / her</span>
+              <small>trans femme & building things ✨</small>
             </div>
           </div>
         </section>
@@ -5483,38 +5474,137 @@ export default function App({ initialContent = null }) {
         </section>
 
         {/* =================================================
-            PROJECTS
+            TOOLS / PROJECTS / RESEARCH
         ================================================= */}
 
-        <section id="projects">
-          <small>
-            05 / LAB
-          </small>
+        <section id="tools" className="cozy-tools-section">
+          <span id="projects" className="cozy-anchor-proxy" aria-hidden="true" />
 
-          <h2>
-            Project & Research
-          </h2>
-
-          <Rail
-            items={content.projects}
-            mediaPlaceholder="Project image"
-            mediaVariant="project"
-            onOpen={(item) =>
-              setSelected(['Project', item])
-            }
-          />
-
-          <div className="section-subhead">
-            <small>RESEARCH</small>
-            <h3>Research</h3>
+          <div className="cozy-section-heading">
+            <div>
+              <small>05 / PLAYGROUND</small>
+              <h2>tools, scripts & little experiments</h2>
+            </div>
+            <p>
+              practical security automation, research rabbit holes, and
+              whatever useful thing i felt like building this week.
+            </p>
           </div>
 
-          <Rail
-            items={content.research}
-            onOpen={(item) =>
-              setSelected(['Research', item])
-            }
-          />
+          <div className="cozy-project-grid">
+            {content.projects.map((item) => (
+              <article className="cozy-project-card" key={item.id}>
+                <button
+                  type="button"
+                  className="cozy-project-open"
+                  onClick={() => setSelected(['Project', item])}
+                  aria-label={`Open project: ${item.title}`}
+                >
+                  <div className="cozy-project-orbit" aria-hidden="true">
+                    <span>✦</span>
+                  </div>
+
+                  <small>
+                    {item.category || 'PROJECT'}
+                  </small>
+
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+
+                  <div className="cozy-badge-row">
+                    {cozyProjectBadges(item).map((badge) => (
+                      <span key={badge}>{badge}</span>
+                    ))}
+                  </div>
+
+                  <b>
+                    peek inside
+                    <ArrowUpRight size={14} />
+                  </b>
+                </button>
+
+                {item.link && (
+                  <a
+                    className="cozy-project-link"
+                    href={item.link}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    project link ↗
+                  </a>
+                )}
+              </article>
+            ))}
+          </div>
+
+          <div className="cozy-research-header">
+            <small>RESEARCH NOTES</small>
+            <h3>things i'm happily overthinking</h3>
+          </div>
+
+          <div className="cozy-research-grid">
+            {content.research.map((item) => (
+              <button
+                key={item.id}
+                className="cozy-research-card"
+                onClick={() => setSelected(['Research', item])}
+              >
+                <span>♡</span>
+                <div>
+                  <small>{item.category || 'RESEARCH'}</small>
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* =================================================
+            MENTOR PROFILE
+        ================================================= */}
+
+        <section id="mentor-profile" className="mentor-profile">
+          <div className="mentor-profile-copy">
+            <small>MENTOR PROFILE / NO GATEKEEPING</small>
+            <h2>
+              security is easier when
+              <i> people feel safe asking questions.</i>
+            </h2>
+            <p>
+              I like explaining technical ideas in plain language, documenting
+              the steps people usually skip, and turning intimidating security
+              topics into hands-on exercises that actually make sense.
+            </p>
+
+            <a
+              className="cozy-primary-button"
+              href="/port_resume?hiring=system_security_mentor"
+            >
+              open mentor-ready resume
+              <ArrowUpRight size={15} />
+            </a>
+          </div>
+
+          <div className="mentor-values-grid">
+            <article>
+              <span>01</span>
+              <strong>clarity first</strong>
+              <p>explain the system before throwing jargon at someone.</p>
+            </article>
+
+            <article>
+              <span>02</span>
+              <strong>document the weird bits</strong>
+              <p>write down the tiny steps that experienced people forget are not obvious.</p>
+            </article>
+
+            <article>
+              <span>03</span>
+              <strong>patient by design</strong>
+              <p>give learners room to experiment, ask again, and break things safely.</p>
+            </article>
+          </div>
         </section>
 
         {/* =================================================
