@@ -3769,6 +3769,54 @@ function WebcomicWildCard({
   );
 }
 
+function isCybersecurityWriteup(item) {
+  if (!item || typeof item !== 'object') {
+    return false;
+  }
+
+  const kind =
+    String(item.kind || '')
+      .trim()
+      .toLowerCase();
+
+  if (kind === 'webcomic' || kind === 'blog') {
+    return false;
+  }
+
+  if (kind === 'ctf') {
+    return true;
+  }
+
+  if (
+    item.ctf &&
+    typeof item.ctf === 'object' &&
+    (
+      item.ctf.event ||
+      item.ctf.category ||
+      item.ctf.difficulty ||
+      item.ctf.points
+    )
+  ) {
+    return true;
+  }
+
+  const haystack = [
+    item.title,
+    item.excerpt,
+    item.description,
+    item.category,
+    item.issuer,
+    ...(Array.isArray(item.tags) ? item.tags : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return /\b(ctf|cyber|cybersecurity|security|dfir|forensic|forensics|osint|reverse engineering|reversing|binary exploitation|pwn|web exploitation|web security|cryptography|crypto challenge|malware|incident response|soc|vulnerability|pentest|penetration testing|network security|packet|threat intel|threat intelligence)\b/.test(
+    haystack
+  );
+}
+
 function CTFBlogIndexView() {
   const [ctfItems, setCtfItems] =
     useState([]);
@@ -4102,6 +4150,231 @@ function CTFBlogIndexView() {
           setOpenComic(null)
         }
       />
+    </>
+  );
+}
+
+function CTFCatalogView() {
+  const [items, setItems] =
+    useState([]);
+  const [loading, setLoading] =
+    useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCatalog() {
+      const candidates = [
+        BASE_PATH +
+          'ctf_blog/index.json',
+        BASE_PATH +
+          'ctf-blog/index.json',
+      ];
+
+      for (const url of candidates) {
+        try {
+          const response =
+            await fetch(url);
+
+          if (!response.ok) {
+            continue;
+          }
+
+          const data =
+            await response.json();
+
+          const writeups =
+            Array.isArray(data?.writeups)
+              ? data.writeups
+              : [];
+
+          if (active) {
+            setItems(
+              writeups.filter(
+                isCybersecurityWriteup
+              )
+            );
+            setLoading(false);
+          }
+
+          return;
+        } catch {
+          // Try the legacy path next.
+        }
+      }
+
+      if (active) {
+        setItems([]);
+        setLoading(false);
+      }
+    }
+
+    loadCatalog();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const heroImage = blogAsset(
+    'images/blog-hero-sakura-catgirl.webp'
+  );
+
+  const cards =
+    items.length
+      ? items
+      : Array.from(
+          { length: 6 },
+          (_, index) => ({
+            __placeholder: true,
+            id:
+              'ctf-catalog-placeholder-' +
+              index,
+          })
+        );
+
+  return (
+    <>
+      <nav className="blog-top-nav">
+        <a
+          href="/"
+          className="blog-brand"
+        >
+          <b>
+            ZUL<span>/</span>JAMAL
+          </b>
+        </a>
+
+        <div>
+          <a href="/blog">
+            Blog
+          </a>
+          <a href="#writeups">
+            CTF writeups
+          </a>
+        </div>
+      </nav>
+
+      <main className="blog-home">
+        <section className="blog-hero ctf-catalog-hero">
+          <img
+            src={heroImage}
+            alt=""
+            className="blog-hero-image"
+          />
+
+          <div className="blog-hero-shade" />
+
+          <div className="blog-hero-copy">
+            <small>
+              CYBERSECURITY / CTF ARCHIVE
+            </small>
+
+            <h1>
+              Challenge notes,
+              <br />
+              <i>
+                evidence & exploits.
+              </i>
+            </h1>
+
+            <p>
+              This archive intentionally shows
+              only cybersecurity and CTF-related
+              writeups. General blog posts and
+              webcomics stay under /blog.
+            </p>
+
+            <div className="blog-engine-strip">
+              <span>DFIR</span>
+              <span>OSINT</span>
+              <span>WEB</span>
+              <span>REV</span>
+              <span>PWN</span>
+              <span>CRYPTO</span>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="writeups"
+          className="blog-shelf"
+        >
+          <div className="blog-shelf-head">
+            <div>
+              <small>
+                SECURITY-ONLY INDEX
+              </small>
+
+              <h2>
+                CTF & cybersecurity
+              </h2>
+
+              <p>
+                Filtered from the published CTF
+                index using document type, CTF
+                metadata, tags and security
+                keywords.
+              </p>
+            </div>
+
+            <span>
+              {items.length} published
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="writeup-index-empty">
+              <strong>
+                Loading security archive...
+              </strong>
+            </div>
+          ) : (
+            <div className="blog-card-grid">
+              {cards.map((item, index) => (
+                <BlogSectionCard
+                  key={
+                    item.slug ||
+                    item.id ||
+                    index
+                  }
+                  item={item}
+                  type="CTF"
+                  fallbackImage={
+                    heroImage
+                  }
+                  placeholder={
+                    Boolean(
+                      item.__placeholder
+                    )
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="blog-vector-footer">
+          <div>
+            <small>
+              SCOPE BOUNDARY
+            </small>
+
+            <h2>
+              Security work only.
+            </h2>
+
+            <p>
+              Personal notes, general systems
+              articles and webcomics remain on
+              the main blog instead of leaking
+              into the CTF archive.
+            </p>
+          </div>
+
+          <PolymathVectorSystem />
+        </section>
+      </main>
     </>
   );
 }
@@ -4690,12 +4963,15 @@ export default function App({ initialContent = null }) {
      CTF BLOG ROUTES
   ======================================================= */
 
+  if (ctfPath === '/blog') {
+    return <CTFBlogIndexView />;
+  }
+
   if (
-    ctfPath === '/blog' ||
     ctfPath === '/ctf_blog' ||
     ctfPath === '/ctf-blog'
   ) {
-    return <CTFBlogIndexView />;
+    return <CTFCatalogView />;
   }
 
   if (
