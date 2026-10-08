@@ -4347,6 +4347,39 @@ function SystemEditor({
         {serviceStatus.checkedAt && <small className="system-note">Checked {new Date(serviceStatus.checkedAt).toLocaleString()}</small>}
       </section>
 
+      <section className="panel admin-pipeline-panel">
+        <PanelHeader eyebrow="CONTENT PIPELINE" title="Private publishing path" />
+        <p className="helper">The local admin stays private. Content is created here, passed to the Tailscale API, then synchronized through the service that owns each type of data.</p>
+
+        <div className="admin-pipeline-map" aria-label="Admin publishing architecture">
+          <div className="pipeline-node primary">
+            <small>01</small>
+            <strong>Admin UI</strong>
+            <span>local/private</span>
+          </div>
+          <div className="pipeline-arrow">→</div>
+          <div className="pipeline-node">
+            <small>02</small>
+            <strong>Tailscale API</strong>
+            <span>:8787</span>
+          </div>
+          <div className="pipeline-arrow">→</div>
+          <div className="pipeline-services">
+            <div className="pipeline-node"><small>03A</small><strong>Google Drive</strong><span>documents + library</span></div>
+            <div className="pipeline-node"><small>03B</small><strong>Cloudflare R2</strong><span>image / video / audio</span></div>
+            <div className="pipeline-node"><small>03C</small><strong>GitHub App</strong><span>commit published JSON</span></div>
+            <div className="pipeline-node"><small>03D</small><strong>Vercel API</strong><span>public chatbot/read API</span></div>
+          </div>
+        </div>
+
+        <div className="pipeline-note-grid">
+          <span><b>Writeups:</b> document editor → GitHub App</span>
+          <span><b>Media:</b> editor → R2</span>
+          <span><b>Source files:</b> editor → Drive</span>
+          <span><b>Public AI:</b> Vercel first, Tailscale backup</span>
+        </div>
+      </section>
+
       <section className="panel">
         <PanelHeader eyebrow="PUBLIC AI" title="Chatbot smoke test" />
         <p className="helper">Sends one real request to the online Vercel chatbot using the current portfolio content.</p>
