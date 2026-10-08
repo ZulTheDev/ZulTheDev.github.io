@@ -1,0 +1,15 @@
+---
+const {
+  label,
+  tone = 'pink',
+} = Astro.props;
+---
+
+<span
+  class:list={[
+    'tech-badge',
+    tone === 'blue' && 'tech-badge--blue',
+  ]}
+>
+  {label}
+</span>

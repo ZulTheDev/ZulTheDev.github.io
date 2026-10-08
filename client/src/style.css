@@ -6251,3 +6251,115 @@ samp{
 .chat .usr{
   background:rgba(255,121,198,.14);
 }
+
+
+/* =========================================================
+   NAVIGATION ISLAND V2
+   One compact bottom-centre navigation surface replaces the
+   large left rail. This leaves the content canvas uncluttered
+   and matches the Astro shell used by /blog.
+========================================================= */
+
+.cozy-dock{
+  left:50%!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:18px!important;
+  width:auto!important;
+  max-width:calc(100vw - 30px);
+  transform:translateX(-50%)!important;
+  display:flex!important;
+  align-items:center;
+  gap:5px!important;
+  padding:7px!important;
+  border-radius:20px!important;
+  background:rgba(36,30,51,.9)!important;
+  box-shadow:
+    0 24px 70px rgba(4,2,10,.35),
+    0 0 0 1px rgba(255,121,198,.025) inset!important;
+  backdrop-filter:blur(20px)!important;
+}
+
+.cozy-dock-brand{
+  min-height:46px;
+  display:flex!important;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:7px 10px!important;
+  border:1px solid rgba(255,121,198,.1);
+  border-radius:13px!important;
+  background:rgba(255,121,198,.045)!important;
+  white-space:nowrap;
+}
+
+.cozy-dock-links{
+  display:flex!important;
+  align-items:center;
+  gap:3px!important;
+}
+
+.cozy-dock-links a,
+.cozy-dock-blog{
+  min-height:46px;
+  display:flex!important;
+  align-items:center;
+  justify-content:center;
+  padding:7px 11px!important;
+  border-radius:13px!important;
+  white-space:nowrap;
+}
+
+.cozy-dock-links a:hover,
+.cozy-dock-links a:focus-visible,
+.cozy-dock-blog:hover,
+.cozy-dock-blog:focus-visible{
+  transform:translateY(-2px)!important;
+}
+
+.cozy-dock-blog{
+  margin-left:0!important;
+}
+
+/* With the left rail gone, sections regain a centred content canvas. */
+.cozy-main > section{
+  padding-left:clamp(28px,6vw,92px)!important;
+  padding-right:clamp(28px,6vw,92px)!important;
+}
+
+.cozy-main{
+  padding-bottom:92px;
+}
+
+@media(max-width:760px){
+  .cozy-dock{
+    bottom:10px!important;
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+
+  .cozy-dock::-webkit-scrollbar{
+    display:none;
+  }
+
+  .cozy-dock-brand{
+    min-width:46px;
+    padding:7px 9px!important;
+  }
+
+  .cozy-dock-brand b{
+    display:none;
+  }
+
+  .cozy-dock-links a,
+  .cozy-dock-blog{
+    min-height:43px;
+    padding:6px 9px!important;
+    font-size:9px!important;
+  }
+
+  .cozy-main > section{
+    padding-left:18px!important;
+    padding-right:18px!important;
+  }
+}

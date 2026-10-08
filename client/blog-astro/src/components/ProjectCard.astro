@@ -1,0 +1,47 @@
+---
+import TechBadge from './TechBadge.astro';
+
+const {
+  title,
+  description = '',
+  category = 'Project',
+  href = '',
+  tags = [],
+} = Astro.props;
+---
+
+<article class="archive-card">
+  <small class="archive-card__type">
+    {category}
+  </small>
+
+  <h3>{title}</h3>
+
+  {description && (
+    <p>{description}</p>
+  )}
+
+  {Array.isArray(tags) && tags.length > 0 && (
+    <div class="badge-row">
+      {
+        tags.map((tag, index) => (
+          <TechBadge
+            label={tag}
+            tone={index % 2 ? 'blue' : 'pink'}
+          />
+        ))
+      }
+    </div>
+  )}
+
+  {href && (
+    <a
+      class="archive-card__link"
+      href={href}
+      target={href.startsWith('http') ? '_blank' : undefined}
+      rel={href.startsWith('http') ? 'noreferrer' : undefined}
+    >
+      open project ↗
+    </a>
+  )}
+</article>

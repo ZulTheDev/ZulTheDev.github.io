@@ -1,5 +1,6 @@
 ---
 import '../styles/blog.css';
+import Layout from '../layouts/Layout.astro';
 import blogIndex from '../../../public/blog/index.json';
 import ctfIndex from '../../../public/ctf_blog/index.json';
 import webcomicIndex from '../../../public/webcomic/index.json';
@@ -167,84 +168,19 @@ const hrefFor = (item, kind) => {
 };
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1"
-    />
-    <meta
-      name="description"
-      content="Zul Jamal's field notes, CTF writeups, systems experiments and webcomic side quests."
-    />
-    <meta
-      name="theme-color"
-      content="#0d0a11"
-    />
-    <link
-      rel="preload"
-      href={heroImage}
-      as="image"
-      type="image/webp"
-      fetchpriority="high"
-    />
-    <title>
-      Zul/Jamal — Blog & CTF Lab
-    </title>
-  </head>
-
-  <body>
-    <header class="topbar">
-      <a
-        class="brand"
-        href="/"
-        aria-label="Back to portfolio home"
-      >
-        ZUL<span>/</span>JAMAL
-      </a>
-
-      <details class="nav-cluster">
-        <summary>
-          <span class="nav-dot"></span>
-          Explore
-          <span
-            class="nav-chevron"
-            aria-hidden="true"
-          >
-            ▾
-          </span>
-        </summary>
-
-        <nav
-          class="dropdown"
-          aria-label="Blog navigation"
-        >
-          <a href="/">
-            <span>00</span>
-            Home
-          </a>
-
-          <a href="#recently-added">
-            <span>01</span>
-            Recently added
-          </a>
-
-          <a href="#ctf-writeups">
-            <span>02</span>
-            CTF writeup
-          </a>
-
-          <a href="#webcomic">
-            <span>03</span>
-            Webcomic
-          </a>
-        </nav>
-      </details>
-    </header>
-
-    <main>
+<Layout
+  title="Zul/Jamal — Blog & CTF Lab"
+  description="Zul Jamal's field notes, CTF writeups, systems experiments and webcomic side quests."
+  preloadImage={heroImage}
+  navItems={[
+    { href: '/', label: 'Home', icon: '⌂' },
+    { href: '#recently-added', label: 'Recent', icon: '✦' },
+    { href: '#ctf-writeups', label: 'CTF', icon: '⚑' },
+    { href: '#webcomic', label: 'Comic', icon: '♡' },
+    { href: '/port_resume/', label: 'Resume', icon: '▤' },
+  ]}
+>
+  <main class="blog-page">
       <section
         class="hero"
         aria-labelledby="hero-title"
@@ -1008,5 +944,4 @@ const hrefFor = (item, kind) => {
         </section>
       ))
     }
-  </body>
-</html>
+</Layout>
