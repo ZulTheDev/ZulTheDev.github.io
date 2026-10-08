@@ -1,0 +1,926 @@
+---
+import '../styles/blog.css';
+import blogIndex from '../../../public/blog/index.json';
+import ctfIndex from '../../../public/ctf_blog/index.json';
+import webcomicIndex from '../../../public/webcomic/index.json';
+
+const blogPosts = Array.isArray(blogIndex?.posts)
+  ? blogIndex.posts
+  : [];
+
+const ctfWriteups = Array.isArray(ctfIndex?.writeups)
+  ? ctfIndex.writeups
+  : [];
+
+const comics = Array.isArray(webcomicIndex?.comics)
+  ? webcomicIndex.comics
+  : [];
+
+const recent = [
+  ...blogPosts.map((item) => ({
+    ...item,
+    __kind: 'BLOG',
+  })),
+  ...ctfWriteups.map((item) => ({
+    ...item,
+    __kind: 'CTF',
+  })),
+]
+  .sort((a, b) =>
+    String(
+      b.updatedAt ||
+      b.publishedAt ||
+      ''
+    ).localeCompare(
+      String(
+        a.updatedAt ||
+        a.publishedAt ||
+        ''
+      )
+    )
+  )
+  .slice(0, 6);
+
+const systemsNotes = blogPosts.filter((item) => {
+  const haystack = [
+    item?.title,
+    item?.excerpt,
+    ...(Array.isArray(item?.tags) ? item.tags : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return /system|security|cyber|network|linux|forensic|dfir|code|software|hardware/.test(
+    haystack
+  );
+});
+
+const heroImage =
+  '/images/blog-hero-sakura-catgirl.webp';
+
+const catImage =
+  '/images/blog-clueless-cat.webp';
+
+const dateLabel = (value) => {
+  if (!value) {
+    return 'Coming soon';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Recently';
+  }
+
+  return new Intl.DateTimeFormat('en-SG', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+};
+
+const fillCards = (
+  items,
+  count = 6
+) => {
+  const result = [...items];
+
+  while (result.length < count) {
+    result.push({
+      __placeholder: true,
+      id:
+        'placeholder-' +
+        result.length,
+    });
+  }
+
+  return result;
+};
+
+const hrefFor = (item, kind) => {
+  if (item?.__placeholder) {
+    return '';
+  }
+
+  if (kind === 'CTF') {
+    return '/ctf_blog/' + item.slug;
+  }
+
+  if (kind === 'WEBCOMIC') {
+    return '#comic-' + item.slug;
+  }
+
+  return '/blog/' + item.slug;
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+    <meta
+      name="description"
+      content="Zul Jamal's field notes, CTF writeups, systems experiments and webcomic side quests."
+    />
+    <meta
+      name="theme-color"
+      content="#0d0a11"
+    />
+    <link
+      rel="preload"
+      href={heroImage}
+      as="image"
+      type="image/webp"
+      fetchpriority="high"
+    />
+    <title>
+      Zul/Jamal — Blog & CTF Lab
+    </title>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a
+        class="brand"
+        href="/"
+        aria-label="Back to portfolio home"
+      >
+        ZUL<span>/</span>JAMAL
+      </a>
+
+      <details class="nav-cluster">
+        <summary>
+          <span class="nav-dot"></span>
+          Explore
+          <span
+            class="nav-chevron"
+            aria-hidden="true"
+          >
+            ▾
+          </span>
+        </summary>
+
+        <nav
+          class="dropdown"
+          aria-label="Blog navigation"
+        >
+          <a href="/">
+            <span>00</span>
+            Home
+          </a>
+
+          <a href="#recently-added">
+            <span>01</span>
+            Recently added
+          </a>
+
+          <a href="#ctf-writeups">
+            <span>02</span>
+            CTF writeup
+          </a>
+
+          <a href="#webcomic">
+            <span>03</span>
+            Webcomic
+          </a>
+        </nav>
+      </details>
+    </header>
+
+    <main>
+      <section
+        class="hero"
+        aria-labelledby="hero-title"
+      >
+        <img
+          class="hero-image"
+          src={heroImage}
+          alt="Sakura tree in bloom with a chibi cat girl looking up at the sky"
+          width="1600"
+          height="900"
+          decoding="async"
+          fetchpriority="high"
+        />
+
+        <div class="hero-overlay"></div>
+
+        <div class="hero-copy">
+          <div class="eyebrow-row">
+            <span>FIELD NOTES / 2026</span>
+            <span class="astro-badge">
+              ASTRO STATIC
+            </span>
+          </div>
+
+          <h1 id="hero-title">
+            Curiosity grows
+            <br />
+            <em>where systems bloom.</em>
+          </h1>
+
+          <p>
+            CTF writeups, computer systems,
+            cybersecurity experiments, code,
+            and small illustrated side quests.
+          </p>
+
+          <div class="signal-row">
+            <span>Cloudflare R2 media</span>
+            <span>Judge0 labs</span>
+            <span>Pure vector systems</span>
+            <span>0 hydration on this page</span>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="recently-added"
+        class="shelf"
+      >
+        <header class="shelf-head">
+          <div>
+            <small>01 / FRESH SIGNALS</small>
+            <h2>Recently added</h2>
+            <p>
+              New notes and writeups, rendered as
+              static HTML before they ever reach
+              your browser.
+            </p>
+          </div>
+
+          <span class="count">
+            {recent.length} published
+          </span>
+        </header>
+
+        <div class="card-stack">
+          {
+            fillCards(recent).map(
+              (item, index) => {
+                const kind =
+                  item.__kind ||
+                  'RECENT';
+
+                const href =
+                  hrefFor(item, kind);
+
+                const image =
+                  item.banner ||
+                  item.image ||
+                  (
+                    index % 2 === 0
+                      ? catImage
+                      : heroImage
+                  );
+
+                const content = (
+                  <>
+                    <div class="card-image">
+                      {
+                        item.__placeholder ? (
+                          <div class="empty-art">
+                            <span>
+                              ฅ^•ﻌ•^ฅ
+                            </span>
+                            <small>
+                              awaiting signal
+                            </small>
+                          </div>
+                        ) : (
+                          <img
+                            src={image}
+                            alt=""
+                            width="960"
+                            height="540"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )
+                      }
+
+                      <span class="kind">
+                        {kind}
+                      </span>
+
+                      <span class="index">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+
+                    <div class="card-copy">
+                      <small>
+                        {
+                          item.__placeholder
+                            ? 'Reserved'
+                            : dateLabel(
+                                item.updatedAt ||
+                                item.publishedAt
+                              )
+                        }
+                      </small>
+
+                      <h3>
+                        {
+                          item.__placeholder
+                            ? 'Empty slot'
+                            : item.title
+                        }
+                      </h3>
+
+                      <p>
+                        {
+                          item.__placeholder
+                            ? 'A clean slot for the next article, lab note or challenge writeup.'
+                            : (
+                                item.excerpt ||
+                                'Open the entry to explore the full note.'
+                              )
+                        }
+                      </p>
+
+                      <b>
+                        {
+                          item.__placeholder
+                            ? 'Waiting for content'
+                            : 'Open entry →'
+                        }
+                      </b>
+                    </div>
+                  </>
+                );
+
+                return item.__placeholder ? (
+                  <article class="entry-card empty">
+                    {content}
+                  </article>
+                ) : (
+                  <a
+                    class="entry-card"
+                    href={href}
+                  >
+                    {content}
+                  </a>
+                );
+              }
+            )
+          }
+        </div>
+      </section>
+
+      <section
+        id="ctf-writeups"
+        class="shelf"
+      >
+        <header class="shelf-head">
+          <div>
+            <small>02 / SECURITY LAB</small>
+            <h2>CTF writeups</h2>
+            <p>
+              Challenge notes, evidence,
+              packet trails and runnable code.
+            </p>
+          </div>
+
+          <span class="count">
+            {ctfWriteups.length} published
+          </span>
+        </header>
+
+        <div class="card-stack">
+          {
+            fillCards(ctfWriteups).map(
+              (item, index) => {
+                const href =
+                  hrefFor(item, 'CTF');
+
+                const content = (
+                  <>
+                    <div class="card-image">
+                      {
+                        item.__placeholder ? (
+                          <div class="empty-art cyber">
+                            <svg
+                              viewBox="0 0 160 90"
+                              aria-hidden="true"
+                            >
+                              <path d="M8 68L40 28L72 54L108 18L152 48" />
+                              <circle cx="40" cy="28" r="4" />
+                              <circle cx="72" cy="54" r="4" />
+                              <circle cx="108" cy="18" r="4" />
+                            </svg>
+                            <small>
+                              no challenge loaded
+                            </small>
+                          </div>
+                        ) : (
+                          <img
+                            src={
+                              item.banner ||
+                              heroImage
+                            }
+                            alt=""
+                            width="960"
+                            height="540"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )
+                      }
+
+                      <span class="kind">
+                        CTF
+                      </span>
+
+                      <span class="index">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+
+                    <div class="card-copy">
+                      <small>
+                        {
+                          item.__placeholder
+                            ? 'Reserved'
+                            : dateLabel(
+                                item.updatedAt ||
+                                item.publishedAt
+                              )
+                        }
+                      </small>
+
+                      <h3>
+                        {
+                          item.__placeholder
+                            ? 'Unsolved slot'
+                            : item.title
+                        }
+                      </h3>
+
+                      <p>
+                        {
+                          item.__placeholder
+                            ? 'The next exploit, forensic trail or weird packet mystery goes here.'
+                            : (
+                                item.excerpt ||
+                                'Read the full challenge writeup.'
+                              )
+                        }
+                      </p>
+
+                      <b>
+                        {
+                          item.__placeholder
+                            ? 'Awaiting challenge'
+                            : 'Enter lab →'
+                        }
+                      </b>
+                    </div>
+                  </>
+                );
+
+                return item.__placeholder ? (
+                  <article class="entry-card empty">
+                    {content}
+                  </article>
+                ) : (
+                  <a
+                    class="entry-card"
+                    href={href}
+                  >
+                    {content}
+                  </a>
+                );
+              }
+            )
+          }
+        </div>
+      </section>
+
+      <section
+        id="systems-notes"
+        class="shelf"
+      >
+        <header class="shelf-head">
+          <div>
+            <small>03 / POLYMATH NOTEBOOK</small>
+            <h2>Systems & field notes</h2>
+            <p>
+              Computer systems, software,
+              cybersecurity and technical
+              rabbit holes worth keeping.
+            </p>
+          </div>
+
+          <span class="count">
+            {systemsNotes.length} published
+          </span>
+        </header>
+
+        <div class="card-stack">
+          {
+            fillCards(systemsNotes).map(
+              (item, index) => {
+                const href =
+                  hrefFor(item, 'BLOG');
+
+                const content = (
+                  <>
+                    <div class="card-image">
+                      {
+                        item.__placeholder ? (
+                          <div class="empty-art">
+                            <img
+                              src={catImage}
+                              alt=""
+                              width="960"
+                              height="540"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </div>
+                        ) : (
+                          <img
+                            src={
+                              item.banner ||
+                              catImage
+                            }
+                            alt=""
+                            width="960"
+                            height="540"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )
+                      }
+
+                      <span class="kind">
+                        NOTE
+                      </span>
+
+                      <span class="index">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+
+                    <div class="card-copy">
+                      <small>
+                        {
+                          item.__placeholder
+                            ? 'Reserved'
+                            : dateLabel(
+                                item.updatedAt ||
+                                item.publishedAt
+                              )
+                        }
+                      </small>
+
+                      <h3>
+                        {
+                          item.__placeholder
+                            ? 'Cat has no clue yet'
+                            : item.title
+                        }
+                      </h3>
+
+                      <p>
+                        {
+                          item.__placeholder
+                            ? 'A placeholder for the next systems note. The cat is investigating.'
+                            : (
+                                item.excerpt ||
+                                'Open the note for more.'
+                              )
+                        }
+                      </p>
+
+                      <b>
+                        {
+                          item.__placeholder
+                            ? 'Thinking...'
+                            : 'Read note →'
+                        }
+                      </b>
+                    </div>
+                  </>
+                );
+
+                return item.__placeholder ? (
+                  <article class="entry-card empty">
+                    {content}
+                  </article>
+                ) : (
+                  <a
+                    class="entry-card"
+                    href={href}
+                  >
+                    {content}
+                  </a>
+                );
+              }
+            )
+          }
+        </div>
+      </section>
+
+      <section
+        id="webcomic"
+        class="shelf"
+      >
+        <header class="shelf-head">
+          <div>
+            <small>04 / SIDE QUEST</small>
+            <h2>Webcomic</h2>
+            <p>
+              Small illustrated stories,
+              strange thoughts and cat-shaped
+              debugging sessions.
+            </p>
+          </div>
+
+          <span class="count">
+            {comics.length} published
+          </span>
+        </header>
+
+        <div class="card-stack">
+          {
+            fillCards(comics).map(
+              (item, index) => {
+                const href =
+                  hrefFor(
+                    item,
+                    'WEBCOMIC'
+                  );
+
+                const content = (
+                  <>
+                    <div class="card-image">
+                      {
+                        item.__placeholder ? (
+                          <div class="empty-art">
+                            <img
+                              src={catImage}
+                              alt=""
+                              width="960"
+                              height="540"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </div>
+                        ) : (
+                          <img
+                            src={
+                              item.banner ||
+                              item.image ||
+                              catImage
+                            }
+                            alt=""
+                            width="960"
+                            height="540"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )
+                      }
+
+                      <span class="kind">
+                        COMIC
+                      </span>
+
+                      <span class="index">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+
+                    <div class="card-copy">
+                      <small>
+                        {
+                          item.__placeholder
+                            ? 'Reserved'
+                            : dateLabel(
+                                item.updatedAt ||
+                                item.publishedAt
+                              )
+                        }
+                      </small>
+
+                      <h3>
+                        {
+                          item.__placeholder
+                            ? 'No cat incident yet'
+                            : item.title
+                        }
+                      </h3>
+
+                      <p>
+                        {
+                          item.__placeholder
+                            ? 'A quiet slot for the next illustrated side quest.'
+                            : (
+                                item.excerpt ||
+                                item.description ||
+                                'Open the wild card.'
+                              )
+                        }
+                      </p>
+
+                      <b>
+                        {
+                          item.__placeholder
+                            ? 'Cat is buffering'
+                            : 'Open wild card ↗'
+                        }
+                      </b>
+                    </div>
+                  </>
+                );
+
+                return item.__placeholder ? (
+                  <article class="entry-card empty">
+                    {content}
+                  </article>
+                ) : (
+                  <a
+                    class="entry-card"
+                    href={href}
+                  >
+                    {content}
+                  </a>
+                );
+              }
+            )
+          }
+        </div>
+      </section>
+
+      <section class="vector-footer">
+        <div>
+          <small>STATIC FIRST</small>
+          <h2>
+            Less JavaScript.
+            <br />
+            More page.
+          </h2>
+          <p>
+            This first Astro migration renders
+            the blog as static HTML and CSS.
+            React remains untouched elsewhere
+            while the portfolio is migrated
+            route by route.
+          </p>
+        </div>
+
+        <svg
+          class="system-vector"
+          viewBox="0 0 700 300"
+          role="img"
+          aria-label="Vector system map connecting browser, static HTML, media and content"
+        >
+          <defs>
+            <marker
+              id="arrow"
+              markerWidth="8"
+              markerHeight="8"
+              refX="7"
+              refY="3"
+              orient="auto"
+            >
+              <path d="M0 0L8 3L0 6Z"></path>
+            </marker>
+          </defs>
+
+          <g class="edges">
+            <line x1="110" y1="85" x2="280" y2="70" />
+            <line x1="280" y1="70" x2="465" y2="105" />
+            <line x1="280" y1="70" x2="300" y2="220" />
+            <line x1="300" y1="220" x2="500" y2="215" />
+            <line x1="465" y1="105" x2="500" y2="215" />
+          </g>
+
+          <g class="node" transform="translate(110 85)">
+            <polygon points="-62,-24 48,-24 62,-10 62,28 50,40 -58,40 -70,28 -70,-13"></polygon>
+            <text x="-45" y="0">BROWSER</text>
+            <text x="-45" y="17">request</text>
+          </g>
+
+          <g class="node active" transform="translate(280 70)">
+            <polygon points="-62,-24 48,-24 62,-10 62,28 50,40 -58,40 -70,28 -70,-13"></polygon>
+            <text x="-45" y="0">ASTRO</text>
+            <text x="-45" y="17">static HTML</text>
+          </g>
+
+          <g class="node" transform="translate(465 105)">
+            <polygon points="-62,-24 48,-24 62,-10 62,28 50,40 -58,40 -70,28 -70,-13"></polygon>
+            <text x="-45" y="0">R2</text>
+            <text x="-45" y="17">media</text>
+          </g>
+
+          <g class="node" transform="translate(300 220)">
+            <polygon points="-62,-24 48,-24 62,-10 62,28 50,40 -58,40 -70,28 -70,-13"></polygon>
+            <text x="-45" y="0">GITHUB</text>
+            <text x="-45" y="17">content</text>
+          </g>
+
+          <g class="node" transform="translate(500 215)">
+            <polygon points="-62,-24 48,-24 62,-10 62,28 50,40 -58,40 -70,28 -70,-13"></polygon>
+            <text x="-45" y="0">JUDGE0</text>
+            <text x="-45" y="17">code labs</text>
+          </g>
+        </svg>
+      </section>
+    </main>
+
+    {
+      comics.map((comic) => (
+        <section
+          id={'comic-' + comic.slug}
+          class="wild-card-modal"
+          aria-label={
+            comic.title ||
+            'Webcomic preview'
+          }
+        >
+          <a
+            class="modal-backdrop"
+            href="#webcomic"
+            aria-label="Close webcomic"
+          ></a>
+
+          <article class="wild-card">
+            <a
+              class="close"
+              href="#webcomic"
+              aria-label="Close webcomic"
+            >
+              ×
+            </a>
+
+            <img
+              src={
+                comic.banner ||
+                comic.image ||
+                catImage
+              }
+              alt=""
+              width="1200"
+              height="675"
+              loading="lazy"
+              decoding="async"
+            />
+
+            <div class="wild-copy">
+              <small>
+                WEBCOMIC / WILD CARD
+              </small>
+
+              <h2>
+                {comic.title}
+              </h2>
+
+              <p>
+                {
+                  comic.excerpt ||
+                  comic.description ||
+                  'A small illustrated side quest.'
+                }
+              </p>
+
+              {
+                Array.isArray(comic.tags) &&
+                comic.tags.length > 0 && (
+                  <div class="tag-row">
+                    {
+                      comic.tags.map(
+                        (tag) => (
+                          <span>{tag}</span>
+                        )
+                      )
+                    }
+                  </div>
+                )
+              }
+
+              {
+                comic.link && (
+                  <a
+                    class="read-more"
+                    href={comic.link}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Read more ↗
+                  </a>
+                )
+              }
+            </div>
+          </article>
+        </section>
+      ))
+    }
+  </body>
+</html>
