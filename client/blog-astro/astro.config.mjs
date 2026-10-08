@@ -5,7 +5,7 @@ export default defineConfig({
   site: 'https://zulthedev.github.io',
   base: '/blog',
   outDir: '../dist/blog',
-  publicDir: './public',
+  publicDir: '../public/blog',
   build: {
     format: 'directory',
   },
