@@ -1399,7 +1399,7 @@ function ProfilePhoto({ profile }) {
         <img
           className="hero-photo"
           src={src}
-          alt={`${profile?.name || 'Zulfaqar Jamal'} profile`}
+          alt={`${profile?.preferredName || profile?.displayName || profile?.name || 'Fiya'} profile`}
           onError={() => {
             setSourceIndex((current) => {
               const next = current + 1;
@@ -5179,6 +5179,38 @@ export default function App({ initialContent = null }) {
     ...(durations.length ? durations : [1])
   );
 
+  const professionalCertifications =
+    content.certifications.filter((item) =>
+      ['cert-cct', 'cert-cet'].includes(item.id)
+    );
+
+  const participationCertificates =
+    content.certifications.filter((item) => {
+      if (professionalCertifications.some((primary) => primary.id === item.id)) {
+        return false;
+      }
+
+      const haystack = [
+        item.title,
+        item.category,
+        item.description,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return /participat|ctf|event|hack|competition|challenge/.test(haystack);
+    });
+
+  const otherCertificates =
+    content.certifications.filter(
+      (item) =>
+        !professionalCertifications.some((primary) => primary.id === item.id) &&
+        !participationCertificates.some((participation) => participation.id === item.id)
+    );
+
+  const academicHonours = content.awards || [];
+
   /* =======================================================
      MAIN PORTFOLIO
   ======================================================= */
@@ -5189,343 +5221,173 @@ export default function App({ initialContent = null }) {
           COZY EXPLORATION DOCK
       =================================================== */}
 
-      <nav className="cozy-dock" aria-label="Primary navigation">
-        <a href="#home" className="cozy-dock-brand">
-          <span className="cozy-dock-sparkle">✦</span>
-          <b>ZUL<span>/</span>JAMAL</b>
+      <nav className="portfolio-dock" aria-label="Portfolio navigation">
+        <a href="#home" className="portfolio-dock-brand" aria-label="Home">
+          <span>✦</span>
+          <b>FIYA</b>
         </a>
 
-        <div className="cozy-dock-links">
+        <div className="portfolio-dock-links">
           <a href="#home">Home</a>
-          <a href="#tools">Tools</a>
-          <a href="#mentor-profile">Mentor profile</a>
-          <a href="/port_resume">Resume</a>
+          <a href="#projects">Projects</a>
+          <a href="#certifications">Certifications</a>
+          <a href="#education">Education</a>
+          <a href="#work">Work</a>
+          <a href="#contact">Contact</a>
         </div>
-
-        <a className="cozy-dock-blog" href="/blog">
-          blog 🌸
-        </a>
       </nav>
 
-      <main className="cozy-main">
+      <main className="portfolio-journey">
         {/* =================================================
-            HERO / DIGITAL ARCHIVE
+            HOME / IDENTITY OVERVIEW
         ================================================= */}
 
-        <section
-          id="home"
-          className="hero cozy-hero"
-        >
-          <div className="cozy-hero-copy">
+        <section id="home" className="portfolio-home">
+          <div className="portfolio-home-copy">
             {isMentorHiring && (
               <aside className="mentor-query-banner">
                 <span>MENTORSHIP ZONE ✦</span>
                 <strong>
-                  hey hiring team — i don't gatekeep security concepts.
+                  hi hiring team — i don't gatekeep security concepts.
                 </strong>
                 <p>
                   I care about patient explanations, clean documentation,
-                  repeatable labs, and helping people understand the “why”
-                  before asking them to memorize the “how”.
+                  repeatable labs, and making security knowledge easier to enter.
                 </p>
               </aside>
             )}
 
-            <div className="cozy-eyebrow">
+            <div className="portfolio-kicker">
               <span className="status-dot" />
-              local tech girlie · singapore
+              Singapore · independent cybersecurity enthusiast
             </div>
 
+            <p className="portfolio-name-label">preferred name</p>
             <h1>
-              hey, i'm zul!
-              <br />
-              <i>(she/her) ✨</i>
+              Zulfiya
+              <i>“Fiya”</i>
             </h1>
 
-            <p className="cozy-hero-lede">
-              just a local trans femme tech girlie automating system security,
-              writing cozy python scripts, and breaking into things securely.
-              welcome to my digital archive—take a look around! 🌸
+            <div className="portfolio-identity-row">
+              <span>He / She / Her / Faer</span>
+              <span>legal name: Zulfaqar</span>
+              <span>firesecurity</span>
+              <span>FireByte_1011</span>
+            </div>
+
+            <p className="portfolio-summary">
+              {content.profile.summary}
             </p>
 
-            <div className="cozy-hero-actions">
-              <a className="cozy-primary-button" href="#tools">
-                browse my toolbox
+            <p className="portfolio-availability">
+              <Sparkles size={16} />
+              {content.profile.availabilitySummary}
+            </p>
+
+            <div className="portfolio-home-actions">
+              <a
+                className="cozy-primary-button"
+                href={"mailto:" + content.profile.email}
+              >
+                email me
                 <ArrowUpRight size={15} />
               </a>
 
+              {content.profile.linkedin && (
+                <a
+                  className="cozy-secondary-button"
+                  href={content.profile.linkedin}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  linkedin ↗
+                </a>
+              )}
+
+              {content.profile.github && (
+                <a
+                  className="cozy-secondary-button"
+                  href={content.profile.github}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  github ↗
+                </a>
+              )}
+
               <a className="cozy-secondary-button" href="/blog">
-                read the archive
+                blog 🌸
               </a>
             </div>
+          </div>
 
-            <div className="cozy-mini-badges" aria-label="Focus areas">
-              <span>💗 security automation</span>
-              <span>🩵 dfir + cti</span>
-              <span>🐍 python things</span>
-              <span>🌙 soft systems energy</span>
+          <div className="portfolio-profile-board">
+            <ProfilePhoto profile={content.profile} />
+
+            <div className="portfolio-profile-meta">
+              <strong>Zulfiya / Fiya</strong>
+              <span>Independent cybersecurity enthusiast</span>
+              <small>{content.profile.location}</small>
+            </div>
+
+            <div className="portfolio-focus-pills">
+              <span>🛡️ offensive + defensive</span>
+              <span>🔎 DFIR + CTI</span>
+              <span>🐍 automation</span>
+              <span>🌸 open to opportunities</span>
             </div>
           </div>
-
-          <div className="heroart cozy-hero-art">
-            <ProfilePhoto
-              profile={content.profile}
-            />
-
-            <div className="hero-pronouns cozy-pronouns">
-              <span>she / her</span>
-              <small>trans femme & building things ✨</small>
-            </div>
-          </div>
         </section>
 
         {/* =================================================
-            RECENT ACTIVITY
+            PROJECTS
         ================================================= */}
 
-        <section id="recent">
-          <small>
-            01 / SIGNAL
-          </small>
-
-          <h2>
-            Recent activity
-          </h2>
-
-          <div className="tiles">
-            {(content.recent.length
-              ? content.recent
-              : [
-                  {
-                    id: 'recent-development',
-                    title: 'Software development',
-                    description: 'Automation and indie development.',
-                  },
-                  {
-                    id: 'recent-security',
-                    title: 'Security community',
-                    description: 'CTF learning and team leadership.',
-                  },
-                  {
-                    id: 'recent-human',
-                    title: 'Human side',
-                    description: 'Content, music, leadership and learning.',
-                  },
-                ]
-            ).map((item, index) => (
-              <button
-                className="tile-button"
-                key={item.id || item.title || index}
-                onClick={() =>
-                  setSelected([
-                    'Recent Activity',
-                    {
-                      ...item,
-                      id:
-                        item.id ||
-                        `recent-${index}`,
-                      title:
-                        item.title ||
-                        'Recent activity',
-                      description:
-                        item.description ||
-                        item.summary ||
-                        '',
-                    },
-                  ])
-                }
-              >
-                <b>{item.title}</b>
-                <br />
-                <small>
-                  {item.description ||
-                    item.summary ||
-                    ''}
-                </small>
-                <span className="tile-button-open">
-                  Open <ArrowUpRight size={14} />
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* =================================================
-            CERTIFICATIONS
-        ================================================= */}
-
-        <section id="certifications">
-          <small>
-            02 / PROOF
-          </small>
-
-          <h2>
-            Certification &
-            Achievements
-          </h2>
-
-          <Rail
-            items={content.certifications}
-            mediaPlaceholder="Certificate image"
-            mediaVariant="certificate"
-            onOpen={(item) =>
-              setSelected(['Certification', item])
-            }
-          />
-
-          <div className="section-subhead">
-            <small>ACHIEVEMENTS</small>
-            <h3>Achievements</h3>
-          </div>
-
-          <Rail
-            items={content.achievements}
-            onOpen={(item) =>
-              setSelected(['Achievement', item])
-            }
-          />
-        </section>
-
-        {/* =================================================
-            EDUCATION
-        ================================================= */}
-
-        <section>
-          <small>
-            03 / FOUNDATION & RECOGNITION
-          </small>
-
-          <h2>
-            Education
-          </h2>
-
-          <div className="tiles">
-            {content.education.map(
-              (item, index) => (
-                <button
-                  className="tile-button"
-                  key={item.id || index}
-                  onClick={() =>
-                    setSelected([
-                      'Education',
-                      {
-                        ...item,
-                        id:
-                          item.id ||
-                          `education-${index}`,
-                        title:
-                          item.school ||
-                          'Education',
-                        description:
-                          [
-                            item.qualification,
-                            item.period,
-                          ]
-                            .filter(Boolean)
-                            .join(' · '),
-                      },
-                    ])
-                  }
-                >
-                  <b>
-                    {item.school}
-                  </b>
-
-                  <p>
-                    {item.qualification}
-                  </p>
-
-                  <small>
-                    {item.period}
-                  </small>
-
-                  <span className="tile-button-open">
-                    Open <ArrowUpRight size={14} />
-                  </span>
-                </button>
-              )
-            )}
-          </div>
-        </section>
-
-
-        {/* =================================================
-            AWARDS
-        ================================================= */}
-
-        <section id="awards">
-          <small>
-            03 / HONOURS
-          </small>
-
-          <h2>
-            Awards & Honour
-          </h2>
-
-          <Rail
-            items={content.awards}
-            onOpen={(item) =>
-              setSelected([
-                'Award',
-                item,
-              ])
-            }
-          />
-        </section>
-
-        {/* =================================================
-            TOOLS / PROJECTS / RESEARCH
-        ================================================= */}
-
-        <section id="tools" className="cozy-tools-section">
-          <span id="projects" className="cozy-anchor-proxy" aria-hidden="true" />
-
-          <div className="cozy-section-heading">
+        <section id="projects" className="portfolio-section">
+          <div className="portfolio-section-heading">
             <div>
-              <small>05 / PLAYGROUND</small>
-              <h2>tools, scripts & little experiments</h2>
+              <small>01 / PROJECTS</small>
+              <h2>Things I build & explore</h2>
             </div>
             <p>
-              practical security automation, research rabbit holes, and
-              whatever useful thing i felt like building this week.
+              Security automation, software experiments, and hands-on projects
+              built around curiosity rather than buzzwords.
             </p>
           </div>
 
-          <div className="cozy-project-grid">
+          <div className="portfolio-project-grid">
             {content.projects.map((item) => (
-              <article className="cozy-project-card" key={item.id}>
+              <article className="portfolio-project-card" key={item.id}>
                 <button
                   type="button"
-                  className="cozy-project-open"
                   onClick={() => setSelected(['Project', item])}
                   aria-label={`Open project: ${item.title}`}
                 >
-                  <div className="cozy-project-orbit" aria-hidden="true">
+                  <div className="portfolio-project-art" aria-hidden="true">
                     <span>✦</span>
+                    <small>{item.category || 'PROJECT'}</small>
                   </div>
 
-                  <small>
-                    {item.category || 'PROJECT'}
-                  </small>
+                  <div className="portfolio-project-copy">
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
 
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
+                    <div className="cozy-badge-row">
+                      {cozyProjectBadges(item).map((badge) => (
+                        <span key={badge}>{badge}</span>
+                      ))}
+                    </div>
 
-                  <div className="cozy-badge-row">
-                    {cozyProjectBadges(item).map((badge) => (
-                      <span key={badge}>{badge}</span>
-                    ))}
+                    <b>
+                      open details
+                      <ArrowUpRight size={14} />
+                    </b>
                   </div>
-
-                  <b>
-                    peek inside
-                    <ArrowUpRight size={14} />
-                  </b>
                 </button>
 
                 {item.link && (
                   <a
-                    className="cozy-project-link"
+                    className="portfolio-project-external"
                     href={item.link}
                     target="_blank"
                     rel="noreferrer"
@@ -5536,225 +5398,296 @@ export default function App({ initialContent = null }) {
               </article>
             ))}
           </div>
+        </section>
 
-          <div className="cozy-research-header">
-            <small>RESEARCH NOTES</small>
-            <h3>things i'm happily overthinking</h3>
+        {/* =================================================
+            CERTIFICATIONS + HONOURS
+        ================================================= */}
+
+        <section id="certifications" className="portfolio-section">
+          <div className="portfolio-section-heading">
+            <div>
+              <small>02 / CERTIFICATIONS</small>
+              <h2>Professional proof, honours & participation</h2>
+            </div>
+            <p>
+              Core technical certifications stay visible. Academic honours and
+              participation certificates live in tidy expandable drawers.
+            </p>
           </div>
 
-          <div className="cozy-research-grid">
-            {content.research.map((item) => (
+          <div className="portfolio-cert-primary-grid">
+            {professionalCertifications.map((item) => (
               <button
+                type="button"
                 key={item.id}
-                className="cozy-research-card"
-                onClick={() => setSelected(['Research', item])}
+                className="portfolio-cert-primary"
+                onClick={() => setSelected(['Certification', item])}
               >
-                <span>♡</span>
+                <span>CORE CERTIFICATION</span>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+                <b>
+                  view details <ArrowUpRight size={14} />
+                </b>
+              </button>
+            ))}
+          </div>
+
+          <div className="portfolio-disclosure-stack">
+            <details className="portfolio-disclosure">
+              <summary>
                 <div>
-                  <small>{item.category || 'RESEARCH'}</small>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
+                  <span>🎓</span>
+                  <div>
+                    <strong>Academic honours & awards</strong>
+                    <small>{academicHonours.length} records</small>
+                  </div>
                 </div>
+                <b>open ＋</b>
+              </summary>
+
+              <div className="portfolio-disclosure-grid">
+                {academicHonours.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => setSelected(['Award', item])}
+                  >
+                    <small>{item.date || item.category || 'HONOUR'}</small>
+                    <strong>{item.title}</strong>
+                    <span>{item.issuer}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+
+            <details className="portfolio-disclosure">
+              <summary>
+                <div>
+                  <span>🎟️</span>
+                  <div>
+                    <strong>Participation certificates</strong>
+                    <small>{participationCertificates.length} records</small>
+                  </div>
+                </div>
+                <b>open ＋</b>
+              </summary>
+
+              <div className="portfolio-disclosure-grid">
+                {participationCertificates.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => setSelected(['Certification', item])}
+                  >
+                    <small>{item.date || item.category || 'PARTICIPATION'}</small>
+                    <strong>{item.title}</strong>
+                    <span>{item.issuer}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+
+            {otherCertificates.length > 0 && (
+              <details className="portfolio-disclosure">
+                <summary>
+                  <div>
+                    <span>🌱</span>
+                    <div>
+                      <strong>Other learning certificates</strong>
+                      <small>{otherCertificates.length} records</small>
+                    </div>
+                  </div>
+                  <b>open ＋</b>
+                </summary>
+
+                <div className="portfolio-disclosure-grid">
+                  {otherCertificates.map((item) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      onClick={() => setSelected(['Certification', item])}
+                    >
+                      <small>{item.date || item.category || 'LEARNING'}</small>
+                      <strong>{item.title}</strong>
+                      <span>{item.issuer}</span>
+                    </button>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        </section>
+
+        {/* =================================================
+            EDUCATION JOURNEY
+        ================================================= */}
+
+        <section id="education" className="portfolio-section">
+          <div className="portfolio-section-heading">
+            <div>
+              <small>03 / EDUCATION JOURNEY</small>
+              <h2>Where I learned, grew & kept tinkering</h2>
+            </div>
+          </div>
+
+          <div className="portfolio-journey-list">
+            {content.education.map((item, index) => (
+              <button
+                type="button"
+                key={item.id || index}
+                className="portfolio-journey-item"
+                onClick={() =>
+                  setSelected([
+                    'Education',
+                    {
+                      ...item,
+                      id: item.id || `education-${index}`,
+                      title: item.school,
+                      description:
+                        item.description ||
+                        [item.qualification, item.period]
+                          .filter(Boolean)
+                          .join(' · '),
+                    },
+                  ])
+                }
+              >
+                <div className="portfolio-journey-marker">
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                </div>
+
+                <div>
+                  <small>{item.period}</small>
+                  <h3>{item.school}</h3>
+                  <p>{item.qualification}</p>
+                </div>
+
+                <ArrowUpRight size={18} />
               </button>
             ))}
           </div>
         </section>
 
         {/* =================================================
-            MENTOR PROFILE
+            WORK JOURNEY
         ================================================= */}
 
-        <section id="mentor-profile" className="mentor-profile">
-          <div className="mentor-profile-copy">
-            <small>MENTOR PROFILE / NO GATEKEEPING</small>
-            <h2>
-              security is easier when
-              <i> people feel safe asking questions.</i>
-            </h2>
+        <section id="work" className="portfolio-section">
+          <div className="portfolio-section-heading">
+            <div>
+              <small>04 / WORK JOURNEY</small>
+              <h2>Work, leadership & hands-on experience</h2>
+            </div>
             <p>
-              I like explaining technical ideas in plain language, documenting
-              the steps people usually skip, and turning intimidating security
-              topics into hands-on exercises that actually make sense.
+              Not every role is cybersecurity—and that is part of the story.
+              Each one adds responsibility, communication and practical judgment.
             </p>
-
-            <a
-              className="cozy-primary-button"
-              href="/port_resume?hiring=system_security_mentor"
-            >
-              open mentor-ready resume
-              <ArrowUpRight size={15} />
-            </a>
           </div>
 
-          <div className="mentor-values-grid">
-            <article>
-              <span>01</span>
-              <strong>clarity first</strong>
-              <p>explain the system before throwing jargon at someone.</p>
-            </article>
-
-            <article>
-              <span>02</span>
-              <strong>document the weird bits</strong>
-              <p>write down the tiny steps that experienced people forget are not obvious.</p>
-            </article>
-
-            <article>
-              <span>03</span>
-              <strong>patient by design</strong>
-              <p>give learners room to experiment, ask again, and break things safely.</p>
-            </article>
-          </div>
-        </section>
-
-        {/* =================================================
-            WORK EXPERIENCE
-        ================================================= */}
-
-        <section id="experience">
-          <small>
-            06 / TIMELINE
-          </small>
-
-          <h2>
-            Work experience
-          </h2>
-
-          <div className="timeline">
-            {content.experience.map(
-              (item) => (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    setSelected([
-                      'exp',
-                      item,
-                    ])
-                  }
-                >
-                  <div>
-                    <strong>
-                      {item.company}
-                    </strong>
-
-                    <span>
-                      {item.role}
-                    </span>
-                  </div>
-
-                  <div className="bar">
-                    <i
-                      style={{
-                        width: `${Math.max(
-                          8,
-                          (months(
-                            item.start,
-                            item.end
-                          ) /
-                            maxDuration) *
-                            100
-                        )}%`,
-                      }}
-                    />
-                  </div>
-
-                  <small>
-                    {date(item.start)} —{' '}
-                    {date(item.end)}
-                  </small>
-                </button>
-              )
-            )}
-          </div>
-        </section>
-
-        {/* =================================================
-            SKILLS
-        ================================================= */}
-
-        <section id="skills">
-          <small>07 / TOOLKIT</small>
-          <h2>Skills</h2>
-          <div className="skill-groups">
-            {[
-              ['Technical skills', content.skills?.technical],
-              ['Soft skills', content.skills?.soft],
-              ['Languages', content.skills?.languages],
-              ['Programming languages', content.skills?.programming],
-            ].map(([label, items]) => (
-              <div className="skill-group" key={label}>
-                <small>{label}</small>
-                <div className="skill-tags">
-                  {(items?.length ? items : ['Not published yet']).map((item) => (
-                    <span key={item}>{item}</span>
-                  ))}
-                </div>
-              </div>
+          <div className="portfolio-work-grid">
+            {content.experience.map((item, index) => (
+              <button
+                type="button"
+                className="portfolio-work-card"
+                key={item.id}
+                onClick={() => setSelected(['exp', item])}
+              >
+                <span className="portfolio-work-index">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <small>
+                  {date(item.start)} — {date(item.end)}
+                </small>
+                <h3>{item.role}</h3>
+                <strong>{item.company}</strong>
+                <p>{item.summary}</p>
+                <b>
+                  read journey <ArrowUpRight size={14} />
+                </b>
+              </button>
             ))}
           </div>
         </section>
 
         {/* =================================================
-            SUPPORT / BUY-FIRST
+            CONTACT + RESUME QR
         ================================================= */}
 
-        <MonetizationSection
-          cards={content.buyFirst}
-          kofiUrl={content.settings?.kofiUrl || ''}
-          apiBase={API || ONLINE_API}
-        />
-
-        {/* =================================================
-            CONTACT
-        ================================================= */}
-
-        <section
-          id="contact"
-          className="contact"
-        >
-          <div>
-            <small>
-              08 / OPEN CHANNEL
-            </small>
-
+        <section id="contact" className="portfolio-section portfolio-contact">
+          <div className="portfolio-contact-copy">
+            <small>05 / CONTACT</small>
             <h2>
-              Let's build something
+              Looking up for opportunities
               <br />
-              <i>
-                useful & curious.
-              </i>
+              <i>and ready to connect & work.</i>
             </h2>
-          </div>
 
-          <div>
-            {content.profile.links.map(
-              (link) => (
-                <a
-                  key={link}
-                  href={link}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {link}
+            <p>
+              Reach me through email, LinkedIn, GitHub, or scan the resume QR
+              if you want the more formal version of my journey.
+            </p>
 
-                  <ArrowUpRight />
+            <div className="portfolio-contact-links">
+              <a href={"mailto:" + content.profile.email}>
+                <span>Email</span>
+                <strong>{content.profile.email}</strong>
+                <ArrowUpRight size={16} />
+              </a>
+
+              {content.profile.linkedin && (
+                <a href={content.profile.linkedin} target="_blank" rel="noreferrer">
+                  <span>LinkedIn</span>
+                  <strong>zulfaqarnet</strong>
+                  <ArrowUpRight size={16} />
                 </a>
-              )
-            )}
-          </div>
-          <div className="resume-qr-card">
-            <small>RESUME / LIVE LINK</small>
-            <img
-              src={"https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(content.profile.resumeUrl || (import.meta.env.BASE_URL || '/'))}
-              alt="Dynamic QR code linking to Zulfaqar Jamal's resume"
-              loading="lazy"
-            />
-            <strong>Scan for my resume</strong>
-            <a href={content.profile.resumeUrl || (import.meta.env.BASE_URL || '/')} target="_blank" rel="noreferrer">
-              Open resume <ArrowUpRight size={14} />
-            </a>
+              )}
+
+              {content.profile.github && (
+                <a href={content.profile.github} target="_blank" rel="noreferrer">
+                  <span>GitHub</span>
+                  <strong>ZulTheDev</strong>
+                  <ArrowUpRight size={16} />
+                </a>
+              )}
+
+              <a href="/blog">
+                <span>Blog</span>
+                <strong>notes, writeups & side quests</strong>
+                <ArrowUpRight size={16} />
+              </a>
+            </div>
           </div>
 
+          <aside className="portfolio-resume-card">
+            <div className="portfolio-resume-qr">
+              <img
+                src={
+                  "https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=12&data=" +
+                  encodeURIComponent(content.profile.resumeUrl)
+                }
+                alt="QR code linking to Fiya's resume"
+                loading="lazy"
+              />
+            </div>
+
+            <small>RESUME / GOOGLE DOCS</small>
+            <strong>scan for my current resume</strong>
+            <p>
+              The QR is generated from the resume URL stored in the portfolio
+              content, so changing the link updates the destination automatically.
+            </p>
+
+            <a
+              href={content.profile.resumeUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              open resume directly
+              <ArrowUpRight size={14} />
+            </a>
+          </aside>
         </section>
       </main>
 
@@ -5764,7 +5697,7 @@ export default function App({ initialContent = null }) {
 
       <footer>
         © {new Date().getFullYear()}{' '}
-        Zulfaqar Jamal
+        Zulfiya “Fiya”
       </footer>
 
       {/* ===================================================
