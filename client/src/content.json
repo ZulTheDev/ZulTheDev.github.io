@@ -1,15 +1,15 @@
 {
   "profile": {
     "name": "Zulfaqar Jamal",
-    "displayName": "Zulfaqar Jamal",
-    "title": "Threat Intelligence Specialist | CCT by EC Council | Indie Developer",
-    "headline": "Cybersecurity • DFIR • CTI • Automation",
-    "summary": "Independent cybersecurity enthusiast and EC-Council Certified Cybersecurity Technician (CCT) with a strong interest in offensive and defensive security. Leads the Infinity Code CTF team, training members in problem-solving and security fundamentals. Focused on DFIR, Cyber Threat Intelligence (CTI), automation, VAPT fundamentals and hands-on security projects, while also exploring software development, technical initiatives and STEM education.",
-    "pronouns": "He/Her/She/Faer",
+    "displayName": "Zulfiya “Fiya”",
+    "title": "Independent Cybersecurity Enthusiast | EC-Council CCT | CET",
+    "headline": "Offensive & Defensive Security • DFIR • CTI • Automation",
+    "summary": "Independent cybersecurity enthusiast. EC-Council Certified Cybersecurity Technician (CCT) and Certified in Electronics and Telecommunication (CET) dedicated to mastering the art of offensive and defensive security.",
+    "pronouns": "He/She/Her/Faer",
     "location": "Singapore, Singapore",
     "email": "zulfaqardhiyaulhaq@gmail.com",
     "linkedin": "https://www.linkedin.com/in/zulfaqarnet",
-    "github": "",
+    "github": "https://github.com/ZulTheDev",
     "website": "https://zulthedev.github.io/",
     "orcid": "https://orcid.org/0009-0004-2126-7780",
     "image": {
@@ -19,10 +19,19 @@
     "links": [
       "mailto:zulfaqardhiyaulhaq@gmail.com",
       "https://www.linkedin.com/in/zulfaqarnet",
+      "https://github.com/ZulTheDev",
       "https://zulthedev.github.io/",
       "https://orcid.org/0009-0004-2126-7780"
     ],
-    "resumeUrl": "https://zulthedev.github.io/port_resume"
+    "resumeUrl": "https://docs.google.com/document/d/1pSgdLG1SkYwP1cxUcThZw_rO0PqPYbrCOos9LMV5TpI/edit?usp=drive_link",
+    "preferredName": "Zulfiya",
+    "legalName": "Zulfaqar",
+    "nickname": "Fiya",
+    "professionalAliases": [
+      "firesecurity",
+      "FireByte_1011"
+    ],
+    "availabilitySummary": "Looking up for opportunities and ready to connect and work"
   },
   "settings": {
     "theme": {
@@ -63,6 +72,16 @@
       "issuer": "EC-Council",
       "category": "Cybersecurity Certification",
       "description": "Certified Cybersecurity Technician (CCT) certification associated with EC-Council.",
+      "date": "",
+      "link": "",
+      "media": []
+    },
+    {
+      "id": "cert-cet",
+      "title": "Certified in Electronics and Telecommunication (CET)",
+      "issuer": "",
+      "category": "Technical Certification",
+      "description": "Certified in Electronics and Telecommunication (CET), supporting a practical foundation across electronics, telecommunications and technical systems.",
       "date": "",
       "link": "",
       "media": []
