@@ -8,8 +8,54 @@ const blogPosts = Array.isArray(blogIndex?.posts)
   ? blogIndex.posts
   : [];
 
+const isCybersecurityWriteup = (item) => {
+  if (!item || typeof item !== 'object') {
+    return false;
+  }
+
+  const kind = String(item.kind || '')
+    .trim()
+    .toLowerCase();
+
+  if (kind === 'blog' || kind === 'webcomic') {
+    return false;
+  }
+
+  if (kind === 'ctf') {
+    return true;
+  }
+
+  if (
+    item.ctf &&
+    typeof item.ctf === 'object' &&
+    (
+      item.ctf.event ||
+      item.ctf.category ||
+      item.ctf.difficulty ||
+      item.ctf.points
+    )
+  ) {
+    return true;
+  }
+
+  const haystack = [
+    item.title,
+    item.excerpt,
+    item.description,
+    item.category,
+    ...(Array.isArray(item.tags) ? item.tags : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return /\b(ctf|cyber|cybersecurity|security|dfir|forensic|forensics|osint|reverse engineering|reversing|binary exploitation|pwn|web exploitation|web security|cryptography|crypto challenge|malware|incident response|soc|vulnerability|pentest|penetration testing|network security|packet|threat intel|threat intelligence)\b/.test(
+    haystack
+  );
+};
+
 const ctfWriteups = Array.isArray(ctfIndex?.writeups)
-  ? ctfIndex.writeups
+  ? ctfIndex.writeups.filter(isCybersecurityWriteup)
   : [];
 
 const comics = Array.isArray(webcomicIndex?.comics)
