@@ -5697,7 +5697,7 @@ export default function App({ initialContent = null }) {
 
       <footer>
         © {new Date().getFullYear()}{' '}
-        Zulfaqar Jamal
+        Zulfiya “Fiya”
       </footer>
 
       {/* ===================================================
