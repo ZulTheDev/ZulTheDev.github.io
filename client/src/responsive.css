@@ -392,3 +392,173 @@ code {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* =========================================================
+   COZY PORTFOLIO RESPONSIVE OVERRIDES
+========================================================= */
+
+@media (max-width: 1100px) {
+  .cozy-dock {
+    left: 12px;
+    width: 154px;
+  }
+
+  .cozy-main > section {
+    padding-left: 190px;
+    padding-right: 34px;
+  }
+
+  .cozy-project-grid,
+  .cozy-research-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mentor-profile {
+    grid-template-columns: 1fr;
+  }
+
+  .mentor-values-grid article:nth-child(2) {
+    transform: none;
+  }
+}
+
+@media (max-width: 780px) {
+  body {
+    padding-bottom: 82px;
+  }
+
+  .cozy-dock {
+    left: 12px;
+    right: 12px;
+    top: auto;
+    bottom: 10px;
+    width: auto;
+    transform: none;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 18px;
+  }
+
+  .cozy-dock-brand {
+    padding: 8px;
+  }
+
+  .cozy-dock-brand b {
+    display: none;
+  }
+
+  .cozy-dock-links {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px !important;
+  }
+
+  .cozy-dock-links a {
+    padding: 8px 5px;
+    text-align: center;
+    font-size: 8px !important;
+  }
+
+  .cozy-dock-blog {
+    padding: 8px !important;
+    font-size: 8px !important;
+  }
+
+  .cozy-main > section {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .cozy-hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding-top: 82px;
+    padding-bottom: 70px;
+  }
+
+  .cozy-hero h1 {
+    font-size: clamp(48px, 15vw, 72px);
+  }
+
+  .cozy-hero-lede {
+    font-size: 15px !important;
+  }
+
+  .cozy-hero-art {
+    min-height: 390px;
+    height: auto;
+  }
+
+  .cozy-pronouns {
+    right: 4%;
+    bottom: 2%;
+  }
+
+  .cozy-main .tiles,
+  .cozy-project-grid,
+  .cozy-research-grid,
+  .mentor-values-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cozy-section-heading {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .cozy-project-card,
+  .cozy-project-open {
+    min-height: 280px;
+  }
+
+  .mentor-profile {
+    padding-top: 72px;
+    padding-bottom: 72px;
+  }
+}
+
+@media (max-width: 520px) {
+  .cozy-dock {
+    grid-template-columns: auto 1fr;
+  }
+
+  .cozy-dock-blog {
+    display: none;
+  }
+
+  .cozy-dock-links a:nth-child(3) {
+    font-size: 0 !important;
+  }
+
+  .cozy-dock-links a:nth-child(3)::after {
+    content: "Mentor";
+    font-size: 8px;
+  }
+
+  .cozy-hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .cozy-primary-button,
+  .cozy-secondary-button {
+    width: 100%;
+  }
+
+  .cozy-mini-badges {
+    gap: 5px;
+  }
+
+  .mentor-query-banner {
+    padding: 15px;
+  }
+
+  .cozy-pronouns {
+    position: static;
+    margin-top: -20px;
+    width: 100%;
+  }
+}

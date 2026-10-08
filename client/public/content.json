@@ -5,7 +5,7 @@
     "title": "Threat Intelligence Specialist | CCT by EC Council | Indie Developer",
     "headline": "Cybersecurity • DFIR • CTI • Automation",
     "summary": "Independent cybersecurity enthusiast and EC-Council Certified Cybersecurity Technician (CCT) with a strong interest in offensive and defensive security. Leads the Infinity Code CTF team, training members in problem-solving and security fundamentals. Focused on DFIR, Cyber Threat Intelligence (CTI), automation, VAPT fundamentals and hands-on security projects, while also exploring software development, technical initiatives and STEM education.",
-    "pronouns": "He/Her/She/Faer",
+    "pronouns": "she/her",
     "location": "Singapore, Singapore",
     "email": "zulfaqardhiyaulhaq@gmail.com",
     "linkedin": "https://www.linkedin.com/in/zulfaqarnet",
@@ -26,12 +26,14 @@
   },
   "settings": {
     "theme": {
-      "bg": "#0e0b13",
-      "primary": "#f2a8d4",
-      "violet": "#cbb5ff",
-      "text": "#f7eff9",
-      "muted": "#aa9eaf",
-      "line": "#302635"
+      "bg": "#1a1625",
+      "primary": "#ff79c6",
+      "violet": "#c6a8ff",
+      "text": "#f4f0fa",
+      "muted": "#b9afc8",
+      "line": "#403651",
+      "sky": "#8be9fd",
+      "card": "#241e33"
     }
   },
   "recent": [
