@@ -698,3 +698,27 @@ main{
     transition:none!important;
   }
 }
+
+
+/* Editorial entrance: real navigation before the first article is published */
+.featured-section{padding:55px 0 10px}
+.featured-heading{max-width:680px;margin-bottom:22px}
+.featured-kicker{font-size:10px;font-weight:800;letter-spacing:.16em;color:var(--blue)}
+.featured-heading h2{margin:9px 0;color:var(--text);font-size:clamp(30px,4vw,50px);letter-spacing:-.04em}
+.featured-heading p{color:var(--muted);font-size:13px;line-height:1.65}
+.featured-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.featured-card{position:relative;display:flex;flex-direction:column;min-height:235px;padding:23px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(91,206,250,.06),transparent 55%),var(--panel);text-decoration:none;transition:transform .2s,border-color .2s}
+.featured-card:nth-child(2){background:linear-gradient(145deg,rgba(242,168,212,.08),transparent 55%),var(--panel)}
+.featured-card:nth-child(3){background:linear-gradient(145deg,rgba(255,255,255,.05),transparent 55%),var(--panel)}
+.featured-card:hover,.featured-card:focus-visible{transform:translateY(-4px);border-color:rgba(91,206,250,.4);outline:none}
+.featured-icon{display:grid;place-items:center;width:39px;height:39px;margin-bottom:15px;border:1px solid rgba(91,206,250,.2);border-radius:12px;color:var(--pink);font-size:24px}
+.featured-card small{color:var(--blue);font-size:9px;letter-spacing:.12em}
+.featured-card h3{margin:8px 0;color:var(--text);font-size:21px}
+.featured-card p{margin:0 0 18px;color:var(--muted);font-size:12px;line-height:1.65}
+.featured-link{margin-top:auto;color:var(--pink);font-size:11px;font-weight:700}
+.welcome-note{display:flex;align-items:center;gap:15px;margin-top:25px;padding:20px 23px;border:1px solid rgba(242,168,212,.16);border-radius:16px;background:rgba(242,168,212,.035)}
+.welcome-signal{flex:none;width:10px;height:10px;border-radius:50%;background:var(--pink);box-shadow:0 0 15px rgba(242,168,212,.35)}
+.welcome-note strong{font-size:13px;color:var(--text)}
+.welcome-note p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
+.welcome-note>a{flex:none;margin-left:auto;color:var(--blue);text-decoration:none;font-size:11px;font-weight:700}
+@media(max-width:760px){.featured-grid{grid-template-columns:1fr}.featured-card{min-height:190px}.welcome-note{align-items:flex-start;flex-wrap:wrap}.welcome-note>a{margin-left:25px}}
