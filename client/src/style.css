@@ -5805,26 +5805,52 @@ samp{
 }
 
 .cozy-hero-art .hero-photo-frame{
-  border-radius:28px!important;
-  padding:5px;
-  background:
-    linear-gradient(
-      135deg,
-      var(--trans-blue) 0 25%,
-      #fff 25% 38%,
-      var(--p) 38% 62%,
-      #fff 62% 75%,
-      var(--trans-blue) 75% 100%
-    );
+  /* Keep the profile treatment fully circular. The colour lives on
+     the cutout ring below, not on a rounded-square parent frame. */
+  border-radius:50%!important;
+  padding:0;
+  background:transparent;
   box-shadow:
     0 25px 70px rgba(0,0,0,.32),
-    0 0 42px rgba(255,121,198,.13);
+    0 0 46px rgba(245,169,184,.15),
+    0 0 34px rgba(91,206,250,.1);
 }
 
 .cozy-hero-art .hero-photo-cutout{
-  border-radius:24px!important;
+  border-radius:50%!important;
   overflow:hidden;
-  background:#201a2d;
+
+  /* Five equal flag bands around the circular ring:
+     pastel cyan → pastel pink → white → pastel pink → pastel cyan. */
+  border:10px solid transparent;
+  background:
+    linear-gradient(#201a2d,#201a2d) padding-box,
+    conic-gradient(
+      from -90deg,
+      #5BCEFA 0% 20%,
+      #F5A9B8 20% 40%,
+      #FFFFFF 40% 60%,
+      #F5A9B8 60% 80%,
+      #5BCEFA 80% 100%
+    ) border-box;
+
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.1),
+    0 16px 38px rgba(0,0,0,.3),
+    0 0 34px rgba(245,169,184,.12);
+}
+
+.cozy-hero-art .hero-photo{
+  border-radius:50%;
+}
+
+.cozy-hero-art .hero-photo-scan{
+  border-radius:50%!important;
+}
+
+/* The old corner brackets visually fought the circular frame. */
+.cozy-hero-art .hero-photo-corner{
+  display:none;
 }
 
 .cozy-pronouns{
