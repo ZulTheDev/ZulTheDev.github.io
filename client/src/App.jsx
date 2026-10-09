@@ -5221,21 +5221,56 @@ export default function App({ initialContent = null }) {
           COZY EXPLORATION DOCK
       =================================================== */}
 
-      <nav className="portfolio-dock" aria-label="Portfolio navigation">
-        <a href="#home" className="portfolio-dock-brand" aria-label="Home">
-          <span>✦</span>
-          <b>FIYA</b>
-        </a>
+      <details className="portfolio-menu">
+        <summary aria-label="Open portfolio navigation">
+          <span className="portfolio-menu-icon" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span className="portfolio-menu-label">Menu</span>
+        </summary>
 
-        <div className="portfolio-dock-links">
-          <a href="#home">Home</a>
-          <a href="#projects">Projects</a>
-          <a href="#certifications">Certifications</a>
-          <a href="#education">Education</a>
-          <a href="#work">Work</a>
-          <a href="#contact">Contact</a>
-        </div>
-      </nav>
+        <nav className="portfolio-menu-panel" aria-label="Portfolio navigation">
+          <div className="portfolio-menu-heading">
+            <span>✦</span>
+            <div>
+              <strong>FIYA</strong>
+              <small>digital archive</small>
+            </div>
+          </div>
+
+          <a href="#home" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>
+            <span>01</span>
+            Home
+          </a>
+          <a href="#projects" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>
+            <span>02</span>
+            Projects
+          </a>
+          <a href="#certifications" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>
+            <span>03</span>
+            Certifications
+          </a>
+          <a href="#education" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>
+            <span>04</span>
+            Education
+          </a>
+          <a href="#work" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>
+            <span>05</span>
+            Work
+          </a>
+          <a href="#contact" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>
+            <span>06</span>
+            Contact
+          </a>
+
+          <div className="portfolio-menu-shortcuts">
+            <a href="/blog">Blog ↗</a>
+            <a href="/ctf_blog/">CTF ↗</a>
+          </div>
+        </nav>
+      </details>
 
       <main className="portfolio-journey">
         {/* =================================================

@@ -7450,3 +7450,267 @@ samp{
     flex:0 0 auto;
   }
 }
+
+
+/* =========================================================
+   TOP-RIGHT HAMBURGER NAVIGATION
+   Replaces the persistent bottom dock with one small control.
+========================================================= */
+
+.portfolio-menu{
+  position:fixed;
+  z-index:180;
+  top:18px;
+  right:20px;
+  width:auto;
+  height:auto;
+  margin:0;
+}
+
+.portfolio-menu > summary{
+  width:50px;
+  height:50px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:16px;
+  background:rgba(36,30,51,.9);
+  box-shadow:0 14px 42px rgba(4,2,10,.3);
+  backdrop-filter:blur(18px);
+  cursor:pointer;
+  list-style:none;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    box-shadow .18s ease;
+}
+
+.portfolio-menu > summary::-webkit-details-marker{
+  display:none;
+}
+
+.portfolio-menu > summary:hover,
+.portfolio-menu > summary:focus-visible,
+.portfolio-menu[open] > summary{
+  transform:translateY(-1px);
+  border-color:rgba(255,121,198,.42);
+  background:#2b2440;
+  box-shadow:0 14px 42px rgba(255,121,198,.11);
+  outline:none;
+}
+
+.portfolio-menu-icon{
+  width:20px;
+  height:16px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+
+.portfolio-menu-icon i{
+  display:block;
+  width:100%;
+  height:2px;
+  border-radius:999px;
+  background:#f4f0fa;
+  transform-origin:center;
+  transition:
+    transform .2s ease,
+    opacity .16s ease,
+    background .2s ease;
+}
+
+.portfolio-menu-icon i:nth-child(2){
+  width:14px;
+  align-self:flex-end;
+  background:#ff79c6;
+}
+
+.portfolio-menu[open] .portfolio-menu-icon i:first-child{
+  transform:translateY(7px) rotate(45deg);
+  background:#8be9fd;
+}
+
+.portfolio-menu[open] .portfolio-menu-icon i:nth-child(2){
+  opacity:0;
+}
+
+.portfolio-menu[open] .portfolio-menu-icon i:last-child{
+  transform:translateY(-7px) rotate(-45deg);
+  background:#ff79c6;
+}
+
+.portfolio-menu-label{
+  position:absolute;
+  width:1px;
+  height:1px;
+  overflow:hidden;
+  clip:rect(0 0 0 0);
+  white-space:nowrap;
+}
+
+.portfolio-menu-panel{
+  position:absolute;
+  top:60px;
+  right:0;
+  width:min(286px,calc(100vw - 28px));
+  display:grid;
+  gap:4px;
+  padding:10px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:18px;
+  background:rgba(30,25,43,.96);
+  box-shadow:0 26px 70px rgba(4,2,10,.45);
+  backdrop-filter:blur(22px);
+  transform-origin:top right;
+  animation:portfolio-menu-in .18s ease-out;
+}
+
+@keyframes portfolio-menu-in{
+  from{
+    opacity:0;
+    transform:translateY(-8px) scale(.97);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
+
+.portfolio-menu-heading{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:5px;
+  padding:10px 11px 12px;
+  border-bottom:1px solid rgba(244,240,250,.08);
+}
+
+.portfolio-menu-heading > span{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  background:linear-gradient(
+    135deg,
+    rgba(139,233,253,.13),
+    rgba(255,121,198,.13)
+  );
+  color:#ff79c6;
+}
+
+.portfolio-menu-heading > div{
+  display:grid;
+  gap:1px;
+}
+
+.portfolio-menu-heading strong{
+  color:#f4f0fa;
+  font-size:10px;
+  letter-spacing:.1em;
+}
+
+.portfolio-menu-heading small{
+  color:#8f8398;
+  font-size:8px;
+}
+
+.portfolio-menu-panel > a{
+  display:grid;
+  grid-template-columns:30px minmax(0,1fr);
+  align-items:center;
+  min-height:42px;
+  padding:8px 11px;
+  border-radius:12px;
+  color:#d7cede;
+  font-size:10px;
+  font-weight:700;
+  text-decoration:none;
+  transition:
+    transform .16s ease,
+    color .16s ease,
+    background .16s ease;
+}
+
+.portfolio-menu-panel > a > span{
+  color:#8be9fd;
+  font:700 7px/1 monospace;
+  letter-spacing:.06em;
+}
+
+.portfolio-menu-panel > a:hover,
+.portfolio-menu-panel > a:focus-visible{
+  transform:translateX(-2px);
+  color:#fff;
+  background:linear-gradient(
+    90deg,
+    rgba(255,121,198,.1),
+    rgba(139,233,253,.055)
+  );
+  outline:none;
+}
+
+.portfolio-menu-shortcuts{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:5px;
+  margin-top:5px;
+  padding-top:9px;
+  border-top:1px solid rgba(244,240,250,.08);
+}
+
+.portfolio-menu-shortcuts a{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:34px;
+  border:1px solid rgba(255,121,198,.12);
+  border-radius:10px;
+  background:rgba(255,121,198,.04);
+  color:#e8cce0;
+  font-size:8px;
+  font-weight:800;
+  text-decoration:none;
+}
+
+.portfolio-menu-shortcuts a:last-child{
+  border-color:rgba(139,233,253,.12);
+  background:rgba(139,233,253,.04);
+  color:#c7eaf2;
+}
+
+/* No bottom navigation remains, so the page/footer no longer needs dock room. */
+.portfolio-journey{
+  padding-bottom:40px;
+}
+
+.portfolio-journey + footer{
+  padding-bottom:30px;
+}
+
+@media(max-width:760px){
+  .portfolio-menu{
+    top:12px;
+    right:12px;
+  }
+
+  .portfolio-menu > summary{
+    width:46px;
+    height:46px;
+    border-radius:14px;
+  }
+
+  .portfolio-menu-panel{
+    top:55px;
+    width:min(270px,calc(100vw - 24px));
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .portfolio-menu-panel{
+    animation:none;
+  }
+}
