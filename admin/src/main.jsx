@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
+import bundledContent from '../../client/public/content.json';
+import { readApiJson, validateContent as assertPortfolioContent, serviceAvailable } from './api.js';
 
 function normalizeApiBase(value) {
   return String(value || '')
@@ -10,7 +12,7 @@ function normalizeApiBase(value) {
 
 const PRIVATE_API = normalizeApiBase(
   import.meta.env.VITE_PRIVATE_API_URL ||
-    'https://system32.tail39684d.ts.net:8787'
+    (import.meta.env.DEV ? '' : 'http://localhost:8787')
 );
 const API = normalizeApiBase(
   import.meta.env.VITE_API_BASE_URL ||
@@ -465,7 +467,7 @@ function AdminShell() {
     try {
       const response = await authFetch(API + '/api/writeups');
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -498,7 +500,7 @@ function AdminShell() {
         API + '/api/writeups/' + encodeURIComponent(slug)
       );
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -551,7 +553,7 @@ function AdminShell() {
         }
       );
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -598,7 +600,7 @@ function AdminShell() {
         }
       );
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -654,7 +656,7 @@ function AdminShell() {
         { method: 'DELETE' }
       );
 
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(data?.error || 'Writeup delete failed');
@@ -683,7 +685,7 @@ function AdminShell() {
           encodeURIComponent(cleanKey)
       );
 
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiJson(response);
 
       if (!response.ok || !data?.url) {
         throw new Error(data?.error || 'R2 read URL unavailable');
@@ -718,7 +720,7 @@ function AdminShell() {
         }
       );
 
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(data?.error || 'R2 delete failed');
@@ -778,7 +780,7 @@ function AdminShell() {
       }
     );
 
-    const data = await response.json();
+    const data = await readApiJson(response);
 
     if (!response.ok) {
       throw new Error(
@@ -937,7 +939,7 @@ function AdminShell() {
               '/api/r2/objects?prefix=' +
               encodeURIComponent(prefix)
           );
-          const data = await response.json();
+          const data = await readApiJson(response);
 
           if (!response.ok) {
             throw new Error(
@@ -994,8 +996,7 @@ function AdminShell() {
     setContent(normalized);
     setSavedSnapshot(JSON.stringify(normalized));
     setRaw(JSON.stringify(normalized, null, 2));
-    setHasDraft(false);
-    try { localStorage.removeItem(LOCAL_DRAFT_KEY); } catch {}
+    // Loading server/snapshot data must not delete an existing recovery draft.
     setNotice(message);
   }
 
@@ -1003,25 +1004,20 @@ function AdminShell() {
     setNotice('Loading portfolio data...');
 
     try {
-      const response = await fetch(`${API}/api/content`);
-      if (!response.ok) throw new Error(`API returned ${response.status}`);
-      const data = await response.json();
+      const response = await fetch(`${API}/api/content`, {
+        signal: AbortSignal.timeout(10000),
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await readApiJson(response);
+      if (!response.ok) throw new Error(`Content API returned ${response.status}`);
+      assertPortfolioContent(data);
       setApiOnline(true);
-      await setLoadedContent(data, 'Connected to the portfolio API.');
+      await setLoadedContent(data, 'Connected to the portfolio content API.');
     } catch (error) {
-      console.error(error);
       setApiOnline(false);
-
-      // Give the editor a useful local fallback instead of an empty screen.
-      try {
-        const local = await fetch('/content.json');
-        if (local.ok) {
-          await setLoadedContent(await local.json(), 'API offline — editing local content. Saving requires the API.');
-          return;
-        }
-      } catch {}
-
-      await setLoadedContent(clone(DEFAULT_CONTENT), 'API and local content unavailable — started with an empty template.');
+      await setLoadedContent(clone(bundledContent),
+        `Content API unavailable: ${error.message} Editing the bundled snapshot; saving requires the private API. Existing recovery drafts are preserved.`);
     }
   }
 
@@ -1041,7 +1037,7 @@ function AdminShell() {
         body: JSON.stringify(content),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       if (!response.ok) throw new Error(data?.error || ('Save failed (' + response.status + ')'));
 
       const normalized = normalizeContent(data.content || content);
@@ -1208,23 +1204,25 @@ function AdminShell() {
   async function refreshSystem() {
     setServiceLoading(true);
 
-    const probe = async (label, url) => {
+    const probe = async (label, url, kind) => {
       const started = performance.now();
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         let response;
+        let data;
         try {
           response = await fetch(url, { signal: controller.signal });
+          data = await readApiJson(response);
         } finally {
           clearTimeout(timeout);
         }
-        const text = await response.text();
-        let data = {};
-        try { data = text ? JSON.parse(text) : {}; } catch {}
+        const available = serviceAvailable(kind, data);
         return {
           label,
-          ok: response.ok,
+          ok: response.ok && available,
+          stateLabel: kind === 'ai' && available && response.ok ? 'Configured (not probed)' : undefined,
+          error: !response.ok ? (data.error || `HTTP ${response.status}`) : !available ? 'Service not configured or unexpected API response' : undefined,
           status: response.status,
           latency: Math.round(performance.now() - started),
           data,
@@ -1241,12 +1239,12 @@ function AdminShell() {
     };
 
     const checks = [
-      probe('Private Tailscale API', API + '/api/health'),
-      probe('Online Vercel API', ONLINE_API + '/api/health'),
-      probe('Google Drive', API + '/api/drive/folders?parentId=' + encodeURIComponent(DRIVE_ROOT_ID)),
-      probe('Cloudflare R2', API + '/api/r2/status'),
-      probe('GitHub App', API + '/api/github-app/status'),
-      probe('Local AI', API + '/api/ai-status'),
+      probe('Private Tailscale API', API + '/api/health', 'private'),
+      probe('Online Vercel API', ONLINE_API + '/api/health', 'online'),
+      probe('Google Drive', API + '/api/drive/folders?parentId=' + encodeURIComponent(DRIVE_ROOT_ID), 'drive'),
+      probe('Cloudflare R2', API + '/api/r2/status', 'integration'),
+      probe('GitHub App', API + '/api/github-app/status', 'integration'),
+      probe('Local AI', API + '/api/ai-status', 'ai'),
     ];
 
     const results = await Promise.all(checks);
@@ -1303,7 +1301,7 @@ function AdminShell() {
           const response = await authFetch(
             base + candidate.path
           );
-          const data = await response.json();
+          const data = await readApiJson(response);
 
           if (!response.ok) {
             throw new Error(
@@ -1364,7 +1362,7 @@ function AdminShell() {
     setCommentLoading(true);
     try {
       const response = await authFetch(API + '/api/admin/comments');
-      const data = await response.json();
+      const data = await readApiJson(response);
       if (!response.ok) throw new Error(data?.error || 'Comments API returned ' + response.status);
       setComments(Array.isArray(data.comments) ? data.comments : []);
       setNotice('Loaded ' + (Array.isArray(data.comments) ? data.comments.length : 0) + ' comments.');
@@ -1381,7 +1379,7 @@ function AdminShell() {
       const response = await authFetch(API + '/api/admin/comments/' + encodeURIComponent(id), {
         method: 'DELETE',
       });
-      const data = await response.json();
+      const data = await readApiJson(response);
       if (!response.ok) throw new Error(data?.error || 'Moderation failed (' + response.status + ')');
       setComments((current) => current.map((item) =>
         item.id === id
@@ -1406,7 +1404,7 @@ function AdminShell() {
           context: content,
         }),
       });
-      const data = await response.json();
+      const data = await readApiJson(response);
       if (!response.ok) throw new Error(data?.error || 'Online AI returned ' + response.status);
       setOnlineChatTest({ loading: false, reply: data.reply || '', error: '' });
     } catch (error) {
@@ -1422,7 +1420,7 @@ function AdminShell() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: hiringTarget, content }),
       });
-      const data = await response.json();
+      const data = await readApiJson(response);
       if (!response.ok) throw new Error(data?.error || 'Hiring API returned ' + response.status);
       setHiringTest({ loading: false, data, error: '' });
     } catch (error) {
@@ -2583,7 +2581,7 @@ function WriteupBlockEditor({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -3794,7 +3792,7 @@ function ServiceRow({ label, item }) {
     <div className="service-row">
       <span>{label}</span>
       <div>
-        <b className={item.ok ? 'service-ok' : 'service-fail'}>{item.ok ? 'Online' : 'Offline'}</b>
+        <b className={item.ok ? 'service-ok' : 'service-fail'}>{item.stateLabel || (item.ok ? 'Online' : 'Unavailable')}</b>
         {item.status > 0 && <small>{item.status} · {item.latency} ms</small>}
         {item.error && <small>{item.error}</small>}
         {item.data?.chatbot !== undefined && <small>Chatbot: {item.data.chatbot ? 'configured' : 'missing'}</small>}
@@ -3834,7 +3832,7 @@ function MediaLibraryEditor({
             DRIVE_ROOT_ID
           )
       );
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -3886,7 +3884,7 @@ function MediaLibraryEditor({
       );
 
       const data =
-        await response.json();
+        await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -3992,7 +3990,7 @@ function MediaLibraryEditor({
       );
 
       const data =
-        await response.json();
+        await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -4040,7 +4038,7 @@ function MediaLibraryEditor({
       );
 
       const data =
-        await response.json();
+        await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -4341,7 +4339,7 @@ function SystemEditor({
     <div className="system-grid">
       <section className="panel">
         <PanelHeader eyebrow="RUNTIME" title="Service diagnostics" />
-        <p className="helper">Primary admin API: <code>{PRIVATE_API}</code>. Content changes flow through the private API, then Google Drive / Cloudflare R2 / GitHub App as needed. Vercel is checked separately as the public online service.</p>
+        <p className="helper">Primary admin API: <code>{API || '/api → local development proxy'}</code>. Content changes flow through the private API, then Google Drive / Cloudflare R2 / GitHub App as needed. Vercel is checked separately as the public online service.</p>
         <div className="service-list">{[['local', 'Private Tailscale API'], ['drive', 'Google Drive'], ['r2', 'Cloudflare R2'], ['github', 'GitHub App'], ['ai', 'Local AI'], ['online', 'Online Vercel API']].map(([key, label]) => <ServiceRow key={key} label={label} item={serviceStatus[key]} />)}</div>
         <button className="accent-button" onClick={refreshSystem} disabled={serviceLoading}>{serviceLoading ? 'Checking...' : 'Run diagnostic'}</button>
         {serviceStatus.checkedAt && <small className="system-note">Checked {new Date(serviceStatus.checkedAt).toLocaleString()}</small>}
